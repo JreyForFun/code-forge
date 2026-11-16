@@ -9,6 +9,8 @@ impl App {
     pub fn run_screen(&mut self, ctx: &mut egui::Ui, mut rs: Box<RunState>) -> Option<Box<RunState>> {
         let mut keep = true;
         let mut finished = false;
+        // Slide moves are applied after the whole frame is drawn, so every panel sees the same state.
+        let mut slide_step: i32 = 0;
         let n_slides = rs.slides.len();
         let in_slides = rs.stage < n_slides;
         let duel = matches!(rs.kind, Kind::Duel(_));
@@ -47,9 +49,9 @@ impl App {
         egui::Panel::bottom("rbot").frame(egui::Frame::new().fill(bot_fill).inner_margin(16.0)).show(ctx, |ui| {
             if in_slides {
                 ui.horizontal(|ui| {
-                    if rs.stage > 0 && pbtn(ui, "BACK", PANEL_HI, 100.0).clicked() { rs.stage -= 1; }
+                    if rs.stage > 0 && pbtn(ui, "BACK", PANEL_HI, 100.0).clicked() { slide_step = -1; }
                     let w = ui.available_width();
-                    if pbtn(ui, if rs.stage + 1 == n_slides { "START THE QUIZ" } else { "NEXT" }, GOLD, w).clicked() || go { rs.stage += 1; }
+                    if pbtn(ui, if rs.stage + 1 == n_slides { "START THE QUIZ" } else { "NEXT" }, GOLD, w).clicked() || go { slide_step = 1; }
                 });
             } else if let Some((ok, why)) = rs.fb.clone() {
                 ui.label(title(if ok { "CORRECT" } else { "NOT QUITE" }, 12.0).color(if ok { GREEN } else { RED }));
@@ -215,6 +217,7 @@ impl App {
                 }
             });
         });
+        if slide_step > 0 { rs.stage = (rs.stage + 1).min(n_slides); } else if slide_step < 0 { rs.stage = rs.stage.saturating_sub(1); }
         if finished { self.finish(&rs); return None; }
         if keep { Some(rs) } else { None }
     }

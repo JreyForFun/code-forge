@@ -404,7 +404,12 @@ fn toggle(ui: &mut egui::Ui, name: &str, sub: &str, v: &mut bool) -> bool {
 
 // ---------------- app glue ----------------
 impl eframe::App for App {
-    fn ui(&mut self, ui: &mut egui::Ui, _f: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _f: &mut eframe::Frame) { self.frame_ui(ui); }
+}
+
+impl App {
+    /// One frame of the whole app. Separate from eframe so tests can drive it headlessly.
+    fn frame_ui(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         self.tick();
         if self.s.hearts < MAX_HEARTS { ctx.request_repaint_after(std::time::Duration::from_secs(1)); }
@@ -448,9 +453,7 @@ impl eframe::App for App {
         self.draw_toast(&ctx);
         self.screenshot(&ctx);
     }
-}
 
-impl App {
     fn modals(&mut self, ctx: &egui::Context) {
         if self.modal == Modal::None { return; }
         dim_back(ctx);
@@ -727,5 +730,101 @@ mod tests {
         assert!(again.s.log.iter().any(|(_, t)| t.contains("cleared")));
         assert!(dir.join("pixel_learn").join("save.bak").exists(), "previous save kept as backup");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ---------- headless UI driving ----------
+    fn key(k: egui::Key, ctrl: bool) -> egui::Event {
+        let m = if ctrl { egui::Modifiers { ctrl: true, command: true, ..Default::default() } } else { egui::Modifiers::NONE };
+        egui::Event::Key { key: k, physical_key: None, pressed: true, repeat: false, modifiers: m }
+    }
+    fn ui_ctx() -> egui::Context {
+        let ctx = egui::Context::default();
+        install_fonts(&ctx);
+        Box::leak(Box::new(load_textures(&ctx)));
+        ctx
+    }
+    fn frame(ctx: &egui::Context, app: &mut App, events: Vec<egui::Event>) {
+        let modifiers = events.iter().find_map(|e| if let egui::Event::Key { modifiers, .. } = e { Some(*modifiers) } else { None }).unwrap_or_default();
+        let mut events = events;
+        events.insert(0, egui::Event::ModifiersChanged(modifiers));
+        let raw = egui::RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(440.0, 780.0))), events, ..Default::default() };
+        let mut out = ctx.run_ui(raw, |ui| app.frame_ui(ui));
+        out.textures_delta.clear();
+    }
+    fn demo_app() -> App { let mut a = App::new(Some(String::new())); a.shot = None; a }
+
+    /// Play a running lesson with the keyboard until it completes. `wrong_first` answers the
+    /// first question wrongly once. Returns the number of frames used.
+    fn play(ctx: &egui::Context, app: &mut App, wrong_first: bool) -> usize {
+        let mut wrong_left = wrong_first;
+        for f in 0..400 {
+            let mut ev = vec![];
+            match &mut app.screen {
+                Screen::Run(rs) => {
+                    if rs.stage < rs.slides.len() || rs.fb.is_some() { ev.push(key(egui::Key::Enter, false)); }
+                    else if let Some(&qi) = rs.queue.first() {
+                        let mut ctrl = false;
+                        match &rs.qs[qi] {
+                            Q::Mc { right, opts, .. } | Q::Fill { right, opts, .. } => rs.sel = Some(if wrong_left { (right + 1) % opts.len() } else { *right }),
+                            Q::Type { answer, .. } => { rs.text = if wrong_left { "nope".into() } else { answer.to_string() }; ctrl = answer.contains('\n'); }
+                        }
+                        wrong_left = false;
+                        ev.push(key(egui::Key::Enter, ctrl));
+                    }
+                }
+                Screen::Complete(_) => return f,
+                _ => panic!("left the lesson unexpectedly"),
+            }
+            frame(ctx, app, ev);
+        }
+        let st = match &app.screen { Screen::Run(rs) => format!("{} stage {}/{} queue {:?} fb {:?} sel {:?} text {:?}", rs.title, rs.stage, rs.slides.len(), rs.queue, rs.fb, rs.sel, rs.text), _ => "?".into() };
+        panic!("lesson did not finish: {}", st);
+    }
+
+    /// Regression for the START THE QUIZ crash: click through every lesson of every course.
+    #[test]
+    fn every_lesson_can_be_played_through_the_ui() {
+        let ctx = ui_ctx();
+        let mut app = demo_app();
+        app.s.hearts = MAX_HEARTS;
+        for c in 0..app.courses.len() {
+            for m in 0..app.courses[c].modules.len() {
+                for l in 0..app.courses[c].modules[m].lessons.len() {
+                    app.open_lesson(c, m, l);
+                    frame(&ctx, &mut app, vec![]);
+                    play(&ctx, &mut app, false);
+                    assert!(app.s.done.contains(&App::key(c, m, l)), "{}.{}.{} not cleared", c, m, l);
+                    app.screen = Screen::Main;
+                    frame(&ctx, &mut app, vec![]);
+                }
+            }
+        }
+        for t in [Tab::Learn, Tab::Train, Tab::Ranks, Tab::Create, Tab::Hero] { app.tab = t; frame(&ctx, &mut app, vec![]); }
+    }
+
+    #[test]
+    fn wrong_answer_costs_a_heart_and_comes_back() {
+        let ctx = ui_ctx();
+        let mut app = demo_app();
+        app.s.hearts = MAX_HEARTS;
+        app.open_lesson(2, 0, 0);
+        frame(&ctx, &mut app, vec![]);
+        play(&ctx, &mut app, true);
+        assert_eq!(app.s.hearts, MAX_HEARTS - 1);
+        let Screen::Complete(c) = &app.screen else { panic!() };
+        assert!(!c.perfect);
+        assert!(c.score < 100);
+    }
+
+    #[test]
+    fn no_hearts_blocks_lessons_but_not_duels() {
+        let mut app = demo_app();
+        app.s.hearts = 0; app.s.heart_t = now();
+        app.open_lesson(0, 0, 0);
+        assert!(matches!(app.screen, Screen::Main));
+        assert!(app.modal == Modal::NoHearts);
+        app.modal = Modal::None;
+        app.start_run("duel", Kind::Duel(0), vec![], duel_questions(1));
+        assert!(matches!(app.screen, Screen::Run(_)));
     }
 }
