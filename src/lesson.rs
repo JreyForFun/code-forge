@@ -11,12 +11,15 @@ impl App {
         let mut finished = false;
         // Slide moves are applied after the whole frame is drawn, so every panel sees the same state.
         let mut slide_step: i32 = 0;
-        let n_slides = rs.slides.len();
+        let n_slides = rs.pages();
+        let n_pics = rs.slides.len();
         let in_slides = rs.stage < n_slides;
         let duel = matches!(rs.kind, Kind::Duel(_));
         let cur_q = rs.queue.first().copied();
         let shown_q = if rs.fb.is_some() { rs.last } else { cur_q };
-        let phase = if in_slides { "1  LEARN" } else {
+        let phase = if in_slides {
+            if rs.stage < n_pics { "1  LEARN" } else if rs.stage == n_pics && !rs.explain.is_empty() { "1  THE FULL SCROLL" } else { "1  SUMMARY" }
+        } else {
             match shown_q.map(|i| &rs.qs[i]) { Some(Q::Fill { .. }) => "2  COMPLETE THE CODE", Some(Q::Type { guide: true, .. }) => "3  TYPE THE CODE", Some(Q::Type { .. }) => "3  CODE IT FROM MEMORY", _ => "QUIZ" }
         };
 
@@ -34,6 +37,7 @@ impl App {
         if ctx.ctx().input(|i| i.key_pressed(egui::Key::Escape)) && self.modal == Modal::None { keep = false; }
 
         egui::Panel::top("rtop").frame(egui::Frame::new().fill(BG2).inner_margin(egui::Margin { left: 16, right: 16, top: 12, bottom: 12 })).show(ctx, |ui| {
+            ledge(ui, true);
             ui.horizontal(|ui| {
                 let (r, resp) = ui.allocate_exact_size(Vec2::splat(28.0), Sense::click());
                 ui.painter().text(r.center(), Align2::CENTER_CENTER, "X", FontId::new(14.0, press()), if resp.hovered() { INK } else { DIM });
@@ -47,11 +51,12 @@ impl App {
 
         let bot_fill = match &rs.fb { Some((true, _)) => Color32::from_rgb(0x10, 0x32, 0x1c), Some((false, _)) => Color32::from_rgb(0x3a, 0x12, 0x1e), None => BG2 };
         egui::Panel::bottom("rbot").frame(egui::Frame::new().fill(bot_fill).inner_margin(16.0)).show(ctx, |ui| {
+            if bot_fill == BG2 { ledge(ui, false); }
             if in_slides {
                 ui.horizontal(|ui| {
                     if rs.stage > 0 && pbtn(ui, "BACK", PANEL_HI, 100.0).clicked() { slide_step = -1; }
                     let w = ui.available_width();
-                    if pbtn(ui, if rs.stage + 1 == n_slides { "START THE QUIZ" } else { "NEXT" }, GOLD, w).clicked() || go { slide_step = 1; }
+                    if pbtn(ui, if rs.stage + 1 == n_slides { "START PRACTICE" } else { "NEXT" }, GOLD, w).clicked() || go { slide_step = 1; }
                 });
             } else if let Some((ok, why)) = rs.fb.clone() {
                 ui.label(title(if ok { "CORRECT" } else { "NOT QUITE" }, 12.0).color(if ok { GREEN } else { RED }));
@@ -59,7 +64,7 @@ impl App {
                 ui.label(body(why, 14.0));
                 ui.add_space(SP_S);
                 if pbtn(ui, "CONTINUE", if ok { GREEN } else { RED }, 0.0).clicked() || go {
-                    rs.fb = None; rs.sel = None; rs.text.clear();
+                    rs.fb = None; rs.sel = None; rs.text.clear(); rs.ran = None;
                     if rs.queue.is_empty() { finished = true; }
                     else if self.s.hearts == 0 && !duel { keep = false; self.modal = Modal::NoHearts; }
                 }
@@ -95,7 +100,7 @@ impl App {
         });
 
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
-            floor(ui.painter(), ui.max_rect(), self.s.scan);
+            floor(ui.painter(), ui.clip_rect(), self.s.scan);
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     let (r, _) = ui.allocate_exact_size(Vec2::new(8.0, 14.0), Sense::hover());
@@ -105,24 +110,31 @@ impl App {
                 });
                 ui.label(body(rs.title.clone(), 13.0).color(DIM));
                 ui.add_space(SP_M);
-                if in_slides {
+                if in_slides && rs.stage >= n_pics {
+                    if rs.stage == n_pics && !rs.explain.is_empty() {
+                        ui.label(body("Read it slowly. Everything in the practice comes from this page.", 12.0).color(DIM));
+                        ui.add_space(SP_S);
+                        explain_page(ui, rs.explain);
+                    } else {
+                        summary_card(ui, "REMEMBER", &rs.summary);
+                        ui.label(body("Next: practice. Wrong answers come back at the end, so you master every step.", 12.0).color(DIM));
+                    }
+                    page_dots(ui, rs.stage, n_slides);
+                } else if in_slides {
                     let (text, img) = rs.slides[rs.stage];
                     // picture
                     let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 128.0), Sense::hover());
                     let p = ui.painter();
-                    p.rect_filled(r.expand(2.0), 0.0, EDGE);
-                    p.rect_filled(r, 0.0, Color32::from_rgb(0x0b, 0x12, 0x28));
+                    p.add(frame_shapes(r, Color32::from_rgb(0x0b, 0x12, 0x28), EDGE));
                     p.rect_filled(Rect::from_min_max(Pos2::new(r.min.x, r.max.y - 26.0), r.max), 0.0, Color32::from_rgb(0x14, 0x20, 0x3a));
                     p.rect_filled(Rect::from_center_size(Pos2::new(r.center().x, r.max.y - 26.0), Vec2::new(84.0, 6.0)), 0.0, Color32::from_black_alpha(110));
                     draw_icon(p, Rect::from_center_size(Pos2::new(r.center().x, r.center().y - 6.0), Vec2::splat(96.0)), img, Color32::WHITE);
-                    for i in 0..n_slides {
-                        p.rect_filled(Rect::from_min_size(Pos2::new(r.center().x - n_slides as f32 * 8.0 + i as f32 * 16.0, r.max.y - 12.0), Vec2::new(10.0, 4.0)), 0.0, if i == rs.stage { GOLD } else { PANEL_HI });
-                    }
                     ui.add_space(SP_M);
-                    panel(ui, PARCH, EDGE, |ui| {
+                    parchment(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.label(RichText::new(text).monospace().size(15.0).color(EDGE));
+                        ui.label(RichText::new(text).monospace().size(15.0).color(INK_DARK));
                     });
+                    page_dots(ui, rs.stage, n_slides);
                 } else if let Some(qi) = shown_q {
                     let locked = rs.fb.is_some();
                     let ok_now = matches!(rs.fb, Some((true, _)));
@@ -210,7 +222,8 @@ impl App {
                             });
                             ui.label(body(if multi { "Ctrl+Enter to check" } else { "Enter to check" }, 11.0).color(DIM));
                             if locked && ok_now && !self.course_lang(&rs).is_empty() {
-                                let out = interp::run(self.course_lang(&rs), &rs.text);
+                                if rs.ran.is_none() { rs.ran = Some(interp::run(self.course_lang(&rs), &rs.text)); }
+                                let out = rs.ran.clone().unwrap_or_default();
                                 panel(ui, PANEL, EDGE, |ui| { ui.set_width(ui.available_width()); ui.label(title("OUTPUT", 9.0).color(GOLD)); ui.add_space(SP_XS); out_view(ui, &out); });
                             }
                         }
@@ -224,4 +237,66 @@ impl App {
     }
 
     fn course_lang(&self, rs: &RunState) -> &'static str { rs.lang }
+}
+
+/// Small page markers under the learn pages.
+fn page_dots(ui: &mut egui::Ui, at: usize, n: usize) {
+    let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 12.0), Sense::hover());
+    for i in 0..n {
+        let x = r.center().x - n as f32 * 8.0 + i as f32 * 16.0;
+        ui.painter().rect_filled(Rect::from_min_size(Pos2::new(x, r.min.y + 4.0), Vec2::new(10.0, 4.0)), 0.0, if i == at { GOLD } else { PANEL_HI });
+    }
+}
+
+const RUST_BROWN: Color32 = Color32::from_rgb(0x7a, 0x2e, 0x12);
+
+/// A long explanation on parchment. Format: blank line = new paragraph, `## ` = heading,
+/// `- ` = bullet, lines indented by 4 spaces = code.
+pub fn explain_page(ui: &mut egui::Ui, text: &str) {
+    parchment(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.spacing_mut().item_spacing.y = 6.0;
+        let mut code: Vec<&str> = vec![];
+        let flush = |ui: &mut egui::Ui, code: &mut Vec<&str>| {
+            if code.is_empty() { return; }
+            egui::Frame::new().fill(Color32::from_rgb(0x1c, 0x18, 0x24)).inner_margin(egui::Margin::symmetric(10, 8)).corner_radius(2.0).show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.label(RichText::new(code.join("\n")).monospace().size(14.0).color(PARCH));
+            });
+            code.clear();
+        };
+        let txt = |s: &str| RichText::new(s.to_string()).font(FontId::new(16.0, read())).color(INK_DARK);
+        for line in text.lines() {
+            if let Some(c) = line.strip_prefix("    ") { code.push(c); continue; }
+            flush(ui, &mut code);
+            let t = line.trim();
+            if t.is_empty() { ui.add_space(2.0); }
+            else if let Some(h) = t.strip_prefix("## ") { ui.add_space(4.0); ui.label(RichText::new(h).font(FontId::new(17.0, read())).strong().color(RUST_BROWN)); }
+            else if let Some(b) = t.strip_prefix("- ") {
+                ui.horizontal_top(|ui| {
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(14.0, 18.0), Sense::hover());
+                    ui.painter().rect_filled(Rect::from_center_size(Pos2::new(r.center().x, r.min.y + 9.0), Vec2::splat(5.0)), 0.0, RUST_BROWN);
+                    ui.add(egui::Label::new(txt(b)).wrap());
+                });
+            }
+            else { ui.add(egui::Label::new(txt(t)).wrap()); }
+        }
+        flush(ui, &mut code);
+    });
+}
+
+/// Key points with green checks on a wooden-framed card.
+pub fn summary_card(ui: &mut egui::Ui, heading: &str, items: &[&str]) {
+    panel(ui, PANEL, GOLD, |ui| {
+        ui.set_width(ui.available_width());
+        card_title(ui, heading);
+        for it in items {
+            ui.horizontal_top(|ui| {
+                spr(ui, Spr::Check, 1.5, &[('w', GREEN)]);
+                ui.add_space(SP_XS);
+                ui.add(egui::Label::new(RichText::new(*it).font(FontId::new(15.0, read())).color(INK)).wrap());
+            });
+            ui.add_space(SP_XS);
+        }
+    });
 }

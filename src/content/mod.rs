@@ -9,8 +9,11 @@
 pub use crate::data::*;
 
 mod css;
+mod css_deep;
 mod html;
+mod html_deep;
 mod js;
+mod js_deep;
 mod python;
 mod sql;
 
@@ -23,15 +26,44 @@ pub fn copy(prompt: &'static str, answer: &'static str, why: &'static str) -> Q 
 pub fn recall(prompt: &'static str, answer: &'static str, why: &'static str) -> Q { Q::Type { prompt, answer, why, guide: false } }
 pub fn quiz(q: &'static str, opts: &[&'static str], right: usize, why: &'static str) -> Q { Q::Mc { q, opts: opts.to_vec(), right, why } }
 /// A regular lesson.
-pub fn l(title: &'static str, slides: &[S], qs: Vec<Q>) -> Lesson { Lesson { title, slides: slides.to_vec(), qs, project: false } }
+pub fn l(title: &'static str, slides: &[S], qs: Vec<Q>) -> Lesson { Lesson { title, slides: slides.to_vec(), qs, project: false, explain: "", summary: vec![] } }
 /// A checkpoint project that closes a chapter.
-pub fn p(title: &'static str, slides: &[S], qs: Vec<Q>) -> Lesson { Lesson { title, slides: slides.to_vec(), qs, project: true } }
-/// A chapter without a blurb (older courses).
-pub fn m(name: &'static str, lessons: Vec<Lesson>) -> Module { Module { name, desc: "", lessons } }
+pub fn p(title: &'static str, slides: &[S], qs: Vec<Q>) -> Lesson { Lesson { title, slides: slides.to_vec(), qs, project: true, explain: "", summary: vec![] } }
+
+impl Lesson {
+    /// Add the long explanation and the key points to a lesson written in one place.
+    pub fn with(mut self, explain: &'static str, summary: &[&'static str]) -> Self { self.explain = explain; self.summary = summary.to_vec(); self }
+}
+
+/// The deep part of a lesson, kept in a per-course table next to the lesson list:
+/// a long explanation, the key points, and extra practice.
+pub struct Deep { pub title: &'static str, pub explain: &'static str, pub summary: &'static [&'static str], pub qs: Vec<Q> }
+pub fn d(title: &'static str, explain: &'static str, summary: &'static [&'static str], qs: Vec<Q>) -> Deep { Deep { title, explain, summary, qs } }
+
+/// Attach deep content to the lessons with the same title. Extra concept and fill questions go
+/// before the typing questions, so a lesson still ends with "type it" and "from memory".
+pub fn attach(mut c: Course, deep: Vec<Deep>) -> Course {
+    for dp in deep {
+        let Some(ls) = c.modules.iter_mut().flat_map(|m| m.lessons.iter_mut()).find(|l| l.title == dp.title) else {
+            if cfg!(test) { panic!("{}: deep content for unknown lesson '{}'", c.name, dp.title) } else { continue }
+        };
+        ls.explain = dp.explain;
+        ls.summary = dp.summary.to_vec();
+        let at = ls.qs.iter().position(|q| matches!(q, Q::Type { .. })).unwrap_or(ls.qs.len());
+        let (typing, extra): (Vec<Q>, Vec<Q>) = dp.qs.into_iter().partition(|q| matches!(q, Q::Type { .. }));
+        let tail = ls.qs.split_off(at);
+        ls.qs.extend(extra);
+        ls.qs.extend(tail);
+        ls.qs.extend(typing);
+    }
+    c
+}
 /// A chapter with a one-line blurb shown in the course preview.
 pub fn ch(name: &'static str, desc: &'static str, lessons: Vec<Lesson>) -> Module { Module { name, desc, lessons } }
 
-pub fn all() -> Vec<Course> { vec![html::course(), css::course(), js::course(), python::course(), sql::course()] }
+pub fn all() -> Vec<Course> {
+    vec![attach(html::course(), html_deep::deep()), attach(css::course(), css_deep::deep()), attach(js::course(), js_deep::deep()), python::course(), sql::course()]
+}
 
 /// 1.0 saves keyed lessons by position (`course.chapter.lesson`). Map them to stable ids.
 /// (old key, course slug, lesson title in the current content)
@@ -75,7 +107,7 @@ mod tests {
         for c in &cs {
             assert!(slugs.insert(c.slug), "duplicate course slug {}", c.slug);
             assert!(!c.modules.is_empty(), "{} has no chapters", c.name);
-            assert!(crate::art::art_exists(c.badge.art), "{}: unknown badge art", c.name);
+            for m in ["bronze", "silver", "gold"] { assert!(crate::art::art_exists(&format!("{}_{}", m, c.badge.art)), "{}: no {} badge icon for {}", c.name, m, c.badge.art); }
             assert!((3..=6).contains(&c.teaches.len()), "{}: teaches needs 3-6 items", c.name);
             let mut ids = HashSet::new();
             for (mi, m) in c.modules.iter().enumerate() {
@@ -117,6 +149,24 @@ mod tests {
         }
         let web: usize = cs.iter().filter(|c| ["html", "css", "javascript"].contains(&c.slug)).map(|c| c.lesson_count()).sum();
         assert!(web >= 80, "HTML+CSS+JS have only {} lessons", web);
+    }
+
+    /// 003 FR-1/FR-2: every lesson is deep: a long explanation, a summary and enough practice.
+    #[test]
+    fn every_lesson_is_deep() {
+        let mut short = vec![];
+        for c in all() {
+            for m in &c.modules {
+                for l in &m.lessons {
+                    let words = l.explain.split_whitespace().count();
+                    if words < 120 { short.push(format!("{} / {}: explanation has {} words (needs 120)", c.name, l.title, words)); }
+                    if !(3..=6).contains(&l.summary.len()) { short.push(format!("{} / {}: summary has {} points (needs 3-6)", c.name, l.title, l.summary.len())); }
+                    if l.qs.len() < 6 { short.push(format!("{} / {}: {} questions (needs 6)", c.name, l.title, l.qs.len())); }
+                    if !matches!(l.qs.last(), Some(Q::Type { .. })) { short.push(format!("{} / {}: must end with a typing step", c.name, l.title)); }
+                }
+            }
+        }
+        assert!(short.is_empty(), "{} problems:\n{}", short.len(), short.join("\n"));
     }
 
     /// SC-002: typing the expected answer in any course never produces an error.

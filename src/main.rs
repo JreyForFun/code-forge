@@ -16,6 +16,7 @@ mod tabs;
 
 use art::*;
 use preview::*;
+use lesson::summary_card;
 use data::*;
 use eframe::egui::{self, Align2, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, Vec2};
 use game::{HINT_COST, LEAGUES, LEAGUE_UP_XP, REFILL_COST, SAVER_COST, XP_PER_LEVEL};
@@ -40,11 +41,19 @@ enum Kind { Lesson(usize, usize, usize), Coach, Duel(usize) }
 struct RunState {
     title: String, kind: Kind, lang: &'static str, slides: Vec<(&'static str, &'static str)>, qs: Vec<Q>, stage: usize, queue: Vec<usize>,
     sel: Option<usize>, text: String, fb: Option<(bool, String)>, mistakes: u32, right: u32, total: usize, last: Option<usize>, hint_q: Option<usize>, project: bool,
+    /// Long explanation and key points shown after the slides (lessons only).
+    explain: &'static str, summary: Vec<&'static str>,
+    /// Output of the learner's correct code, computed once per answer.
+    ran: Option<Vec<(interp::Kind, String)>>,
 }
-struct Complete { title: String, xp: u32, gems: u32, perfect: bool, score: u32, best: u32, duel: Option<(u32, u32, String, bool)>, new_streak: bool, next: Option<(usize, usize, usize)>, project: bool }
+impl RunState {
+    /// Learn pages: picture slides, then the full explanation, then the summary.
+    fn pages(&self) -> usize { self.slides.len() + usize::from(!self.explain.is_empty()) + usize::from(!self.summary.is_empty()) }
+}
+struct Complete { title: String, xp: u32, gems: u32, perfect: bool, score: u32, best: u32, duel: Option<(u32, u32, String, bool)>, new_streak: bool, next: Option<(usize, usize, usize)>, project: bool, summary: Vec<&'static str> }
 struct Editor { idx: Option<usize>, title: String, lang: String, code: String, out: Vec<(interp::Kind, String)> }
 
-enum Screen { Main, Settings, Run(Box<RunState>), Complete(Complete), Editor(Editor), Preview(usize) }
+enum Screen { Main, Settings, Run(Box<RunState>), Complete(Complete), Editor(Editor), Preview(usize), Notes(usize, usize, usize) }
 
 struct App {
     s: Save, tab: Tab, screen: Screen, modal: Modal, courses: Vec<Course>, cur: usize, open_mod: Option<usize>,
@@ -165,11 +174,16 @@ impl App {
             // An unfinished lesson resumes at the first question not yet answered correctly.
             if !self.s.done.contains(&k)
                 && let Some(d) = self.s.qdone.get(&k)
-                    && !d.is_empty() { queue.retain(|i| !d.contains(i)); right = d.len() as u32; stage = slides.len(); }
+                    && !d.is_empty() { queue.retain(|i| !d.contains(i)); right = d.len() as u32; stage = usize::MAX; }
         }
         let lang = match &kind { Kind::Lesson(c, _, _) => self.courses[*c].lang, _ => "" };
-        let project = matches!(kind, Kind::Lesson(c, m, l) if self.courses[c].modules[m].lessons[l].project);
-        self.screen = Screen::Run(Box::new(RunState { title: title.into(), lang, kind, slides, qs, stage, queue, sel: None, text: String::new(), fb: None, mistakes: 0, right, total: n, last: None, hint_q: None, project }));
+        let (project, explain, summary) = match kind {
+            Kind::Lesson(c, m, l) => { let ls = &self.courses[c].modules[m].lessons[l]; (ls.project, ls.explain, ls.summary.clone()) }
+            _ => (false, "", vec![]),
+        };
+        let mut rs = RunState { title: title.into(), lang, kind, slides, qs, stage, queue, sel: None, text: String::new(), fb: None, mistakes: 0, right, total: n, last: None, hint_q: None, project, explain, summary, ran: None };
+        rs.stage = rs.stage.min(rs.pages());
+        self.screen = Screen::Run(Box::new(rs));
     }
 
     fn finish(&mut self, rs: &RunState) {
@@ -212,7 +226,7 @@ impl App {
         game::add_xp(&mut self.s, xp, gems);
         self.award();
         self.persist();
-        self.screen = Screen::Complete(Complete { title: rs.title.clone(), xp, gems, perfect, score, best, duel, new_streak, next, project: rs.project });
+        self.screen = Screen::Complete(Complete { title: rs.title.clone(), xp, gems, perfect, score, best, duel, new_streak, next, project: rs.project, summary: rs.summary.clone() });
     }
 }
 
@@ -220,8 +234,7 @@ impl App {
 fn chip(ui: &mut egui::Ui, art: &str, dim: bool, text: &str) -> egui::Response {
     let (r, resp) = ui.allocate_exact_size(Vec2::new(44.0 + text.len() as f32 * 12.0, 34.0), Sense::click());
     let p = ui.painter();
-    p.rect_filled(r.expand(2.0), 0.0, EDGE);
-    p.rect_filled(r, 0.0, if resp.hovered() { PANEL_HI } else { Color32::from_rgb(0x10, 0x0c, 0x1c) });
+    bevel(p, r, if resp.hovered() { PANEL_HI } else { Color32::from_rgb(0x1a, 0x18, 0x2a) }, false);
     draw_icon(p, Rect::from_min_size(Pos2::new(r.min.x + 4.0, r.min.y + 2.0), Vec2::splat(30.0)), art, if dim { Color32::from_gray(80) } else { Color32::WHITE });
     p.text(Pos2::new(r.min.x + 38.0, r.center().y + 1.0), Align2::LEFT_CENTER, text, FontId::new(11.0, press()), INK);
     resp
@@ -253,9 +266,8 @@ fn draw_avatar(p: &egui::Painter, r: Rect, idx: u32) {
 
 fn header(ctx: &mut egui::Ui, app: &mut App, title_text: &str, back: bool, dropdown: bool) {
     egui::Panel::top("hdr").frame(egui::Frame::new().fill(HDR).inner_margin(egui::Margin { left: 12, right: 12, top: 12, bottom: 12 })).show(ctx, |ui| {
+        ledge(ui, true);
         let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 30.0), Sense::hover());
-        let rr = ui.max_rect();
-        ui.painter().rect_filled(Rect::from_min_size(Pos2::new(rr.min.x - 12.0, rr.max.y + 8.0), Vec2::new(rr.width() + 24.0, 4.0)), 0.0, GOLD);
         let mut x = r.min.x;
         if back {
             let br = Rect::from_min_size(Pos2::new(x, r.min.y), Vec2::new(30.0, 30.0));
@@ -288,8 +300,8 @@ fn header(ctx: &mut egui::Ui, app: &mut App, title_text: &str, back: bool, dropd
 }
 
 fn subtabs(ui: &mut egui::Ui, labels: &[&str], cur: &mut usize) {
-    let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 38.0), Sense::hover());
-    ui.painter().rect_filled(r, 0.0, HDR);
+    let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 40.0), Sense::hover());
+    ui.painter().add(frame_shapes(r, Color32::from_rgb(0x16, 0x14, 0x22), EDGE));
     let n = labels.len() as f32;
     for (i, lab) in labels.iter().enumerate() {
         let tr = Rect::from_min_size(Pos2::new(r.min.x + r.width() / n * i as f32, r.min.y), Vec2::new(r.width() / n, 38.0));
@@ -304,9 +316,8 @@ fn subtabs(ui: &mut egui::Ui, labels: &[&str], cur: &mut usize) {
 
 fn nav(ctx: &mut egui::Ui, app: &mut App) {
     egui::Panel::bottom("nav").frame(egui::Frame::new().fill(Color32::from_rgb(0x1d, 0x16, 0x32)).inner_margin(egui::Margin { left: 4, right: 4, top: 6, bottom: 6 })).show(ctx, |ui| {
+        ledge(ui, false);
         let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 56.0), Sense::hover());
-        let rr = ui.max_rect();
-        ui.painter().rect_filled(Rect::from_min_size(Pos2::new(rr.min.x - 4.0, rr.min.y - 6.0), Vec2::new(rr.width() + 8.0, 3.0)), 0.0, GOLD);
         let items = [(Tab::Learn, "LEARN", "book"), (Tab::Train, "TRAIN", "sword"), (Tab::Ranks, "RANKS", "banner_royal"), (Tab::Create, "CREATE", "staff"), (Tab::Hero, "HERO", "helmet")];
         let w = r.width() / 5.0;
         for (i, (t, name, art)) in items.iter().enumerate() {
@@ -314,11 +325,9 @@ fn nav(ctx: &mut egui::Ui, app: &mut App) {
             let resp = ui.interact(tr, ui.scope_id().with(("nav", i)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
             let on = app.tab == *t;
             if on {
-                ui.painter().rect_filled(tr.shrink2(Vec2::new(3.0, 0.0)).translate(Vec2::new(0.0, 3.0)), 0.0, EDGE);
-                ui.painter().rect_filled(tr.shrink2(Vec2::new(3.0, 0.0)), 0.0, Color32::from_rgb(0x3a, 0x2e, 0x6b));
-                ui.painter().rect_stroke(tr.shrink2(Vec2::new(3.0, 0.0)), 0.0, Stroke::new(2.0, GOLD), egui::StrokeKind::Inside);
+                ui.painter().add(frame_shapes(tr.shrink2(Vec2::new(2.0, 0.0)), Color32::from_rgb(0x2a, 0x20, 0x18), GOLD));
             } else if resp.hovered() {
-                ui.painter().rect_filled(tr.shrink2(Vec2::new(3.0, 0.0)), 0.0, Color32::from_rgb(0x2a, 0x22, 0x48));
+                ui.painter().rect_filled(tr.shrink2(Vec2::new(4.0, 2.0)), 2.0, Color32::from_white_alpha(14));
             }
             draw_icon(ui.painter(), Rect::from_center_size(Pos2::new(tr.center().x, tr.min.y + 20.0), Vec2::splat(30.0)), art, if on || resp.hovered() { Color32::WHITE } else { Color32::from_gray(150) });
             ui.painter().text(Pos2::new(tr.center().x, tr.max.y - 9.0), Align2::CENTER_CENTER, *name, FontId::new(8.0, press()), if on { GOLD } else { DIM });
@@ -463,7 +472,7 @@ impl App {
                 nav(ui, self);
                 let tab = self.tab;
                 egui::CentralPanel::default().frame(egui::Frame::new().fill(BG).inner_margin(egui::Margin { left: SCREEN_PAD, right: SCREEN_PAD, top: SCREEN_PAD, bottom: 0 })).show(ui, |ui| {
-                    if self.s.floor { floor(ui.painter(), ui.max_rect(), self.s.scan); }
+                    if self.s.floor { floor(ui.painter(), ui.clip_rect(), self.s.scan); }
                     ui.set_opacity(alpha);
                     egui::ScrollArea::vertical().id_salt(("main", tab as u32)).auto_shrink([false, false]).show(ui, |ui| match tab {
                         Tab::Learn => self.learn(ui),
@@ -479,6 +488,7 @@ impl App {
             Screen::Complete(c) => { if !self.complete_screen(ui, &c) && matches!(self.screen, Screen::Main) { self.screen = Screen::Complete(c); } }
             Screen::Editor(ed) => { if let Some(ed) = self.editor_screen(ui, ed) { self.screen = Screen::Editor(ed); } }
             Screen::Preview(c) => { self.screen = Screen::Preview(c); self.preview_screen(ui, c); }
+            Screen::Notes(c, m, l) => { self.screen = Screen::Notes(c, m, l); self.notes_screen(ui, c, m, l); }
         }
         self.modals(&ctx);
         self.draw_toast(&ctx);
@@ -701,9 +711,10 @@ fn main() -> eframe::Result {
                 "settings" => app.screen = Screen::Settings,
                 "editor" => app.screen = Screen::Editor(Editor { idx: None, title: "Royal Banner".into(), lang: "css".into(), code: EXAMPLES[5].code.into(), out: interp::run("css", EXAMPLES[5].code) }),
                 "sql" => app.screen = Screen::Editor(Editor { idx: None, title: "Strongest Heroes".into(), lang: "sql".into(), code: EXAMPLES[6].code.into(), out: interp::run("sql", EXAMPLES[6].code) }),
-                "complete" => app.screen = Screen::Complete(Complete { title: "Project: Wanted Poster".into(), xp: 25, gems: 5, perfect: true, score: 100, best: 100, duel: None, new_streak: true, next: Some((0, 1, 0)), project: true }),
+                "complete" => app.screen = Screen::Complete(Complete { title: "Project: Wanted Poster".into(), xp: 25, gems: 5, perfect: true, score: 100, best: 100, duel: None, new_streak: true, next: Some((0, 1, 0)), project: true, summary: app.courses[0].modules[0].lessons[7].summary.clone() }),
                 "preview" => app.screen = Screen::Preview(1),
                 "preview-js" => app.screen = Screen::Preview(2),
+                "notes" => app.screen = Screen::Notes(2, 1, 4),
                 "shop" => app.modal = Modal::Shop,
                 "notif" => app.modal = Modal::Notif,
                 "avatar" => app.modal = Modal::Avatar,
@@ -716,7 +727,7 @@ fn main() -> eframe::Result {
             let p: Vec<usize> = spec.split('.').filter_map(|x| x.parse().ok()).collect();
             if p.len() == 3 && p[0] < app.courses.len() && p[1] < app.courses[p[0]].modules.len() && p[2] < app.courses[p[0]].modules[p[1]].lessons.len() {
                 app.open_lesson(p[0], p[1], p[2]);
-                if let Screen::Run(rs) = &mut app.screen { rs.stage = stage.min(rs.slides.len()); for _ in 0..skip { if rs.queue.len() > 1 { rs.queue.remove(0); } } }
+                if let Screen::Run(rs) = &mut app.screen { rs.stage = stage.min(rs.pages()); for _ in 0..skip { if rs.queue.len() > 1 { rs.queue.remove(0); } } }
             }
         }
         Ok(Box::new(app))
@@ -796,7 +807,7 @@ mod tests {
             let mut ev = vec![];
             match &mut app.screen {
                 Screen::Run(rs) => {
-                    if rs.stage < rs.slides.len() || rs.fb.is_some() { ev.push(key(egui::Key::Enter, false)); }
+                    if rs.stage < rs.pages() || rs.fb.is_some() { ev.push(key(egui::Key::Enter, false)); }
                     else if let Some(&qi) = rs.queue.first() {
                         let mut ctrl = false;
                         match &rs.qs[qi] {
@@ -812,7 +823,7 @@ mod tests {
             }
             frame(ctx, app, ev);
         }
-        let st = match &app.screen { Screen::Run(rs) => format!("{} stage {}/{} queue {:?} fb {:?} sel {:?} text {:?}", rs.title, rs.stage, rs.slides.len(), rs.queue, rs.fb, rs.sel, rs.text), _ => "?".into() };
+        let st = match &app.screen { Screen::Run(rs) => format!("{} stage {}/{} queue {:?} fb {:?} sel {:?} text {:?}", rs.title, rs.stage, rs.pages(), rs.queue, rs.fb, rs.sel, rs.text), _ => "?".into() };
         panic!("lesson did not finish: {}", st);
     }
 

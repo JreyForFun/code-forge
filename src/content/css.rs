@@ -7,7 +7,7 @@ pub fn course() -> Course {
         desc: "Paint and arrange your pages with CSS: colors, fonts, spacing, positioning and flexbox.",
         teaches: vec!["Selectors: type, class, id, groups", "Colors, units, fonts and backgrounds", "The box model: border, padding, margin", "Positioning: relative, absolute, fixed, sticky", "Flexbox layouts"],
         snippet: r##"h1 { color: gold; }"##,
-        badge: Badge { name: "Prism Painter", art: "potion_magic", desc: "Styled every CSS quest" },
+        badge: Badge { name: "Prism Painter", art: "star", desc: "Styled every CSS quest" },
         modules: vec![selectors(), properties(), box_model(), layout(), flexbox()],
     }
 }

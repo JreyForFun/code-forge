@@ -6,16 +6,16 @@ impl App {
         let mut done = false;
         let enter = ctx.ctx().input(|i| i.key_pressed(egui::Key::Enter));
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
-            floor(ui.painter(), ui.max_rect(), self.s.scan);
+            floor(ui.painter(), ui.clip_rect(), self.s.scan);
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(SP_M);
                     let lost = c.duel.as_ref().map(|d| !d.3).unwrap_or(false);
                     let (r, _) = ui.allocate_exact_size(Vec2::new(130.0, 120.0), Sense::hover());
-                    draw_icon(ui.painter(), r, if lost { "heart" } else if c.duel.is_some() { "chalice" } else { "chest" }, if lost { Color32::from_gray(80) } else { Color32::WHITE });
+                    draw_icon(ui.painter(), r, if lost { "red_heart" } else if c.duel.is_some() { "gold_trophy" } else if c.project { "open_gold_red_chest" } else { "open_brown_chest" }, if lost { Color32::from_gray(80) } else { Color32::WHITE });
                     ui.add_space(SP_S);
                     let head = if c.duel.is_some() { if lost { "DEFEATED..." } else { "VICTORY!" } } else { "QUEST COMPLETE!" };
-                    ui.label(title(head, 15.0).color(GOLD));
+                    ribbon(ui, head);
                     ui.add_space(SP_S);
                     ui.label(body(c.title.clone(), 15.0).color(DIM));
                     if let Some((m, b, n, _)) = &c.duel { ui.label(body(format!("You {}  -  {} {}", m, n, b), 15.0)); }
@@ -32,6 +32,9 @@ impl App {
                         ui.label(title(format!("LEVEL {}", self.level()), 10.0));
                         bar(ui, game::level_frac(self.s.xp), BLUE, 14.0);
                     });
+                    if !c.summary.is_empty() {
+                        ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| summary_card(ui, "WHAT YOU LEARNED", &c.summary));
+                    }
                     ui.add_space(SP_M);
                     if let Some((ci, m, l)) = c.next {
                         let name = self.courses[ci].modules[m].lessons[l].title;
@@ -52,7 +55,7 @@ impl App {
     pub fn settings(&mut self, ctx: &mut egui::Ui) {
         header(ctx, self, "Settings", true, false);
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
-            floor(ui.painter(), ui.max_rect(), self.s.scan);
+            floor(ui.painter(), ui.clip_rect(), self.s.scan);
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 panel(ui, PANEL, EDGE, |ui| {
                     ui.set_width(ui.available_width());
@@ -104,6 +107,8 @@ impl App {
                     ui.set_width(ui.available_width());
                     card_title(ui, "CREDITS");
                     ui.horizontal_wrapped(|ui| { icon(ui, "scroll_fire", 32.0); ui.label(body("Assets by Pixelrepo (https://pixelrepo.com), used under the Pixelrepo Free Asset License.", 13.0)); });
+                    ui.horizontal_wrapped(|ui| { icon(ui, "chest_closed", 32.0); ui.label(body("Dungeon tiles and frames: Tiny Dungeon and UI Pack: Pixel Adventure by Kenney (kenney.nl), CC0.", 13.0)); });
+                    ui.horizontal_wrapped(|ui| { icon(ui, "gold_trophy", 32.0); ui.label(body("Badges and rewards: Achievement Icon Pack by GTORAVERSE (itch.io).", 13.0)); });
                     ui.add_space(SP_XS);
                     ui.label(body("Fonts: Press Start 2P (CodeMan38) and Silkscreen (Jason Kottke), SIL Open Font License 1.1.", 13.0).color(DIM));
                     ui.label(body("Python and HTML chapter topics follow common beginner outlines. All lesson text is original.", 13.0).color(DIM));
@@ -118,13 +123,14 @@ impl App {
         let mut keep = true;
         let run_key = ctx.ctx().input(|i| i.key_pressed(egui::Key::Enter) && i.modifiers.command) || ctx.ctx().input(|i| i.key_pressed(egui::Key::F5));
         egui::Panel::top("etop").frame(egui::Frame::new().fill(HDR).inner_margin(12.0)).show(ctx, |ui| {
+            ledge(ui, true);
             ui.horizontal(|ui| {
                 if pbtn(ui, "<", Color32::from_rgb(0x3a, 0x4a, 0xa8), 44.0).on_hover_text("Back (unsaved changes are lost)").clicked() { keep = false; }
                 ui.add(egui::TextEdit::singleline(&mut ed.title).hint_text("Spell name").desired_width(ui.available_width()).char_limit(30).font(FontId::new(16.0, egui::FontFamily::Proportional)));
             });
         });
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
-            floor(ui.painter(), ui.max_rect(), self.s.scan);
+            floor(ui.painter(), ui.clip_rect(), self.s.scan);
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);

@@ -1,42 +1,37 @@
 //! Course Preview screen, the Learn tab's quest-card header, and course badges.
 use super::*;
 
-/// A course badge: a stepped pixel medal in the course color with a gold rim (grey when locked),
-/// the course icon in the middle and two ribbon tails.
-pub fn draw_badge(p: &egui::Painter, r: Rect, course: &Course, earned: bool) {
-    let s = (r.width().min(r.height()) / 16.0).floor().max(1.0);
-    let w = s * 16.0;
-    let o = Pos2::new(r.center().x - w / 2.0, r.center().y - w / 2.0);
-    let px = |x: f32, y: f32, ww: f32, hh: f32, c: Color32| p.rect_filled(Rect::from_min_size(o + Vec2::new(x * s, y * s), Vec2::new(ww * s, hh * s)), 0.0, c);
-    let body = if earned { course.color } else { Color32::from_rgb(0x3a, 0x36, 0x52) };
-    let rim = if earned { GOLD } else { Color32::from_rgb(0x6b, 0x66, 0x88) };
-    // ribbon tails
-    px(4.0, 11.0, 3.0, 5.0, shade(body, 0.7));
-    px(9.0, 11.0, 3.0, 5.0, shade(body, 0.7));
-    px(4.0, 15.0, 1.0, 1.0, Color32::TRANSPARENT);
-    // stepped round medal: outline, rim, body
-    for (y, x0, x1) in [(0.0, 5.0, 11.0), (1.0, 3.0, 13.0), (2.0, 2.0, 14.0), (3.0, 1.0, 15.0), (4.0, 1.0, 15.0), (5.0, 0.0, 16.0), (6.0, 0.0, 16.0), (7.0, 0.0, 16.0), (8.0, 0.0, 16.0), (9.0, 1.0, 15.0), (10.0, 1.0, 15.0), (11.0, 2.0, 14.0), (12.0, 3.0, 13.0), (13.0, 5.0, 11.0)] {
-        px(x0, y, x1 - x0, 1.0, EDGE);
+/// Badge tiers: 0 = not started, 1 = bronze (first chapter), 2 = silver (half the course), 3 = gold (all).
+pub const TIER_NAMES: [&str; 4] = ["Locked", "Bronze", "Silver", "Gold"];
+
+/// A course badge from the GTORAVERSE pack: the course's shape (shield, star, crown...) in the
+/// metal of the tier reached. Locked badges are a dark silhouette.
+pub fn draw_badge(p: &egui::Painter, r: Rect, course: &Course, tier: u8) {
+    let metal = ["bronze", "bronze", "silver", "gold"][tier.min(3) as usize];
+    let name = format!("{}_{}", metal, course.badge.art);
+    if tier >= 3 {
+        // a soft glow behind a gold badge
+        let t = p.ctx().input(|i| i.time) as f32;
+        let a = (40.0 + 25.0 * (t * 2.0).sin()) as u8;
+        p.circle_filled(r.center(), r.width() * 0.46, Color32::from_rgba_unmultiplied(0xfa, 0xcc, 0x15, a));
     }
-    for (y, x0, x1) in [(1.0, 5.0, 11.0), (2.0, 3.0, 13.0), (3.0, 2.0, 14.0), (4.0, 2.0, 14.0), (5.0, 1.0, 15.0), (6.0, 1.0, 15.0), (7.0, 1.0, 15.0), (8.0, 1.0, 15.0), (9.0, 2.0, 14.0), (10.0, 2.0, 14.0), (11.0, 3.0, 13.0), (12.0, 5.0, 11.0)] {
-        px(x0, y, x1 - x0, 1.0, rim);
-    }
-    for (y, x0, x1) in [(2.0, 5.0, 11.0), (3.0, 4.0, 12.0), (4.0, 3.0, 13.0), (5.0, 3.0, 13.0), (6.0, 2.0, 14.0), (7.0, 2.0, 14.0), (8.0, 3.0, 13.0), (9.0, 3.0, 13.0), (10.0, 4.0, 12.0), (11.0, 5.0, 11.0)] {
-        px(x0, y, x1 - x0, 1.0, body);
-    }
-    px(5.0, 2.0, 6.0, 1.0, shade(body, 1.3)); // highlight
-    let ir = Rect::from_center_size(o + Vec2::new(8.0 * s, 6.8 * s), Vec2::splat(8.0 * s));
-    draw_icon(p, ir, course.badge.art, if earned { Color32::WHITE } else { Color32::from_gray(70) });
+    draw_icon(p, r, &name, if tier == 0 { Color32::from_rgb(0x30, 0x2c, 0x40) } else { Color32::WHITE });
 }
 
-pub fn badge(ui: &mut egui::Ui, course: &Course, earned: bool, size: f32) -> egui::Response {
+pub fn badge(ui: &mut egui::Ui, course: &Course, tier: u8, size: f32) -> egui::Response {
     let (r, resp) = ui.allocate_exact_size(Vec2::splat(size), Sense::click());
-    draw_badge(ui.painter(), r, course, earned);
+    draw_badge(ui.painter(), r, course, tier);
     resp
 }
 
 impl App {
     pub fn badge_earned(&self, c: usize) -> Option<u64> { self.s.ach.get(&self.courses[c].badge_id()).copied() }
+
+    /// How far the course badge has grown: bronze after the first chapter, silver at half, gold at the end.
+    pub fn badge_tier(&self, c: usize) -> u8 {
+        let prog = self.progress(c);
+        if self.badge_earned(c).is_some() || prog >= 1.0 { 3 } else if prog >= 0.5 { 2 } else if self.module_done(c, 0) { 1 } else { 0 }
+    }
 
     /// The Learn tab header: a code-drawn quest card (badge, course info, a self-typing code line, progress).
     pub fn quest_card(&mut self, ui: &mut egui::Ui, c: usize) {
@@ -52,7 +47,7 @@ impl App {
             ui.painter().rect_filled(Rect::from_min_size(top.min - Vec2::new(SP_M - 3.0, SP_M - 3.0), Vec2::new(top.width() + 2.0 * SP_M - 6.0, 5.0)), 0.0, col);
             ui.add_space(SP_XS);
             ui.horizontal(|ui| {
-                badge(ui, &self.courses[c], earned, 72.0).on_hover_text(format!("{} badge: {}", self.courses[c].badge.name, if earned { "earned!" } else { "clear every lesson to earn it" }));
+                badge(ui, &self.courses[c], self.badge_tier(c), 72.0).on_hover_text(format!("{} badge ({}): {}", self.courses[c].badge.name, TIER_NAMES[self.badge_tier(c) as usize], if earned { "earned!" } else { "bronze after chapter 1, silver at half, gold when you finish" }));
                 ui.add_space(SP_XS);
                 ui.vertical(|ui| {
                     let cs = &self.courses[c];
@@ -103,6 +98,7 @@ impl App {
         let total = self.courses[c].lesson_count();
         let done = (prog * total as f32).round() as usize;
         egui::Panel::bottom("pv_bot").frame(egui::Frame::new().fill(BG2).inner_margin(egui::Margin::same(SCREEN_PAD))).show(ctx, |ui| {
+            ledge(ui, false);
             let (label, color) = match (next, prog > 0.0) {
                 (Some(_), false) => ("START COURSE".to_string(), GOLD),
                 (Some((m, l)), true) => (format!("CONTINUE: {}", self.courses[c].modules[m].lessons[l].title.to_uppercase()), GOLD),
@@ -117,8 +113,9 @@ impl App {
             ui.add_space(SP_S);
             if pbtn(ui, "OPEN COURSE MAP", PANEL_HI, 0.0).clicked() { self.screen = Screen::Main; self.select_course(c); }
         });
+        let mut notes: Option<(usize, usize)> = None;
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
-            if self.s.floor { floor(ui.painter(), ui.max_rect(), self.s.scan); }
+            if self.s.floor { floor(ui.painter(), ui.clip_rect(), self.s.scan); }
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 let cs = &self.courses[c];
                 // hero block
@@ -128,7 +125,7 @@ impl App {
                     ui.painter().rect_filled(Rect::from_min_size(top.min - Vec2::new(SP_M - 3.0, SP_M - 3.0), Vec2::new(top.width() + 2.0 * SP_M - 6.0, 5.0)), 0.0, cs.color);
                     ui.add_space(SP_XS);
                     ui.horizontal(|ui| {
-                        badge(ui, cs, earned.is_some(), 96.0);
+                        badge(ui, cs, self.badge_tier(c), 96.0);
                         ui.add_space(SP_S);
                         ui.vertical(|ui| {
                             ui.horizontal_wrapped(|ui| { for t in [cs.level, cs.cat] { tag(ui, t, PANEL_HI); } tag(ui, &format!("~{} hours", cs.hours), PANEL_HI); });
@@ -180,13 +177,13 @@ impl App {
                     ui.set_width(ui.available_width());
                     card_title(ui, "COURSE BADGE");
                     ui.horizontal(|ui| {
-                        badge(ui, cs, earned.is_some(), 64.0);
+                        badge(ui, cs, self.badge_tier(c), 64.0);
                         ui.add_space(SP_S);
                         ui.vertical(|ui| {
                             ui.label(title(cs.badge.name, 11.0).color(if earned.is_some() { GOLD } else { INK }));
                             ui.add_space(SP_XS);
                             ui.label(body(cs.badge.desc, 13.0).color(DIM));
-                            ui.label(body(match earned { Some(d) => format!("Earned {}", day_label(d)), None => format!("Clear all {} lessons to earn it ({} to go)", total, total - done) }, 12.0).color(if earned.is_some() { GREEN } else { DIM }));
+                            ui.label(body(match earned { Some(d) => format!("Earned {}", day_label(d)), None => format!("{} now. Bronze after chapter 1, silver at half, gold when all {} lessons are clear ({} to go).", TIER_NAMES[self.badge_tier(c) as usize], total, total - done) }, 12.0).color(if earned.is_some() { GREEN } else { DIM }));
                         });
                     });
                 });
@@ -219,11 +216,41 @@ impl App {
                                 else { ui.painter().rect_filled(Rect::from_center_size(r.center(), Vec2::splat(8.0)), 0.0, PANEL_HI); }
                                 ui.label(body(l.title, 14.0).color(if d || open { INK } else { DIM }));
                                 if l.project { tag(ui, "PROJECT", ORANGE); }
+                                if d { ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| if mini_btn(ui, "NOTES", BLUE).on_hover_text("Re-read the explanation and summary").clicked() { notes = Some((mi, li)); }); }
                             });
                         }
                     });
                 }
                 ui.add_space(SP_L);
+            });
+        });
+        if let Some((m, l)) = notes { self.screen = Screen::Notes(c, m, l); }
+    }
+
+    /// Re-read a cleared lesson: its explanation and key points, with a way to practise again.
+    pub fn notes_screen(&mut self, ctx: &mut egui::Ui, c: usize, m: usize, l: usize) {
+        let title_text = self.courses[c].modules[m].lessons[l].title;
+        header(ctx, self, title_text, true, false);
+        if matches!(self.screen, Screen::Main) { self.screen = Screen::Preview(c); return; }
+        egui::Panel::bottom("notes_bot").frame(egui::Frame::new().fill(BG2).inner_margin(egui::Margin::same(SCREEN_PAD))).show(ctx, |ui| {
+            ledge(ui, false);
+            ui.horizontal(|ui| {
+                if pbtn(ui, "BACK", PANEL_HI, 110.0).clicked() { self.screen = Screen::Preview(c); }
+                let w = ui.available_width();
+                if pbtn(ui, "PRACTISE AGAIN", GOLD, w).clicked() { self.screen = Screen::Main; self.open_lesson(c, m, l); }
+            });
+        });
+        egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
+            if self.s.floor { floor(ui.painter(), ui.clip_rect(), self.s.scan); }
+            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                let ls = &self.courses[c].modules[m].lessons[l];
+                ui.label(title(format!("{}  *  {}", self.courses[c].name.to_uppercase(), self.courses[c].modules[m].name.to_uppercase()), 8.0).color(DIM));
+                ui.add_space(SP_S);
+                if !ls.summary.is_empty() { crate::lesson::summary_card(ui, "KEY POINTS", &ls.summary); }
+                if !ls.explain.is_empty() { crate::lesson::explain_page(ui, ls.explain); }
+                for (text, _) in &ls.slides {
+                    panel(ui, PANEL, EDGE, |ui| { ui.set_width(ui.available_width()); ui.label(RichText::new(*text).monospace().size(14.0).color(PARCH)); });
+                }
             });
         });
     }

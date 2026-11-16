@@ -7,7 +7,7 @@ pub fn course() -> Course {
         desc: "Bring pages to life with JavaScript: logic, loops, arrays, functions, objects and the page itself.",
         teaches: vec!["The console, variables and data types", "Decisions with if / else and random numbers", "Loops, arrays and functions", "Objects for structured data", "Changing a web page with the DOM"],
         snippet: r##"console.log("Hello, hero!");"##,
-        badge: Badge { name: "Lightning Mage", art: "scroll_lightning", desc: "Cast every JavaScript spell" },
+        badge: Badge { name: "Lightning Mage", art: "crown", desc: "Cast every JavaScript spell" },
         modules: vec![console(), variables(), conditionals(), loops(), arrays(), functions(), objects(), the_page()],
     }
 }

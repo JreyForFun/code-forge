@@ -13,6 +13,7 @@ impl App {
         let mut finish = false;
         let enter = ctx.ctx().input(|i| i.key_pressed(egui::Key::Enter));
         egui::Panel::bottom("ob_bot").frame(egui::Frame::new().fill(BG2).inner_margin(16.0)).show(ctx, |ui| {
+            ledge(ui, false);
             ui.horizontal(|ui| {
                 if ob.step > 0 && pbtn(ui, "BACK", PANEL_HI, 110.0).clicked() { ob.step -= 1; }
                 let last = ob.step + 1 == STEPS;
@@ -24,7 +25,7 @@ impl App {
             });
         });
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
-            floor(ui.painter(), ui.max_rect(), true);
+            floor(ui.painter(), ui.clip_rect(), true);
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 // step dots
                 ui.horizontal(|ui| {

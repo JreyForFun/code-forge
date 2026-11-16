@@ -22,17 +22,11 @@ impl App {
             let (r, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 62.0), Sense::click());
             let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
             let p = ui.painter();
-            p.rect_filled(r.translate(Vec2::new(0.0, 4.0)), 0.0, EDGE);
-            p.rect_filled(r, 0.0, if open || resp.hovered() { PANEL_HI } else { PANEL });
-            p.rect_stroke(r, 0.0, Stroke::new(2.0, EDGE), egui::StrokeKind::Inside);
-            let ir = Rect::from_min_size(r.min + Vec2::new(10.0, 10.0), Vec2::splat(42.0));
-            let col = if done { GREEN } else if unlocked { GOLD } else { locked_grey() };
-            p.rect_filled(ir.expand(2.0), 0.0, EDGE);
-            p.rect_filled(ir, 0.0, if done { Color32::from_rgb(0x1a, 0x3a, 0x12) } else { BG });
-            p.rect_stroke(ir, 0.0, Stroke::new(3.0, col), egui::StrokeKind::Inside);
-            if done { draw_spr(p, ir.min + Vec2::new(9.0, 9.0), Spr::Check, 2.0, &[('w', GREEN)]); }
-            else if unlocked { p.text(ir.center(), Align2::CENTER_CENTER, format!("{}", mi + 1), FontId::new(14.0, press()), GOLD); }
-            else { draw_icon(p, ir.shrink(6.0), "keyhole", Color32::from_gray(120)); }
+            p.add(frame_shapes(r, if open || resp.hovered() { PANEL_HI } else { PANEL }, if open { GOLD } else if done { GREEN } else { EDGE }));
+            let ir = Rect::from_min_size(r.min + Vec2::new(11.0, 10.0), Vec2::splat(42.0));
+            if done { bevel(p, ir, Color32::from_rgb(0x2a, 0x6a, 0x22), false); draw_spr(p, ir.min + Vec2::new(9.0, 9.0), Spr::Check, 2.0, &[('w', Color32::WHITE)]); }
+            else if unlocked { bevel(p, ir, Color32::from_rgb(0x8a, 0x6a, 0x1c), false); p.text(ir.center(), Align2::CENTER_CENTER, format!("{}", mi + 1), FontId::new(14.0, press()), Color32::WHITE); }
+            else { p.rect_filled(ir, 0.0, EDGE); draw_icon(p, ir, "door", Color32::from_gray(170)); }
             let total = self.courses[c].modules[mi].lessons.len();
             let cleared = (0..total).filter(|l| self.is_done(c, mi, *l)).count();
             p.text(Pos2::new(r.min.x + 66.0, r.center().y - 8.0), Align2::LEFT_CENTER, self.courses[c].modules[mi].name, FontId::new(9.0, press()), if unlocked { INK } else { DIM });
@@ -49,11 +43,12 @@ impl App {
                 let blurb = self.courses[c].modules[mi].desc;
                 if !blurb.is_empty() { ui.label(body(format!("  {}", blurb), 13.0).color(DIM)); ui.add_space(SP_S); }
                 if !unlocked { ui.label(body("  Clear the previous chapter to unlock.", 13.0).color(DIM)); ui.add_space(SP_S); }
+                panel(ui, Color32::from_rgb(0x14, 0x12, 0x20), EDGE, |ui| {
+                ui.set_width(ui.available_width());
                 for li in 0..total {
                     let ld = self.is_done(c, mi, li);
                     let lu = self.lesson_unlocked(c, mi, li);
                     ui.horizontal(|ui| {
-                        ui.add_space(SP_L);
                         let tl = self.courses[c].modules[mi].lessons[li].title;
                         ui.vertical(|ui| {
                             ui.label(body(format!("Lesson {}", li + 1), 12.0).color(DIM));
@@ -72,8 +67,14 @@ impl App {
                             } else { icon(ui, "keyhole", 28.0); }
                         });
                     });
-                    ui.add_space(SP_S);
+                    if li + 1 < total {
+                        ui.add_space(SP_XS);
+                        let (sr, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 2.0), Sense::hover());
+                        ui.painter().rect_filled(sr, 0.0, Color32::from_white_alpha(12));
+                        ui.add_space(SP_XS);
+                    }
                 }
+                });
             }
         }
         ui.add_space(SP_S);
@@ -82,7 +83,7 @@ impl App {
             ui.set_width(ui.available_width());
             ui.vertical_centered(|ui| {
                 let (r, _) = ui.allocate_exact_size(Vec2::splat(88.0), Sense::hover());
-                draw_badge(ui.painter(), r, &self.courses[c], prog >= 1.0);
+                draw_badge(ui.painter(), r, &self.courses[c], self.badge_tier(c));
                 ui.label(title(format!("{} BADGE", self.courses[c].badge.name.to_uppercase()), 10.0).color(if prog >= 1.0 { GOLD } else { INK }));
                 ui.add_space(SP_XS);
                 let left = self.courses[c].lesson_count() - (prog * self.courses[c].lesson_count() as f32).round() as usize;
@@ -419,7 +420,7 @@ impl App {
                     let earned = self.badge_earned(c);
                     ui.vertical(|ui| {
                         ui.set_width(bw);
-                        let r = badge(ui, &self.courses[c], earned.is_some(), bw).on_hover_text(match earned { Some(d) => format!("{} - earned {}", self.courses[c].badge.name, day_label(d)), None => format!("{} - finish {} to earn", self.courses[c].badge.name, self.courses[c].name) });
+                        let r = badge(ui, &self.courses[c], self.badge_tier(c), bw).on_hover_text(match earned { Some(d) => format!("{} - earned {}", self.courses[c].badge.name, day_label(d)), None => format!("{} - finish {} to earn", self.courses[c].badge.name, self.courses[c].name) });
                         if r.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.screen = Screen::Preview(c); }
                         ui.vertical_centered(|ui| ui.label(body(self.courses[c].tag, 11.0).color(if earned.is_some() { GOLD } else { DIM })));
                     });
@@ -507,7 +508,7 @@ impl App {
         panel(ui, PANEL, GOLD, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
-                badge(ui, &self.courses[c], self.badge_earned(c).is_some(), 56.0);
+                badge(ui, &self.courses[c], self.badge_tier(c), 56.0);
                 ui.vertical(|ui| {
                     ui.label(title(self.courses[c].name, 10.0));
                     match next {
@@ -548,7 +549,7 @@ impl App {
             panel(ui, PANEL, EDGE, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    badge(ui, &self.courses[ci], self.badge_earned(ci).is_some(), 56.0);
+                    badge(ui, &self.courses[ci], self.badge_tier(ci), 56.0);
                     ui.vertical(|ui| {
                         ui.label(title(self.courses[ci].name, 10.0));
                         ui.label(body(format!("{}  -  {}  -  {} chapters, {} lessons, {} projects", self.courses[ci].level, self.courses[ci].cat, self.courses[ci].modules.len(), lessons, self.courses[ci].project_count()), 12.0).color(DIM));

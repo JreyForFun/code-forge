@@ -11,7 +11,8 @@ pub enum Q {
 }
 
 #[derive(Clone)]
-pub struct Lesson { pub title: &'static str, pub slides: Vec<(&'static str, &'static str)>, pub qs: Vec<Q>, pub project: bool }
+/// `explain` is the long beginner-friendly explanation ("The Full Scroll"); `summary` lists the key points.
+pub struct Lesson { pub title: &'static str, pub slides: Vec<(&'static str, &'static str)>, pub qs: Vec<Q>, pub project: bool, pub explain: &'static str, pub summary: Vec<&'static str> }
 pub struct Module { pub name: &'static str, pub desc: &'static str, pub lessons: Vec<Lesson> }
 /// A course badge, earned by clearing every lesson in the course.
 pub struct Badge { pub name: &'static str, pub art: &'static str, pub desc: &'static str }

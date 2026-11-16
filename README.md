@@ -6,7 +6,7 @@ computer.
 
 ## Quick start (players)
 
-1. Unzip `PixelLearn-1.1.0-windows.zip` anywhere.
+1. Unzip `PixelLearn-1.2.0-windows.zip` anywhere.
 2. Double-click **PixelLearn.exe**.
 3. Choose a name, a hero and your first course, then start learning.
 
@@ -14,16 +14,23 @@ Nothing to install, no account, no internet needed.
 
 ## What's inside
 
-- **5 courses, 135 lessons**: HTML (4 chapters), CSS (5), JavaScript (8), Python and SQL. Every lesson
-  has three steps: *Learn → Complete the code → Type the code*, and every web chapter ends with a
-  **checkpoint project** (+10 bonus XP).
+- **5 courses, 181 lessons**: HTML (4 chapters), CSS (5), JavaScript (8), Python (9) and SQL (7).
+  Every chapter ends with a **checkpoint project** (+10 bonus XP).
+- **Deep lessons**: picture slides, then **The Full Scroll** (a long, plain-language explanation with
+  examples and common mistakes), then a **summary** of key points, then at least six practice steps:
+  concept checks, *complete the code*, *type the code* and *code it from memory*. Re-read any cleared
+  lesson's notes from the course preview.
 - **Course preview**: see a course's chapters, lessons, projects, estimated time, what you'll learn
   and its badge before you start.
-- **Course badges**: finish a course to earn its badge (Stonemason, Prism Painter, Lightning Mage,
-  Serpent Sage, Vault Keeper).
-- **Real feedback**: Python and JavaScript snippets really run (objects, functions, loops, template
-  strings), JavaScript DOM lessons show the simulated page changing, HTML shows a preview including
-  forms, CSS shows the styled result, and SQL queries run against a small sample database.
+- **Course badges** that grow with you: bronze after the first chapter, silver at half, gold when the
+  course is done (Stonemason, Prism Painter, Lightning Mage, Serpent Sage, Vault Keeper).
+- **Dungeon look**: stone-brick walls, iron-studded stone cards, carved stone buttons, parchment pages
+  and wooden frames for highlights.
+- **Real feedback**: Python and JavaScript snippets really run (functions, loops, lists, dictionaries,
+  classes, `math` and `random`, objects, template strings), JavaScript DOM lessons show the simulated
+  page changing, HTML shows a preview including forms, CSS shows the styled result, and SQL runs
+  against a sample database (heroes, items, guilds, quests) with filters, totals, joins, INSERT,
+  UPDATE, DELETE and CREATE TABLE.
 - **Spell Forge**: write, run and save your own programs in any of the five languages, or start
   from bundled examples.
 - **Practice**: quick challenges and duels against computer opponents (duels never cost hearts).
@@ -58,16 +65,18 @@ cargo run --release   # optimized build, no console window
 powershell -ExecutionPolicy Bypass -File scripts/package.ps1   # dist/PixelLearn-<ver>-windows.zip
 ```
 
-QA helpers: `--screenshot out.png [--tab learn|train|ranks|create|hero] [--screen settings|editor|sql|complete|shop|notif|avatar|nohearts] [--onboarding] [--size 360x600]`.
+QA helpers: `--screenshot out.png [--tab learn|train|ranks|create|hero] [--screen settings|editor|sql|complete|shop|notif|avatar|nohearts|preview|notes] [--lesson C.M.L --stage N] [--onboarding] [--size 360x600]`.
 Screenshot mode uses an in-memory demo profile and never touches your save.
 
 Project plan and specs live in `specs/` (Spec Kit). Project principles are in
 `.specify/memory/constitution.md`.
 
-> **Note on assets:** the Pixelrepo license forbids redistributing the raw art files. Before
-> publishing this source code publicly, remove or replace `assets/art/`.
+> **Note on assets:** the Pixelrepo and GTORAVERSE licenses do not allow redistributing the raw art
+> files. Before publishing this source code publicly, remove or replace `assets/art/` and
+> `assets/badges/` (the Kenney tiles in `assets/ui/` are CC0 and may stay).
 
 ## Credits
 
-Assets by Pixelrepo (https://pixelrepo.com). Fonts: Press Start 2P and Silkscreen (SIL OFL).
+Assets by Pixelrepo (https://pixelrepo.com), Kenney (https://www.kenney.nl, CC0) and GTORAVERSE
+(Achievement Icon Pack). Fonts: Press Start 2P and Silkscreen (SIL OFL).
 See [CREDITS.md](CREDITS.md).
