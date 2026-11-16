@@ -134,7 +134,7 @@ They help search engines and screen readers."#, "shield"),
 }
 
 fn css() -> Course {
-    Course { name: "CSS", tag: "CSS", color: Color32::from_rgb(0x23, 0x7b, 0xe0), lang: "", cat: "Web", level: "Beginner", desc: "Style web pages with colors, fonts, spacing and layout", modules: vec![
+    Course { name: "CSS", tag: "CSS", color: Color32::from_rgb(0x23, 0x7b, 0xe0), lang: "css", cat: "Web", level: "Beginner", desc: "Style web pages with colors, fonts, spacing and layout", modules: vec![
         m("Selectors", vec![
             l("Your First Rule", &[
                 (r#"CSS styles HTML. A rule has a selector (what to style) and declarations (how).
@@ -497,7 +497,7 @@ print(heal(5))  # 15"#, "potion_red"),
 }
 
 fn sql() -> Course {
-    Course { name: "SQL", tag: "SQL", color: Color32::from_rgb(0x1f, 0x9d, 0x8a), lang: "", cat: "Data", level: "Beginner", desc: "Learn database basics, queries, filtering and totals", modules: vec![
+    Course { name: "SQL", tag: "SQL", color: Color32::from_rgb(0x1f, 0x9d, 0x8a), lang: "sql", cat: "Data", level: "Beginner", desc: "Learn database basics, queries, filtering and totals", modules: vec![
         m("Querying", vec![
             l("SELECT", &[
                 (r#"SQL talks to databases. SELECT reads rows from a table.
@@ -591,4 +591,59 @@ GROUP BY class;"#, "map"),
             ]),
         ]),
     ]}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interp::{run, Kind};
+
+    #[test]
+    fn content_is_well_formed() {
+        let cs = all();
+        assert_eq!(cs.len(), 5);
+        for c in &cs {
+            assert!(!c.modules.is_empty(), "{} has no chapters", c.name);
+            for m in &c.modules {
+                assert!(!m.lessons.is_empty(), "{} / {} has no lessons", c.name, m.name);
+                for l in &m.lessons {
+                    let at = format!("{} / {} / {}", c.name, m.name, l.title);
+                    assert!(!l.slides.is_empty(), "{at}: no slides");
+                    assert!(!l.qs.is_empty(), "{at}: no questions");
+                    for (_, img) in &l.slides { assert!(crate::art::art_exists(img), "{at}: unknown picture '{img}'"); }
+                    for q in &l.qs {
+                        match q {
+                            Q::Mc { opts, right, .. } => assert!(*right < opts.len(), "{at}: bad answer index"),
+                            Q::Fill { code, opts, right, .. } => {
+                                assert!(*right < opts.len(), "{at}: bad answer index");
+                                assert!(code.contains("___"), "{at}: fill question has no gap");
+                            }
+                            Q::Type { answer, .. } => assert!(!answer.trim().is_empty(), "{at}: empty answer"),
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// SC-002: typing the expected answer in any course never produces an error.
+    #[test]
+    fn content_answers_run_clean() {
+        let mut failures = vec![];
+        for c in all() {
+            for m in &c.modules {
+                for l in &m.lessons {
+                    for q in &l.qs {
+                        if let Q::Type { answer, .. } = q {
+                            let out = run(c.lang, answer);
+                            if let Some((_, e)) = out.iter().find(|(k, _)| *k == Kind::Err) {
+                                failures.push(format!("{} / {}: `{}` -> {}", c.name, l.title, answer.replace('\n', "⏎"), e));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{} answers fail:\n{}", failures.len(), failures.join("\n"));
+    }
 }

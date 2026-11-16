@@ -18,28 +18,46 @@ impl App {
             match shown_q.map(|i| &rs.qs[i]) { Some(Q::Fill { .. }) => "2  COMPLETE THE CODE", Some(Q::Type { guide: true, .. }) => "3  TYPE THE CODE", Some(Q::Type { .. }) => "3  CODE IT FROM MEMORY", _ => "QUIZ" }
         };
 
+        let (enter, ctrl_enter, num_key) = ctx.ctx().input(|i| {
+            let n = [egui::Key::Num1, egui::Key::Num2, egui::Key::Num3, egui::Key::Num4, egui::Key::Num5].iter().position(|k| i.key_pressed(*k));
+            (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Enter) && i.modifiers.command, n)
+        });
+        let typing_multiline = matches!(cur_q.map(|i| &rs.qs[i]), Some(Q::Type { answer, .. }) if answer.contains('\n')) && rs.fb.is_none() && !in_slides;
+        let go = if typing_multiline { ctrl_enter } else { enter };
+        if !in_slides && rs.fb.is_none() {
+            if let (Some(n), Some(qi)) = (num_key, cur_q) {
+                let len = match &rs.qs[qi] { Q::Mc { opts, .. } | Q::Fill { opts, .. } => opts.len(), _ => 0 };
+                if n < len { rs.sel = Some(n); }
+            }
+        }
+        if ctx.ctx().input(|i| i.key_pressed(egui::Key::Escape)) && self.modal == Modal::None { keep = false; }
+
         egui::Panel::top("rtop").frame(egui::Frame::new().fill(BG2).inner_margin(egui::Margin { left: 16, right: 16, top: 12, bottom: 12 })).show(ctx, |ui| {
             ui.horizontal(|ui| {
                 let (r, resp) = ui.allocate_exact_size(Vec2::splat(28.0), Sense::click());
                 ui.painter().text(r.center(), Align2::CENTER_CENTER, "X", FontId::new(14.0, press()), if resp.hovered() { INK } else { DIM });
-                if resp.clicked() { keep = false; }
+                if resp.on_hover_text("Leave (progress is kept)").clicked() { keep = false; }
                 let total = (n_slides + rs.total).max(1) as f32;
                 let done = if in_slides { rs.stage as f32 / total } else { (n_slides as f32 + rs.right as f32) / total };
                 ui.allocate_ui(Vec2::new((ui.available_width() - 70.0).max(40.0), 18.0), |ui| bar(ui, done, GREEN, 12.0));
-                if !duel { spr(ui, Spr::Heart, 2.0, &[]); ui.label(title(self.s.hearts.to_string(), 11.0)); }
+                if !duel { icon(ui, "heart", 26.0); ui.label(title(self.s.hearts.to_string(), 11.0)); }
             });
         });
 
         let bot_fill = match &rs.fb { Some((true, _)) => Color32::from_rgb(0x10, 0x32, 0x1c), Some((false, _)) => Color32::from_rgb(0x3a, 0x12, 0x1e), None => BG2 };
         egui::Panel::bottom("rbot").frame(egui::Frame::new().fill(bot_fill).inner_margin(16.0)).show(ctx, |ui| {
             if in_slides {
-                if pbtn(ui, if rs.stage + 1 == n_slides { "COMPLETE THE CODE" } else { "NEXT" }, GOLD, 0.0).clicked() { rs.stage += 1; }
+                ui.horizontal(|ui| {
+                    if rs.stage > 0 && pbtn(ui, "BACK", PANEL_HI, 100.0).clicked() { rs.stage -= 1; }
+                    let w = ui.available_width();
+                    if pbtn(ui, if rs.stage + 1 == n_slides { "START THE QUIZ" } else { "NEXT" }, GOLD, w).clicked() || go { rs.stage += 1; }
+                });
             } else if let Some((ok, why)) = rs.fb.clone() {
                 ui.label(title(if ok { "CORRECT" } else { "NOT QUITE" }, 12.0).color(if ok { GREEN } else { RED }));
                 ui.add_space(2.0);
                 ui.label(body(why, 14.0));
                 ui.add_space(8.0);
-                if pbtn(ui, "CONTINUE", if ok { GREEN } else { RED }, 0.0).clicked() {
+                if pbtn(ui, "CONTINUE", if ok { GREEN } else { RED }, 0.0).clicked() || go {
                     rs.fb = None; rs.sel = None; rs.text.clear();
                     if rs.queue.is_empty() { finished = true; }
                     else if self.s.hearts == 0 && !duel { keep = false; self.modal = Modal::NoHearts; }
@@ -50,11 +68,11 @@ impl App {
                     let hint_w = 120.0;
                     if rs.hint_q != Some(qi) {
                         if pbtn(ui, &format!("HINT {}G", HINT_COST), PANEL_HI, hint_w).clicked() {
-                            if self.s.gems >= HINT_COST { self.s.gems -= HINT_COST; rs.hint_q = Some(qi); self.s.store(); } else { self.say("Not enough gems"); }
+                            if self.s.gems >= HINT_COST { self.s.gems -= HINT_COST; rs.hint_q = Some(qi); self.persist(); } else { self.toast("Not enough gems"); }
                         }
                     }
                     let w = ui.available_width();
-                    if pbtn(ui, "CHECK", if can { GOLD } else { PANEL_HI }, w).clicked() && can {
+                    if (pbtn(ui, "CHECK", if can { GOLD } else { PANEL_HI }, w).clicked() || go) && can {
                         let (ok, why) = match &rs.qs[qi] {
                             Q::Mc { right, why, .. } | Q::Fill { right, why, .. } => (rs.sel == Some(*right), why.to_string()),
                             Q::Type { answer, why, .. } => (norm_code(&rs.text) == norm_code(answer), if norm_code(&rs.text) == norm_code(answer) { why.to_string() } else { format!("{}  Answer: {}", why, answer) }),
@@ -66,10 +84,10 @@ impl App {
                             if let Kind::Lesson(c, mi, l) = rs.kind {
                                 let e = self.s.qdone.entry(Self::key(c, mi, l)).or_default();
                                 if !e.contains(&qi) { e.push(qi); }
-                                self.s.store();
+                                self.persist();
                             }
                         }
-                        else { rs.mistakes += 1; if !duel { rs.queue.push(qi); self.lose_heart(); } }
+                        else { rs.mistakes += 1; if !duel { rs.queue.push(qi); game::lose_heart(&mut self.s, now()); self.persist(); } }
                         rs.fb = Some((ok, why));
                     }
                 });
@@ -145,7 +163,7 @@ impl App {
                                 }
                             });
                             ui.add_space(6.0);
-                            ui.label(body("Tap a piece or drag it into the gap.", 12.0).color(DIM));
+                            ui.label(body("Click a piece (or press 1-4), or drag it into the gap.", 12.0).color(DIM));
                             ui.add_space(6.0);
                             let struck = if rs.hint_q == Some(qi) { (0..opts.len()).find(|i| *i != right) } else { None };
                             ui.horizontal_wrapped(|ui| {
@@ -185,10 +203,13 @@ impl App {
                                 });
                             }
                             if rs.hint_q == Some(qi) { ui.label(body(format!("Hint: {} characters, starts with '{}'", answer.chars().filter(|c| !c.is_whitespace()).count(), answer.chars().next().unwrap_or(' ')), 14.0).color(GOLD)); ui.add_space(4.0); }
-                            let rows = answer.lines().count().max(2) + 1;
+                            let multi = answer.contains('\n');
                             panel(ui, Color32::from_rgb(0x07, 0x0c, 0x1c), if locked { if ok_now { GREEN } else { RED } } else { GOLD }, |ui| {
-                                ui.add_enabled(!locked, egui::TextEdit::multiline(&mut rs.text).code_editor().desired_rows(rows).desired_width(f32::INFINITY).hint_text("type here").text_color(PARCH).frame(egui::Frame::NONE));
+                                let te = if multi { egui::TextEdit::multiline(&mut rs.text).desired_rows(answer.lines().count() + 1) } else { egui::TextEdit::singleline(&mut rs.text) };
+                                let r = ui.add_enabled(!locked, te.code_editor().desired_width(f32::INFINITY).hint_text("type here").text_color(PARCH).frame(egui::Frame::NONE));
+                                if !locked && !r.has_focus() && rs.text.is_empty() { r.request_focus(); }
                             });
+                            ui.label(body(if multi { "Ctrl+Enter to check" } else { "Enter to check" }, 11.0).color(DIM));
                             if locked && ok_now && !self.course_lang(&rs).is_empty() {
                                 let out = interp::run(self.course_lang(&rs), &rs.text);
                                 panel(ui, PANEL, EDGE, |ui| { ui.set_width(ui.available_width()); ui.label(title("OUTPUT", 9.0).color(GOLD)); ui.add_space(4.0); out_view(ui, &out); });

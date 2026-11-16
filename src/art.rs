@@ -260,36 +260,68 @@ pub fn panel_resp(ui: &mut egui::Ui, fill: Color32, edge: Color32, f: impl FnOnc
 // ---------- pixel art from Pixelrepo's free collection ----------
 pub static TEX: OnceLock<HashMap<&'static str, (egui::TextureId, Vec2)>> = OnceLock::new();
 
+/// Every embedded picture: Pixelrepo Free collection (credited in Settings and README).
+pub const ART: &[(&str, &[u8])] = &[
+    ("potion_red", include_bytes!("../assets/art/potion_red.png")),
+    ("crystal_purple", include_bytes!("../assets/art/crystal_purple.png")),
+    ("crystal_blue", include_bytes!("../assets/art/crystal_blue.png")),
+    ("torch", include_bytes!("../assets/art/torch.png")),
+    ("chest", include_bytes!("../assets/art/chest.png")),
+    ("book", include_bytes!("../assets/art/book.png")),
+    ("sword", include_bytes!("../assets/art/sword.png")),
+    ("shield", include_bytes!("../assets/art/shield.png")),
+    ("helmet", include_bytes!("../assets/art/helmet.png")),
+    ("map", include_bytes!("../assets/art/map.png")),
+    ("key", include_bytes!("../assets/art/key.png")),
+    ("staff", include_bytes!("../assets/art/staff.png")),
+    ("cauldron", include_bytes!("../assets/art/cauldron.png")),
+    ("scroll_fire", include_bytes!("../assets/art/scroll_fire.png")),
+    ("coin_gold", include_bytes!("../assets/art/coin_gold.png")),
+    ("gem_green", include_bytes!("../assets/art/gem_green.png")),
+    ("orb_red", include_bytes!("../assets/art/orb_red.png")),
+    ("axe", include_bytes!("../assets/art/axe.png")),
+    ("banner", include_bytes!("../assets/art/banner.png")),
+    ("banner_royal", include_bytes!("../assets/art/banner_royal.png")),
+    ("bow", include_bytes!("../assets/art/bow.png")),
+    ("campfire", include_bytes!("../assets/art/campfire.png")),
+    ("chalice", include_bytes!("../assets/art/chalice.png")),
+    ("coins", include_bytes!("../assets/art/coins.png")),
+    ("console", include_bytes!("../assets/art/console.png")),
+    ("cpu", include_bytes!("../assets/art/cpu.png")),
+    ("crown", include_bytes!("../assets/art/crown.png")),
+    ("cup_silver", include_bytes!("../assets/art/cup_silver.png")),
+    ("flame", include_bytes!("../assets/art/flame.png")),
+    ("gear", include_bytes!("../assets/art/gear.png")),
+    ("hammer", include_bytes!("../assets/art/hammer.png")),
+    ("hat_wizard", include_bytes!("../assets/art/hat_wizard.png")),
+    ("heart", include_bytes!("../assets/art/heart.png")),
+    ("helmet_bronze", include_bytes!("../assets/art/helmet_bronze.png")),
+    ("helmet_knight", include_bytes!("../assets/art/helmet_knight.png")),
+    ("hourglass", include_bytes!("../assets/art/hourglass.png")),
+    ("keyhole", include_bytes!("../assets/art/keyhole.png")),
+    ("lantern", include_bytes!("../assets/art/lantern.png")),
+    ("letter", include_bytes!("../assets/art/letter.png")),
+    ("medallion", include_bytes!("../assets/art/medallion.png")),
+    ("money_bag", include_bytes!("../assets/art/money_bag.png")),
+    ("mystic_figure", include_bytes!("../assets/art/mystic_figure.png")),
+    ("potion_magic", include_bytes!("../assets/art/potion_magic.png")),
+    ("scroll_lightning", include_bytes!("../assets/art/scroll_lightning.png")),
+    ("spellbook", include_bytes!("../assets/art/spellbook.png")),
+    ("amulet", include_bytes!("../assets/art/chest2.png")),
+];
+
+pub fn art_exists(name: &str) -> bool { ART.iter().any(|(n, _)| *n == name) }
+
 pub fn load_textures(ctx: &egui::Context) -> Vec<egui::TextureHandle> {
-    let files: [(&'static str, &'static [u8]); 18] = [
-        ("potion_red", include_bytes!("../assets/art/potion_red.png")),
-        ("crystal_purple", include_bytes!("../assets/art/crystal_purple.png")),
-        ("crystal_blue", include_bytes!("../assets/art/crystal_blue.png")),
-        ("torch", include_bytes!("../assets/art/torch.png")),
-        ("chest", include_bytes!("../assets/art/chest.png")),
-        ("book", include_bytes!("../assets/art/book.png")),
-        ("sword", include_bytes!("../assets/art/sword.png")),
-        ("shield", include_bytes!("../assets/art/shield.png")),
-        ("helmet", include_bytes!("../assets/art/helmet.png")),
-        ("map", include_bytes!("../assets/art/map.png")),
-        ("key", include_bytes!("../assets/art/key.png")),
-        ("staff", include_bytes!("../assets/art/staff.png")),
-        ("cauldron", include_bytes!("../assets/art/cauldron.png")),
-        ("scroll_fire", include_bytes!("../assets/art/scroll_fire.png")),
-        ("coin_gold", include_bytes!("../assets/art/coin_gold.png")),
-        ("gem_green", include_bytes!("../assets/art/gem_green.png")),
-        ("orb_red", include_bytes!("../assets/art/orb_red.png")),
-        ("amulet", include_bytes!("../assets/art/chest2.png")),
-    ];
     let mut map = HashMap::new();
     let mut handles = vec![];
-    for (name, bytes) in files {
+    for (name, bytes) in ART {
         if let Ok(img) = image::load_from_memory(bytes) {
             let rgba = img.to_rgba8();
             let size = [rgba.width() as usize, rgba.height() as usize];
             let ci = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
-            let h = ctx.load_texture(name, ci, egui::TextureOptions::NEAREST);
-            map.insert(name, (h.id(), Vec2::new(size[0] as f32, size[1] as f32)));
+            let h = ctx.load_texture(*name, ci, egui::TextureOptions::NEAREST);
+            map.insert(*name, (h.id(), Vec2::new(size[0] as f32, size[1] as f32)));
             handles.push(h);
         }
     }
@@ -310,3 +342,11 @@ pub fn icon(ui: &mut egui::Ui, name: &str, size: f32) {
     draw_icon(ui.painter(), r, name, Color32::WHITE);
 }
 
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn all_art_decodes() {
+        for (n, b) in super::ART { assert!(image::load_from_memory(b).is_ok(), "{} does not decode", n); }
+    }
+}
