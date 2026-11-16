@@ -6,15 +6,14 @@ impl App {
     // ------------------------------------------------------------ LEARN
     pub fn learn(&mut self, ui: &mut egui::Ui) {
         let c = self.cur;
-        banner(ui, self.courses[c].name, self.courses[c].desc, self.courses[c].color, self.progress(c));
-        ui.add_space(8.0);
+        self.quest_card(ui, c);
         stats_row(ui, self, true);
-        ui.add_space(8.0);
+        ui.add_space(SP_S);
         if let Some((mi, li)) = self.next_lesson(c) {
             let name = self.courses[c].modules[mi].lessons[li].title;
             let resumed = self.s.qdone.get(&self.lkey(c, mi, li)).map(|d| !d.is_empty()).unwrap_or(false);
             if pbtn(ui, &format!("{}: {}", if resumed { "RESUME" } else { "NEXT QUEST" }, name.to_uppercase()), GOLD, 0.0).clicked() { self.open_lesson(c, mi, li); }
-            ui.add_space(10.0);
+            ui.add_space(SP_M);
         }
         for mi in 0..self.courses[c].modules.len() {
             let done = self.module_done(c, mi);
@@ -45,18 +44,23 @@ impl App {
                 p.rect_filled(Rect::from_min_size(Pos2::new(ax - w / 2.0 + 8.0, y), Vec2::new(w, 2.0)), 0.0, DIM);
             }
             if resp.clicked() { self.open_mod = if open { None } else { Some(mi) }; }
-            ui.add_space(8.0);
+            ui.add_space(SP_S);
             if open {
-                if !unlocked { ui.label(body("  Clear the previous chapter to unlock.", 13.0).color(DIM)); ui.add_space(6.0); }
+                let blurb = self.courses[c].modules[mi].desc;
+                if !blurb.is_empty() { ui.label(body(format!("  {}", blurb), 13.0).color(DIM)); ui.add_space(SP_S); }
+                if !unlocked { ui.label(body("  Clear the previous chapter to unlock.", 13.0).color(DIM)); ui.add_space(SP_S); }
                 for li in 0..total {
                     let ld = self.is_done(c, mi, li);
                     let lu = self.lesson_unlocked(c, mi, li);
                     ui.horizontal(|ui| {
-                        ui.add_space(14.0);
+                        ui.add_space(SP_L);
                         let tl = self.courses[c].modules[mi].lessons[li].title;
                         ui.vertical(|ui| {
                             ui.label(body(format!("Lesson {}", li + 1), 12.0).color(DIM));
-                            ui.label(body(if lu { tl } else { "???" }, 15.0).color(if lu { INK } else { DIM }));
+                            ui.horizontal(|ui| {
+                                ui.label(body(if lu { tl } else { "???" }, 15.0).color(if lu { INK } else { DIM }));
+                                if self.courses[c].modules[mi].lessons[li].project { tag(ui, "Project", ORANGE); }
+                            });
                             let key = self.lkey(c, mi, li);
                             if !ld && let Some(d) = self.s.qdone.get(&key) && !d.is_empty() { ui.label(body(format!("in progress {}/{}", d.len(), self.courses[c].modules[mi].lessons[li].qs.len()), 11.0).color(GOLD)); }
                             if let Some((b, a)) = self.s.best.get(&key) { ui.label(body(format!("best {}%  -  played {}x", b, a), 11.0).color(DIM)); }
@@ -68,26 +72,25 @@ impl App {
                             } else { icon(ui, "keyhole", 28.0); }
                         });
                     });
-                    ui.add_space(8.0);
+                    ui.add_space(SP_S);
                 }
             }
         }
-        ui.add_space(6.0);
+        ui.add_space(SP_S);
         let prog = self.progress(c);
         panel(ui, PANEL, if prog >= 1.0 { GOLD } else { EDGE }, |ui| {
             ui.set_width(ui.available_width());
             ui.vertical_centered(|ui| {
-                let (r, _) = ui.allocate_exact_size(Vec2::new(100.0, 90.0), Sense::hover());
-                draw_icon(ui.painter(), r, if prog >= 1.0 { "crown" } else { "scroll_fire" }, if prog >= 1.0 { Color32::WHITE } else { Color32::from_gray(110) });
-                ui.label(title(if prog >= 1.0 { "COURSE MASTERED!" } else { "MASTER THIS COURSE" }, 10.0));
-                ui.add_space(4.0);
+                let (r, _) = ui.allocate_exact_size(Vec2::splat(88.0), Sense::hover());
+                draw_badge(ui.painter(), r, &self.courses[c], prog >= 1.0);
+                ui.label(title(format!("{} BADGE", self.courses[c].badge.name.to_uppercase()), 10.0).color(if prog >= 1.0 { GOLD } else { INK }));
+                ui.add_space(SP_XS);
                 let left = self.courses[c].lesson_count() - (prog * self.courses[c].lesson_count() as f32).round() as usize;
-                ui.label(body(if prog >= 1.0 { "You cleared every quest in this course.".to_string() } else { format!("{} lesson{} to go. Clear them all to earn the crown.", left, if left == 1 { "" } else { "s" }) }, 13.0).color(DIM));
+                ui.label(body(if prog >= 1.0 { "You cleared every quest in this course.".to_string() } else { format!("{} lesson{} to go. Clear them all to earn this badge.", left, if left == 1 { "" } else { "s" }) }, 13.0).color(DIM));
             });
         });
-        ui.add_space(8.0);
-        ui.label(title(">> More courses", 10.0));
-        ui.add_space(8.0);
+        ui.add_space(SP_S);
+        section(ui, "MORE COURSES");
         for ci in 0..self.courses.len() {
             if ci == c { continue; }
             let p = self.progress(ci);
@@ -102,15 +105,15 @@ impl App {
                     });
                 });
             });
-            if resp.clicked() { self.select_course(ci); }
+            if resp.on_hover_text("Course details").clicked() { self.screen = Screen::Preview(ci); }
         }
-        ui.add_space(14.0);
+        ui.add_space(SP_L);
     }
 
     // ------------------------------------------------------------ TRAIN
     pub fn train(&mut self, ui: &mut egui::Ui) {
         subtabs(ui, &["COURSES", "PRACTICE", "LOG"], &mut self.sub_train);
-        ui.add_space(4.0);
+        ui.add_space(SP_XS);
         match self.sub_train { 0 => self.courses_tab(ui), 1 => self.practice(ui), _ => self.log_tab(ui) }
     }
 
@@ -118,7 +121,7 @@ impl App {
         panel(ui, PANEL, EDGE, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| { icon(ui, "scroll_lightning", 32.0); ui.vertical(|ui| { ui.label(title("Quick Challenges", 11.0)); ui.label(body("Short puzzles: +8 XP, +2 gems. Wrong answers cost hearts.", 13.0).color(DIM)); }); });
-            ui.add_space(8.0);
+            ui.add_space(SP_S);
             egui::ScrollArea::horizontal().id_salt("coach").show(ui, |ui| {
                 ui.horizontal(|ui| {
                     for c in coaches() {
@@ -134,7 +137,7 @@ impl App {
                             ui.painter().text(lr.center(), Align2::CENTER_CENTER, c.level, FontId::new(8.0, press()), Color32::WHITE);
                             if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.start_run(c.title, Kind::Coach, vec![], c.qs.clone()); }
                         });
-                        ui.add_space(8.0);
+                        ui.add_space(SP_S);
                     }
                 });
             });
@@ -142,7 +145,7 @@ impl App {
         panel(ui, PANEL, EDGE, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| { icon(ui, "axe", 32.0); ui.vertical(|ui| { ui.label(title("Duel Arena", 11.0)); ui.label(body("3 quick questions against a computer opponent. Duels never cost hearts.", 13.0).color(DIM)); }); });
-            ui.add_space(8.0);
+            ui.add_space(SP_S);
             let ow = ((ui.available_width() - 24.0) / 3.0).max(60.0);
             let opps = opponents();
             ui.horizontal(|ui| {
@@ -160,7 +163,7 @@ impl App {
                     });
                 }
             });
-            ui.add_space(6.0);
+            ui.add_space(SP_S);
             let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 96.0), Sense::hover());
             let p = ui.painter();
             p.rect_filled(r, 0.0, Color32::from_rgb(0x3a, 0x6c, 0xd0));
@@ -168,13 +171,13 @@ impl App {
             draw_avatar(p, Rect::from_min_size(Pos2::new(r.min.x + 20.0, r.min.y + 14.0), Vec2::splat(68.0)), self.s.avatar);
             p.text(r.center(), Align2::CENTER_CENTER, "VS", FontId::new(20.0, press()), Color32::WHITE);
             draw_icon(p, Rect::from_min_size(Pos2::new(r.max.x - 88.0, r.min.y + 14.0), Vec2::splat(68.0)), opps[self.opp].art, Color32::WHITE);
-            ui.add_space(6.0);
+            ui.add_space(SP_S);
             if pbtn(ui, "START DUEL", RED, 0.0).clicked() {
                 let o = self.opp;
                 self.start_run(&format!("Duel vs {}", opps[o].name), Kind::Duel(o), vec![], duel_questions(today() * 3 + o as u64 + self.s.duel_wins as u64));
             }
         });
-        ui.add_space(10.0);
+        ui.add_space(SP_M);
     }
 
     fn log_tab(&mut self, ui: &mut egui::Ui) {
@@ -185,7 +188,7 @@ impl App {
                 draw_avatar(ui.painter(), r, self.s.avatar);
                 ui.vertical(|ui| { ui.label(title(self.s.name.clone(), 10.0)); ui.label(body("Write a note in your adventure log", 13.0).color(BLUE)); });
             });
-            ui.add_space(6.0);
+            ui.add_space(SP_S);
             ui.horizontal(|ui| {
                 let r = ui.add(egui::TextEdit::singleline(&mut self.input).hint_text("Today I learned...").char_limit(140).desired_width((ui.available_width() - 104.0).max(60.0)));
                 let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
@@ -196,8 +199,7 @@ impl App {
                 }
             });
         });
-        ui.label(title("ADVENTURE LOG", 9.0).color(DIM));
-        ui.add_space(8.0);
+        section(ui, "ADVENTURE LOG");
         if self.s.log.is_empty() {
             ui.add_space(30.0);
             ui.vertical_centered(|ui| { icon(ui, "book", 64.0); ui.label(title("Your story starts here", 10.0).color(DIM)); ui.label(body("Clear a lesson to write the first page.", 13.0).color(DIM)); });
@@ -207,7 +209,7 @@ impl App {
             if last_day != Some(*d) { ui.label(body(day_label(*d), 12.0).color(GOLD)); last_day = Some(*d); }
             panel(ui, PANEL, EDGE, |ui| { ui.set_width(ui.available_width()); ui.horizontal_wrapped(|ui| { icon(ui, if t.starts_with("noted") { "letter" } else if t.contains("achievement") { "medallion" } else if t.contains("duel") { "axe" } else if t.contains("league") { "banner_royal" } else { "crystal_blue" }, 26.0); ui.label(body(format!("{} {}", self.s.name, t), 14.0)); }); });
         }
-        ui.add_space(10.0);
+        ui.add_space(SP_M);
     }
 
     // ------------------------------------------------------------ RANKS
@@ -218,7 +220,7 @@ impl App {
             chip(ui, "crystal_purple", false, &self.s.gems.to_string());
             chip(ui, "scroll_lightning", false, &format!("{} XP", self.s.week_xp));
         });
-        ui.add_space(10.0);
+        ui.add_space(SP_M);
         let league = (self.s.league as usize).min(6);
         let cols = [Color32::from_rgb(0x8a, 0x5a, 0x32), Color32::from_rgb(0x6a, 0x6c, 0x80), Color32::from_rgb(0xc0, 0x80, 0x40), Color32::from_rgb(0x8a, 0x94, 0xa8), Color32::from_rgb(0xc8, 0xcc, 0xd8), GOLD, TEAL];
         let w = ((ui.available_width() - 6.0 * 6.0) / 7.0).clamp(30.0, 52.0);
@@ -237,19 +239,19 @@ impl App {
                 }
             }
         });
-        ui.add_space(8.0);
+        ui.add_space(SP_S);
         ui.vertical_centered(|ui| ui.label(title(format!("{} League", LEAGUES[league]), 12.0).color(cols[league])));
-        ui.add_space(4.0);
+        ui.add_space(SP_XS);
         ui.vertical_centered(|ui| ui.label(body("You compete with computer rivals. The week resets every Monday.", 12.0).color(DIM)));
-        ui.add_space(10.0);
+        ui.add_space(SP_M);
         if self.s.week_xp == 0 {
-            ui.add_space(20.0);
+            ui.add_space(SP_XL);
             ui.vertical_centered(|ui| {
                 let (r, _) = ui.allocate_exact_size(Vec2::new(140.0, 120.0), Sense::hover());
                 draw_icon(ui.painter(), r, "chalice", Color32::WHITE);
-                ui.add_space(12.0);
+                ui.add_space(SP_M);
                 ui.label(title("Earn XP to join this week's table!", 10.0));
-                ui.add_space(14.0);
+                ui.add_space(SP_L);
                 if pbtn(ui, "START LEARNING", BLUE, 0.0).clicked() { self.tab = Tab::Learn; }
             });
             return;
@@ -277,11 +279,11 @@ impl App {
                 });
             });
         }
-        ui.add_space(4.0);
+        ui.add_space(SP_XS);
         let up = if self.s.league >= 6 { "You are in the top league. Stay active to keep your place.".to_string() } else { format!("Earn {} XP this week to reach {} ({} so far). Earn none and you drop a league.", LEAGUE_UP_XP, LEAGUES[(league + 1).min(6)], self.s.week_xp) };
         ui.label(body(up, 12.0).color(DIM));
         bar(ui, self.s.week_xp as f32 / LEAGUE_UP_XP as f32, GOLD, 10.0);
-        ui.add_space(10.0);
+        ui.add_space(SP_M);
     }
 
     // ------------------------------------------------------------ CREATE
@@ -289,11 +291,11 @@ impl App {
         subtabs(ui, &["MY SPELLS", "EXAMPLES"], &mut self.sub_create);
         if self.sub_create == 0 {
             if self.s.codes.is_empty() {
-                ui.add_space(24.0);
+                ui.add_space(SP_XL);
                 ui.vertical_centered(|ui| {
                     icon(ui, "staff", 72.0);
                     ui.label(title("No spells yet", 11.0).color(DIM));
-                    ui.add_space(4.0);
+                    ui.add_space(SP_XS);
                     ui.label(body("Write and run your own Python, JavaScript, HTML, CSS or SQL. Tap + to start, or copy an example.", 14.0).color(DIM));
                 });
             }
@@ -314,7 +316,7 @@ impl App {
             ui.add_space(70.0);
         } else {
             ui.label(body("Sample programs to read, run and change. Opening one makes your own copy.", 13.0).color(DIM));
-            ui.add_space(6.0);
+            ui.add_space(SP_S);
             for e in EXAMPLES {
                 let resp = panel_resp(ui, PANEL, EDGE, |ui| {
                     ui.set_width(ui.available_width());
@@ -356,18 +358,17 @@ impl App {
         bevel(ui.painter(), er, if eresp.hovered() { shade(GOLD, 1.1) } else { GOLD }, false);
         ui.painter().text(er.center(), Align2::CENTER_CENTER, "EDIT", FontId::new(8.0, press()), EDGE);
         if eresp.clicked() { self.screen = Screen::Settings; }
-        ui.add_space(8.0);
+        ui.add_space(SP_S);
         panel(ui, PANEL, EDGE, |ui| {
             ui.set_width(ui.available_width());
             ui.label(title(format!("LEVEL {}  -  {} / {} XP", self.level(), self.s.xp % XP_PER_LEVEL, XP_PER_LEVEL), 9.0));
-            ui.add_space(6.0);
+            ui.add_space(SP_S);
             bar(ui, game::level_frac(self.s.xp), BLUE, 14.0);
         });
         let streak = game::live_streak(&self.s, today());
         panel(ui, PANEL, EDGE, |ui| {
             ui.set_width(ui.available_width());
-            ui.label(title("STREAK", 9.0).color(DIM));
-            ui.add_space(6.0);
+            card_title(ui, "STREAK");
             ui.vertical_centered(|ui| {
                 ui.horizontal(|ui| {
                     ui.add_space((ui.available_width() / 2.0 - 90.0).max(0.0));
@@ -376,7 +377,7 @@ impl App {
                     ui.label(body(if streak == 1 { "day" } else { "days" }, 16.0).color(DIM));
                 });
             });
-            ui.add_space(8.0);
+            ui.add_space(SP_S);
             let today_i = game::weekday(today());
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
@@ -391,10 +392,10 @@ impl App {
                     });
                 }
             });
-            ui.add_space(8.0);
+            ui.add_space(SP_S);
             ui.label(body(format!("Streak goal: {} days  ({} / {})", self.s.goal, streak.min(self.s.goal), self.s.goal), 14.0).color(if streak >= self.s.goal { GOLD } else { DIM }));
             bar(ui, streak as f32 / self.s.goal.max(1) as f32, GREEN, 12.0);
-            ui.add_space(8.0);
+            ui.add_space(SP_S);
             ui.columns(2, |c| {
                 c[0].vertical_centered(|ui| {
                     ui.label(body("Streak Savers", 14.0).color(DIM));
@@ -409,8 +410,26 @@ impl App {
         });
         panel(ui, PANEL, EDGE, |ui| {
             ui.set_width(ui.available_width());
-            ui.label(title(format!("ACHIEVEMENTS  {} / {}", self.s.ach.len(), game::ACHIEVEMENTS.len()), 9.0).color(DIM));
-            ui.add_space(8.0);
+            let n = (0..self.courses.len()).filter(|c| self.badge_earned(*c).is_some()).count();
+            card_title(ui, &format!("COURSE BADGES  {} / {}", n, self.courses.len()));
+            let bw = ((ui.available_width() - 4.0 * SP_S) / 5.0).clamp(52.0, 90.0);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = SP_S;
+                for c in 0..self.courses.len() {
+                    let earned = self.badge_earned(c);
+                    ui.vertical(|ui| {
+                        ui.set_width(bw);
+                        let r = badge(ui, &self.courses[c], earned.is_some(), bw).on_hover_text(match earned { Some(d) => format!("{} - earned {}", self.courses[c].badge.name, day_label(d)), None => format!("{} - finish {} to earn", self.courses[c].badge.name, self.courses[c].name) });
+                        if r.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.screen = Screen::Preview(c); }
+                        ui.vertical_centered(|ui| ui.label(body(self.courses[c].tag, 11.0).color(if earned.is_some() { GOLD } else { DIM })));
+                    });
+                }
+            });
+        });
+        panel(ui, PANEL, EDGE, |ui| {
+            ui.set_width(ui.available_width());
+            let got = game::ACHIEVEMENTS.iter().filter(|a| self.s.ach.contains_key(a.id)).count();
+            card_title(ui, &format!("ACHIEVEMENTS  {} / {}", got, game::ACHIEVEMENTS.len()));
             let cols = if ui.available_width() > 420.0 { 4 } else { 3 };
             let cw = (ui.available_width() - (cols as f32 - 1.0) * 8.0) / cols as f32;
             for row in game::ACHIEVEMENTS.chunks(cols) {
@@ -433,13 +452,12 @@ impl App {
                         });
                     }
                 });
-                ui.add_space(6.0);
+                ui.add_space(SP_S);
             }
         });
         panel(ui, PANEL, EDGE, |ui| {
             ui.set_width(ui.available_width());
-            ui.label(title("COURSE PROGRESS", 9.0).color(DIM));
-            ui.add_space(8.0);
+            card_title(ui, "COURSE PROGRESS");
             for ci in 0..self.courses.len() {
                 let p = self.progress(ci);
                 let resp = ui.horizontal(|ui| {
@@ -449,28 +467,26 @@ impl App {
                         ui.horizontal(|ui| { ui.allocate_ui(Vec2::new((ui.available_width() - 48.0).max(40.0), 12.0), |ui| bar(ui, p, GREEN, 10.0)); ui.label(body(format!("{}%", (p * 100.0) as u32), 13.0)); });
                     });
                 }).response;
-                if ui.interact(resp.rect, ui.scope_id().with(("cp", ci)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.select_course(ci); }
-                ui.add_space(6.0);
+                if ui.interact(resp.rect, ui.scope_id().with(("cp", ci)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Course details").clicked() { self.screen = Screen::Preview(ci); }
+                ui.add_space(SP_S);
             }
         });
         panel(ui, PANEL, EDGE, |ui| {
             ui.set_width(ui.available_width());
-            ui.label(title("ADVENTURE LOG", 9.0).color(DIM));
-            ui.add_space(6.0);
+            card_title(ui, "ADVENTURE LOG");
             for (d, t) in self.s.log.iter().rev().take(3) { ui.label(body(format!("{}  -  {}", day_label(*d), t), 13.0)); }
             if self.s.log.is_empty() { ui.label(body("Nothing yet. Clear a lesson!", 13.0).color(DIM)); }
-            ui.add_space(6.0);
+            ui.add_space(SP_S);
             if pbtn(ui, "OPEN LOG", GREEN, 0.0).clicked() { self.tab = Tab::Train; self.sub_train = 2; }
         });
-        ui.add_space(10.0);
+        ui.add_space(SP_M);
     }
 
     // ------------------------------------------------------------ TRAIN > COURSES
     pub fn courses_tab(&mut self, ui: &mut egui::Ui) {
         let total: usize = self.courses.iter().map(|c| c.lesson_count()).sum();
         let done = self.s.done.len();
-        ui.label(title("YOUR PROGRESS", 9.0).color(DIM));
-        ui.add_space(6.0);
+        section(ui, "YOUR PROGRESS");
         panel(ui, PANEL, EDGE, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
@@ -487,12 +503,11 @@ impl App {
         });
         let c = self.cur;
         let next = self.next_lesson(c);
-        ui.label(title("CONTINUE", 9.0).color(DIM));
-        ui.add_space(6.0);
+        section(ui, "CONTINUE");
         panel(ui, PANEL, GOLD, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
-                emblem(ui, self.courses[c].tag, self.courses[c].color, 56.0);
+                badge(ui, &self.courses[c], self.badge_earned(c).is_some(), 56.0);
                 ui.vertical(|ui| {
                     ui.label(title(self.courses[c].name, 10.0));
                     match next {
@@ -502,13 +517,12 @@ impl App {
                     ui.allocate_ui(Vec2::new(ui.available_width(), 14.0), |ui| bar(ui, self.progress(c), GREEN, 10.0));
                 });
             });
-            ui.add_space(8.0);
+            ui.add_space(SP_S);
             if let Some((mi, li)) = next && pbtn(ui, "CONTINUE LESSON", GOLD, 0.0).clicked() { self.open_lesson(c, mi, li); }
         });
-        ui.label(title("BROWSE COURSES", 9.0).color(DIM));
-        ui.add_space(6.0);
+        section(ui, "BROWSE COURSES");
         ui.add(egui::TextEdit::singleline(&mut self.query).hint_text("Search courses").desired_width(f32::INFINITY));
-        ui.add_space(8.0);
+        ui.add_space(SP_S);
         let cats = ["All", "Web", "Code", "Data"];
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
@@ -521,7 +535,7 @@ impl App {
                 if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.cat = i; }
             }
         });
-        ui.add_space(10.0);
+        ui.add_space(SP_M);
         let q = self.query.trim().to_lowercase();
         let mut shown = 0;
         for ci in 0..self.courses.len() {
@@ -534,78 +548,26 @@ impl App {
             panel(ui, PANEL, EDGE, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    emblem(ui, self.courses[ci].tag, self.courses[ci].color, 56.0);
+                    badge(ui, &self.courses[ci], self.badge_earned(ci).is_some(), 56.0);
                     ui.vertical(|ui| {
                         ui.label(title(self.courses[ci].name, 10.0));
-                        ui.label(body(format!("{}  -  {}  -  {} chapters, {} lessons", self.courses[ci].level, self.courses[ci].cat, self.courses[ci].modules.len(), lessons), 12.0).color(DIM));
+                        ui.label(body(format!("{}  -  {}  -  {} chapters, {} lessons, {} projects", self.courses[ci].level, self.courses[ci].cat, self.courses[ci].modules.len(), lessons, self.courses[ci].project_count()), 12.0).color(DIM));
                     });
                 });
-                ui.add_space(4.0);
+                ui.add_space(SP_XS);
                 ui.label(body(self.courses[ci].desc, 13.0));
-                ui.add_space(6.0);
+                ui.add_space(SP_S);
                 ui.horizontal(|ui| { ui.allocate_ui(Vec2::new((ui.available_width() - 48.0).max(40.0), 14.0), |ui| bar(ui, p, GREEN, 10.0)); ui.label(body(format!("{}%", (p * 100.0) as u32), 13.0)); });
-                ui.add_space(6.0);
-                let label = if p >= 1.0 { "REVIEW" } else if p > 0.0 { "CONTINUE" } else { "START" };
-                if pbtn(ui, label, if p >= 1.0 { PANEL_HI } else if p > 0.0 { GOLD } else { BLUE }, 0.0).clicked() { self.select_course(ci); }
+                ui.add_space(SP_S);
+                if pbtn(ui, "VIEW COURSE", if p >= 1.0 { PANEL_HI } else if p > 0.0 { GOLD } else { BLUE }, 0.0).clicked() { self.screen = Screen::Preview(ci); }
             });
         }
-        if shown == 0 { ui.add_space(20.0); ui.vertical_centered(|ui| ui.label(body("No course matches that search.", 14.0).color(DIM))); }
-        ui.add_space(10.0);
+        if shown == 0 { ui.add_space(SP_XL); ui.vertical_centered(|ui| ui.label(body("No course matches that search.", 14.0).color(DIM))); }
+        ui.add_space(SP_M);
     }
 }
 
 fn lang_tile(ui: &mut egui::Ui, lang: &str) {
     let (tag, col) = match lang { "python" => ("PY", PURPLE), "javascript" => ("JS", GOLD), "html" => ("HTML", ORANGE), "css" => ("CSS", BLUE), "sql" => ("SQL", RED), _ => ("?", PANEL_HI) };
     emblem(ui, tag, col, 46.0);
-}
-
-// A pixel landscape banner for the course header.
-fn banner(ui: &mut egui::Ui, name: &str, desc: &str, accent: Color32, prog: f32) {
-    let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 150.0), Sense::hover());
-    let p = ui.painter().with_clip_rect(r);
-    let s = 6.0;
-    let bands = [Color32::from_rgb(0x1f, 0x7a, 0xc8), Color32::from_rgb(0x32, 0x96, 0xdc), Color32::from_rgb(0x4d, 0xb0, 0xea), Color32::from_rgb(0x7d, 0xcb, 0xf2), Color32::from_rgb(0xa9, 0xe0, 0xf6)];
-    let bh = (r.height() * 0.7) / bands.len() as f32;
-    for (i, c) in bands.iter().enumerate() { p.rect_filled(Rect::from_min_size(Pos2::new(r.min.x, r.min.y + bh * i as f32), Vec2::new(r.width(), bh + 1.0)), 0.0, *c); }
-    let base = r.max.y - 34.0;
-    for (cx, h, col) in [(0.22, 60.0, Color32::from_rgb(0x3b, 0x5b, 0x9a)), (0.55, 84.0, Color32::from_rgb(0x2f, 0x4a, 0x86)), (0.85, 52.0, Color32::from_rgb(0x3b, 0x5b, 0x9a))] {
-        let mut y = 0.0;
-        while y < h {
-            let half = (h - y) * 1.1;
-            let x0 = r.min.x + r.width() * cx - half;
-            p.rect_filled(Rect::from_min_size(Pos2::new((x0 / s).floor() * s, base - y - s), Vec2::new(half * 2.0, s + 0.5)), 0.0, col);
-            y += s;
-        }
-    }
-    for (cx, cy) in [(0.12, 0.18), (0.7, 0.1), (0.9, 0.32)] {
-        let o = Pos2::new(r.min.x + r.width() * cx, r.min.y + r.height() * cy);
-        p.rect_filled(Rect::from_min_size(o, Vec2::new(36.0, 6.0)), 0.0, Color32::WHITE);
-        p.rect_filled(Rect::from_min_size(o + Vec2::new(6.0, -6.0), Vec2::new(18.0, 6.0)), 0.0, Color32::WHITE);
-    }
-    p.rect_filled(Rect::from_min_max(Pos2::new(r.min.x, base), r.max), 0.0, Color32::from_rgb(0x4c, 0xa6, 0x2e));
-    p.rect_filled(Rect::from_min_size(Pos2::new(r.min.x, base), Vec2::new(r.width(), 6.0)), 0.0, Color32::from_rgb(0x7c, 0xd0, 0x3c));
-    p.rect_filled(Rect::from_min_max(Pos2::new(r.min.x, base + 20.0), r.max), 0.0, Color32::from_rgb(0x7a, 0x4a, 0x24));
-    let mut x = r.min.x;
-    while x < r.max.x { p.rect_filled(Rect::from_min_size(Pos2::new(x, base + 20.0), Vec2::new(6.0, 6.0)), 0.0, Color32::from_rgb(0x5a, 0x34, 0x18)); x += 24.0; }
-    for fx in [0.04, 0.3, 0.62, 0.93] {
-        let tx = r.min.x + r.width() * fx;
-        p.rect_filled(Rect::from_min_size(Pos2::new(tx + 6.0, base - 8.0), Vec2::new(6.0, 14.0)), 0.0, Color32::from_rgb(0x5a, 0x34, 0x18));
-        for i in 0..4 { let w = 30.0 - i as f32 * 7.0; p.rect_filled(Rect::from_min_size(Pos2::new(tx + 9.0 - w / 2.0, base - 10.0 - i as f32 * 8.0), Vec2::new(w, 8.0)), 0.0, if i % 2 == 0 { Color32::from_rgb(0x1f, 0x6b, 0x2c) } else { Color32::from_rgb(0x2a, 0x85, 0x35) }); }
-    }
-    draw_icon(&p, Rect::from_min_size(Pos2::new(r.max.x - 120.0, base - 30.0), Vec2::splat(64.0)), "chest", Color32::WHITE);
-    draw_icon(&p, Rect::from_min_size(Pos2::new(r.max.x - 70.0, base - 8.0), Vec2::splat(40.0)), "sword", Color32::WHITE);
-    draw_icon(&p, Rect::from_min_size(Pos2::new(r.max.x - 190.0, base - 20.0), Vec2::splat(48.0)), "lantern", Color32::WHITE);
-    let badge = Rect::from_min_size(r.min + Vec2::new(12.0, 10.0), Vec2::new(150.0, 20.0));
-    p.rect_filled(badge, 0.0, Color32::from_black_alpha(150));
-    p.text(badge.center(), Align2::CENTER_CENTER, "BEGINNER COURSE", FontId::new(8.0, press()), Color32::WHITE);
-    p.text(r.min + Vec2::new(14.0, 49.0), Align2::LEFT_CENTER, name, FontId::new(22.0, press()), EDGE);
-    p.text(r.min + Vec2::new(12.0, 46.0), Align2::LEFT_CENTER, name, FontId::new(22.0, press()), Color32::WHITE);
-    let g = p.layout(desc.to_string(), FontId::new(13.0, egui::FontFamily::Proportional), Color32::WHITE, r.width() - 24.0);
-    p.rect_filled(Rect::from_min_size(r.min + Vec2::new(10.0, 64.0), g.size() + Vec2::new(4.0, 2.0)), 0.0, Color32::from_black_alpha(110));
-    p.galley(r.min + Vec2::new(12.0, 65.0), g, Color32::WHITE);
-    let pb = Rect::from_min_size(Pos2::new(r.min.x + 12.0, r.max.y - 18.0), Vec2::new(r.width() * 0.4, 10.0));
-    p.rect_filled(pb.expand(2.0), 0.0, EDGE);
-    p.rect_filled(pb, 0.0, Color32::from_rgb(0x1e, 0x29, 0x3b));
-    p.rect_filled(Rect::from_min_size(pb.min, Vec2::new(pb.width() * prog, pb.height())), 0.0, accent);
-    p.rect_stroke(r, 0.0, Stroke::new(3.0, EDGE), egui::StrokeKind::Inside);
 }

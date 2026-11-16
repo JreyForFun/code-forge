@@ -115,7 +115,7 @@ pub fn lesson_reward(first: bool, perfect: bool) -> (u32, u32) {
 /// Percent of answers that were right on the first try.
 pub fn score(total: u32, mistakes: u32) -> u32 {
     let attempts = total + mistakes;
-    if attempts == 0 { 100 } else { (total * 100 / attempts).min(100) }
+    (total * 100).checked_div(attempts).map(|s| s.min(100)).unwrap_or(100)
 }
 
 pub fn add_xp(s: &mut Save, xp: u32, gems: u32) {

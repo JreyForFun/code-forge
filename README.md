@@ -6,7 +6,7 @@ computer.
 
 ## Quick start (players)
 
-1. Unzip `PixelLearn-1.0.0-windows.zip` anywhere.
+1. Unzip `PixelLearn-1.1.0-windows.zip` anywhere.
 2. Double-click **PixelLearn.exe**.
 3. Choose a name, a hero and your first course, then start learning.
 
@@ -14,10 +14,16 @@ Nothing to install, no account, no internet needed.
 
 ## What's inside
 
-- **5 courses, 42 lessons**: HTML, CSS, JavaScript, Python and SQL. Every lesson has three steps:
-  *Learn → Complete the code → Type the code*.
-- **Real feedback**: Python and JavaScript snippets really run, HTML shows a preview, CSS shows the
-  styled result, and SQL queries run against a small sample database (`heroes`, `items`).
+- **5 courses, 135 lessons**: HTML (4 chapters), CSS (5), JavaScript (8), Python and SQL. Every lesson
+  has three steps: *Learn → Complete the code → Type the code*, and every web chapter ends with a
+  **checkpoint project** (+10 bonus XP).
+- **Course preview**: see a course's chapters, lessons, projects, estimated time, what you'll learn
+  and its badge before you start.
+- **Course badges**: finish a course to earn its badge (Stonemason, Prism Painter, Lightning Mage,
+  Serpent Sage, Vault Keeper).
+- **Real feedback**: Python and JavaScript snippets really run (objects, functions, loops, template
+  strings), JavaScript DOM lessons show the simulated page changing, HTML shows a preview including
+  forms, CSS shows the styled result, and SQL queries run against a small sample database.
 - **Spell Forge**: write, run and save your own programs in any of the five languages, or start
   from bundled examples.
 - **Practice**: quick challenges and duels against computer opponents (duels never cost hearts).

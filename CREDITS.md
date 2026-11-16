@@ -16,3 +16,5 @@ Built with Rust, [egui / eframe](https://github.com/emilk/egui) (MIT/Apache-2.0)
 
 ## Content
 All lesson text, challenges, example programs and character names are original to Pixel Learn.
+The order of topics in the HTML, CSS and JavaScript courses follows the common beginner path used by
+free curricula such as Codédex (https://www.codedex.io).

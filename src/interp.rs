@@ -238,7 +238,7 @@ fn strip_comment(t: &str, js: bool) -> String {
 }
 
 fn braceless(t: &str) -> Option<(String, String)> {
-    if let Some(rest) = t.strip_prefix("else ") { if !rest.starts_with("if") && !rest.trim().is_empty() { return Some(("else".into(), rest.trim().into())); } }
+    if let Some(rest) = t.strip_prefix("else ") && !rest.starts_with("if") && !rest.trim().is_empty() { return Some(("else".into(), rest.trim().into())); }
     let kw = ["else if", "if", "while", "for"].into_iter().find(|k| t.starts_with(k) && t[k.len()..].trim_start().starts_with('('))?;
     let start = t.find('(')?;
     let mut d = 0;
@@ -431,7 +431,7 @@ impl<'a, 'l> Ev<'a, 'l> {
                 i += if py { 1 } else { 2 };
                 let mut d = 1;
                 let st = i;
-                while i < c.len() { if c[i] == '{' { d += 1; } if c[i] == '}' { d -= 1; if d == 0 { break; } } i += 1; }
+                while i < c.len() { if c[i] == '{' { d += 1; } else if c[i] == '}' { d -= 1; if d == 0 { break; } } i += 1; }
                 if i >= c.len() { return Err("a { in the text is never closed".into()); }
                 let inner: String = c[st..i].iter().collect();
                 let v = self.r.eval(&inner)?;
@@ -616,7 +616,7 @@ impl<'l> Run<'l> {
         if let Some(func) = self.funcs.get(f).cloned() { return self.call_user(f, &func, a); }
         // callable stored in a variable that names a function: const f = greet
         let alias = match self.vars.get(f) { Some(V::S(s)) => s.strip_prefix("[function ").and_then(|x| x.strip_suffix(']')).map(|x| x.to_string()), _ => None };
-        if let Some(name) = alias { if let Some(func) = self.funcs.get(&name).cloned() { return self.call_user(&name, &func, a); } }
+        if let Some(name) = alias && let Some(func) = self.funcs.get(&name).cloned() { return self.call_user(&name, &func, a); }
         let first = a.first().cloned();
         let arg0 = || first.clone().ok_or_else(|| format!("{}() needs a value", f));
         let n = |i: usize| -> Result<f64, String> { num(a.get(i).ok_or("missing argument")?) };
@@ -683,9 +683,8 @@ impl<'l> Run<'l> {
                     let evt = self.show(&arg(0)?);
                     let handler = a.get(1).map(|h| self.show(h)).unwrap_or_default();
                     self.page(format!("{} listens for '{}'", sel, evt))?;
-                    if let Some(name) = handler.strip_prefix("[function ").and_then(|x| x.strip_suffix(']')) {
-                        if let Some(func) = self.funcs.get(name).cloned() { self.page(format!("(simulating a {} on {})", evt, sel))?; self.call_user(name, &func, vec![])?; }
-                    }
+                    if let Some(name) = handler.strip_prefix("[function ").and_then(|x| x.strip_suffix(']'))
+                        && let Some(func) = self.funcs.get(name).cloned() { self.page(format!("(simulating a {} on {})", evt, sel))?; self.call_user(name, &func, vec![])?; }
                     Ok(V::Nil)
                 }
                 "classList.add" | "add" => { let c = self.show(&arg(0)?); self.page(format!("{} gets class '{}'", sel, c))?; Ok(V::Nil) }
@@ -694,7 +693,7 @@ impl<'l> Run<'l> {
                 _ => Err(format!("elements here don't support .{}()", m)),
             };
         }
-        if let V::O(o) = &v { if field(o, "__document").is_some() { return self.call(&format!("document.{}", m), a); } }
+        if let V::O(o) = &v && field(o, "__document").is_some() { return self.call(&format!("document.{}", m), a); }
         match (&v, m) {
             (V::S(s), "toUpperCase" | "upper") => Ok(V::S(s.to_uppercase())),
             (V::S(s), "toLowerCase" | "lower") => Ok(V::S(s.to_lowercase())),
@@ -1068,7 +1067,7 @@ fn html(src: &str) -> Vec<(Kind, String)> {
             if name == "title" { out.push((Kind::H2, format!("Tab title: {}", text))); rest = &after[e + close.len()..]; continue; }
             if name == "textarea" { out.push((Kind::Btn, format!("[ {} ]", if text.is_empty() { attr(&tag, "placeholder").unwrap_or_else(|| "text area".into()) } else { text }))); rest = &after[e + close.len()..]; continue; }
             if name == "select" {
-                let first = inner.to_lowercase().find("<option").and_then(|o| inner[o..].find('>').map(|g| strip(&inner[o + g + 1..].split('<').next().unwrap_or("").to_string()))).unwrap_or_default();
+                let first = inner.to_lowercase().find("<option").and_then(|o| inner[o..].find('>').map(|g| strip(inner[o + g + 1..].split('<').next().unwrap_or("")))).unwrap_or_default();
                 let n = inner.to_lowercase().matches("<option").count();
                 out.push((Kind::Btn, format!("[ {} v ]  ({} choice{})", first, n, if n == 1 { "" } else { "s" })));
                 rest = &after[e + close.len()..]; continue;

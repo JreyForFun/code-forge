@@ -8,12 +8,14 @@ mod game;
 mod interp;
 mod lesson;
 mod onboarding;
+mod preview;
 mod save;
 mod screens;
 mod sql;
 mod tabs;
 
 use art::*;
+use preview::*;
 use data::*;
 use eframe::egui::{self, Align2, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, Vec2};
 use game::{HINT_COST, LEAGUES, LEAGUE_UP_XP, REFILL_COST, SAVER_COST, XP_PER_LEVEL};
@@ -37,12 +39,12 @@ enum Kind { Lesson(usize, usize, usize), Coach, Duel(usize) }
 
 struct RunState {
     title: String, kind: Kind, lang: &'static str, slides: Vec<(&'static str, &'static str)>, qs: Vec<Q>, stage: usize, queue: Vec<usize>,
-    sel: Option<usize>, text: String, fb: Option<(bool, String)>, mistakes: u32, right: u32, total: usize, last: Option<usize>, hint_q: Option<usize>,
+    sel: Option<usize>, text: String, fb: Option<(bool, String)>, mistakes: u32, right: u32, total: usize, last: Option<usize>, hint_q: Option<usize>, project: bool,
 }
-struct Complete { title: String, xp: u32, gems: u32, perfect: bool, score: u32, best: u32, duel: Option<(u32, u32, String, bool)>, new_streak: bool, next: Option<(usize, usize, usize)> }
+struct Complete { title: String, xp: u32, gems: u32, perfect: bool, score: u32, best: u32, duel: Option<(u32, u32, String, bool)>, new_streak: bool, next: Option<(usize, usize, usize)>, project: bool }
 struct Editor { idx: Option<usize>, title: String, lang: String, code: String, out: Vec<(interp::Kind, String)> }
 
-enum Screen { Main, Settings, Run(Box<RunState>), Complete(Complete), Editor(Editor) }
+enum Screen { Main, Settings, Run(Box<RunState>), Complete(Complete), Editor(Editor), Preview(usize) }
 
 struct App {
     s: Save, tab: Tab, screen: Screen, modal: Modal, courses: Vec<Course>, cur: usize, open_mod: Option<usize>,
@@ -136,8 +138,7 @@ impl App {
     }
     fn progress(&self, c: usize) -> f32 {
         let total = self.courses[c].lesson_count();
-        let prefix = format!("{}.", c);
-        let done = self.s.done.iter().filter(|k| k.starts_with(&prefix)).count();
+        let done = (0..self.courses[c].modules.len()).map(|m| (0..self.courses[c].modules[m].lessons.len()).filter(|l| self.is_done(c, m, *l)).count()).sum::<usize>();
         done as f32 / total.max(1) as f32
     }
     fn select_course(&mut self, c: usize) {
@@ -167,7 +168,8 @@ impl App {
                     && !d.is_empty() { queue.retain(|i| !d.contains(i)); right = d.len() as u32; stage = slides.len(); }
         }
         let lang = match &kind { Kind::Lesson(c, _, _) => self.courses[*c].lang, _ => "" };
-        self.screen = Screen::Run(Box::new(RunState { title: title.into(), lang, kind, slides, qs, stage, queue, sel: None, text: String::new(), fb: None, mistakes: 0, right, total: n, last: None, hint_q: None }));
+        let project = matches!(kind, Kind::Lesson(c, m, l) if self.courses[c].modules[m].lessons[l].project);
+        self.screen = Screen::Run(Box::new(RunState { title: title.into(), lang, kind, slides, qs, stage, queue, sel: None, text: String::new(), fb: None, mistakes: 0, right, total: n, last: None, hint_q: None, project }));
     }
 
     fn finish(&mut self, rs: &RunState) {
@@ -210,7 +212,7 @@ impl App {
         game::add_xp(&mut self.s, xp, gems);
         self.award();
         self.persist();
-        self.screen = Screen::Complete(Complete { title: rs.title.clone(), xp, gems, perfect, score, best, duel, new_streak, next });
+        self.screen = Screen::Complete(Complete { title: rs.title.clone(), xp, gems, perfect, score, best, duel, new_streak, next, project: rs.project });
     }
 }
 
@@ -297,7 +299,7 @@ fn subtabs(ui: &mut egui::Ui, labels: &[&str], cur: &mut usize) {
         if on { ui.painter().rect_filled(Rect::from_min_size(Pos2::new(tr.min.x, tr.max.y - 4.0), Vec2::new(tr.width(), 4.0)), 0.0, GOLD); }
         if resp.clicked() { *cur = i; }
     }
-    ui.add_space(8.0);
+    ui.add_space(SP_S);
 }
 
 fn nav(ctx: &mut egui::Ui, app: &mut App) {
@@ -333,7 +335,7 @@ fn out_view(ui: &mut egui::Ui, out: &[(interp::Kind, String)]) {
         match k {
             Out => { ui.label(RichText::new(format!("> {}", t)).monospace().size(14.0).color(GREEN)); }
             Err => { ui.label(RichText::new(format!("! {}", t)).monospace().size(13.0).color(RED)); }
-            H1 => { ui.label(title(t.clone(), 15.0).color(PARCH)); ui.add_space(4.0); }
+            H1 => { ui.label(title(t.clone(), 15.0).color(PARCH)); ui.add_space(SP_XS); }
             H2 => { ui.label(title(t.clone(), 11.0).color(PARCH)); ui.add_space(3.0); }
             P => { ui.label(body(t.clone(), 15.0)); }
             Li => { ui.label(body(format!("  * {}", t), 15.0)); }
@@ -378,7 +380,7 @@ fn out_view(ui: &mut egui::Ui, out: &[(interp::Kind, String)]) {
                 if st.bold { p.text(pos + Vec2::new(1.0, 0.0), al, &text, font, col); }
                 if st.underline { p.rect_filled(Rect::from_min_size(Pos2::new(rect.min.x, rect.max.y - 1.0), Vec2::new(rect.width(), 2.0)), 0.0, col); }
                 ui.painter().rect_stroke(r, 0.0, Stroke::new(2.0, EDGE), egui::StrokeKind::Inside);
-                ui.add_space(4.0);
+                ui.add_space(SP_XS);
             }
         }
     }
@@ -411,7 +413,7 @@ fn option_btn(ui: &mut egui::Ui, text: &str, selected: bool, locked: bool, sel: 
     ui.painter().text(Pos2::new(r.min.x + 12.0, r.center().y), Align2::LEFT_CENTER, format!("{}", i + 1), FontId::new(9.0, press()), DIM);
     ui.painter().with_clip_rect(r).text(Pos2::new(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, text, FontId::new(16.0, egui::FontFamily::Proportional), INK);
     if resp.clicked() && !locked { *sel = Some(i); }
-    ui.add_space(8.0);
+    ui.add_space(SP_S);
 }
 
 fn toggle(ui: &mut egui::Ui, name: &str, sub: &str, v: &mut bool) -> bool {
@@ -426,7 +428,7 @@ fn toggle(ui: &mut egui::Ui, name: &str, sub: &str, v: &mut bool) -> bool {
             if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { *v = !*v; ch = true; }
         });
     });
-    ui.add_space(6.0);
+    ui.add_space(SP_S);
     ch
 }
 
@@ -460,7 +462,7 @@ impl App {
                 header(ui, self, &t, false, dd);
                 nav(ui, self);
                 let tab = self.tab;
-                egui::CentralPanel::default().frame(egui::Frame::new().fill(BG).inner_margin(egui::Margin { left: 12, right: 12, top: 10, bottom: 0 })).show(ui, |ui| {
+                egui::CentralPanel::default().frame(egui::Frame::new().fill(BG).inner_margin(egui::Margin { left: SCREEN_PAD, right: SCREEN_PAD, top: SCREEN_PAD, bottom: 0 })).show(ui, |ui| {
                     if self.s.floor { floor(ui.painter(), ui.max_rect(), self.s.scan); }
                     ui.set_opacity(alpha);
                     egui::ScrollArea::vertical().id_salt(("main", tab as u32)).auto_shrink([false, false]).show(ui, |ui| match tab {
@@ -476,6 +478,7 @@ impl App {
             Screen::Run(rs) => { if let Some(rs) = self.run_screen(ui, rs) { self.screen = Screen::Run(rs); } }
             Screen::Complete(c) => { if !self.complete_screen(ui, &c) && matches!(self.screen, Screen::Main) { self.screen = Screen::Complete(c); } }
             Screen::Editor(ed) => { if let Some(ed) = self.editor_screen(ui, ed) { self.screen = Screen::Editor(ed); } }
+            Screen::Preview(c) => { self.screen = Screen::Preview(c); self.preview_screen(ui, c); }
         }
         self.modals(&ctx);
         self.draw_toast(&ctx);
@@ -489,7 +492,7 @@ impl App {
         match self.modal {
             Modal::Notif => dialog(ctx, "notif", |ui| {
                 ui.horizontal(|ui| { icon(ui, "letter", 36.0); ui.label(title("MESSAGES", 11.0).color(GOLD)); });
-                ui.add_space(8.0);
+                ui.add_space(SP_S);
                 let day = today();
                 let streak = game::live_streak(&self.s, day);
                 let msg_streak = if self.s.last_day == day { format!("Today's lesson is done. Streak: {} day{}.", streak, if streak == 1 { "" } else { "s" }) }
@@ -504,34 +507,36 @@ impl App {
                     let lr = match self.s.last_result.as_str() { "LEVEL_UP" => "Last week: promoted!", "LEVEL_DOWN" => "Last week: dropped a league.", _ => "Last week: league unchanged." };
                     ui.horizontal_wrapped(|ui| { icon(ui, "banner_royal", 28.0); ui.label(body(lr, 14.0)); });
                 }
-                ui.add_space(10.0);
+                ui.add_space(SP_M);
                 if pbtn(ui, "CLOSE", BLUE, 0.0).clicked() { close = true; }
             }),
             Modal::Shop => dialog(ctx, "shop", |ui| {
-                ui.horizontal(|ui| { icon(ui, "money_bag", 36.0); ui.label(title("SHOP", 12.0).color(GOLD)); ui.add_space(12.0); icon(ui, "crystal_purple", 28.0); ui.label(title(format!("{}", self.s.gems), 11.0)); });
-                ui.add_space(10.0);
+                ui.horizontal(|ui| { icon(ui, "money_bag", 36.0); ui.label(title("SHOP", 12.0).color(GOLD)); ui.add_space(SP_M); icon(ui, "crystal_purple", 28.0); ui.label(title(format!("{}", self.s.gems), 11.0)); });
+                ui.add_space(SP_M);
                 ui.horizontal_wrapped(|ui| { icon(ui, "heart", 34.0); ui.label(body(format!("Refill all hearts ({} gems)", REFILL_COST), 14.0)); });
                 if pbtn(ui, "BUY HEARTS", RED, 0.0).clicked() { match game::buy_refill(&mut self.s) { Ok(()) => { self.persist(); self.toast("Hearts refilled!"); } Err(e) => self.toast(e.msg()) } }
                 let claimed = self.s.free_day == today();
                 if pbtn(ui, if claimed { "FREE HEART (TOMORROW)" } else { "FREE HEART (1 PER DAY)" }, if claimed { PANEL_HI } else { GREEN }, 0.0).clicked() {
                     match game::claim_free_heart(&mut self.s, today()) { Ok(()) => { self.persist(); self.toast("+1 heart!"); } Err(e) => self.toast(e.msg()) }
                 }
-                ui.add_space(10.0);
+                ui.add_space(SP_M);
                 ui.horizontal_wrapped(|ui| { icon(ui, "hourglass", 34.0); ui.label(body(format!("Streak saver ({} gems, hold up to 3). Protects your streak if you miss one day.", SAVER_COST), 14.0)); });
                 if pbtn(ui, &format!("BUY SAVER ({}/3)", self.s.savers), BLUE, 0.0).clicked() { match game::buy_saver(&mut self.s) { Ok(()) => { self.persist(); self.toast("Streak saver added!"); } Err(e) => self.toast(e.msg()) } }
-                ui.add_space(10.0);
+                ui.add_space(SP_M);
                 ui.label(body("Earn gems by clearing lessons, challenges and duels.", 12.0).color(DIM));
                 if pbtn(ui, "CLOSE", PANEL_HI, 0.0).clicked() { close = true; }
             }),
             Modal::Courses => dialog(ctx, "courses", |ui| {
-                ui.label(title("CHOOSE A COURSE", 11.0).color(GOLD)); ui.add_space(8.0);
+                ui.label(title("CHOOSE A COURSE", 11.0).color(GOLD)); ui.add_space(SP_S);
                 for ci in 0..self.courses.len() {
                     ui.horizontal(|ui| {
                         emblem(ui, self.courses[ci].tag, self.courses[ci].color, 44.0);
                         let label = format!("{}  {}%", self.courses[ci].name, (self.progress(ci) * 100.0) as u32);
-                        if pbtn(ui, &label, if ci == self.cur { GOLD } else { PANEL_HI }, ui.available_width()).clicked() { self.select_course(ci); close = true; }
+                        let w = (ui.available_width() - 52.0).max(80.0);
+                        if pbtn(ui, &label, if ci == self.cur { GOLD } else { PANEL_HI }, w).clicked() { self.select_course(ci); close = true; }
+                        if pbtn(ui, "i", BLUE, 44.0).on_hover_text("Course details").clicked() { self.screen = Screen::Preview(ci); close = true; }
                     });
-                    ui.add_space(4.0);
+                    ui.add_space(SP_XS);
                 }
                 if pbtn(ui, "CLOSE", PANEL_HI, 0.0).clicked() { close = true; }
             }),
@@ -539,22 +544,22 @@ impl App {
                 ui.vertical_centered(|ui| {
                     let (r, _) = ui.allocate_exact_size(Vec2::splat(96.0), Sense::hover());
                     draw_icon(ui.painter(), r, "heart", Color32::from_gray(70));
-                    ui.label(title("OUT OF HEARTS", 12.0).color(RED)); ui.add_space(6.0);
+                    ui.label(title("OUT OF HEARTS", 12.0).color(RED)); ui.add_space(SP_S);
                     let wait = game::next_heart_in(&self.s, now()).map(|s| format!("Next heart in {}:{:02}. ", s / 60, s % 60)).unwrap_or_default();
-                    ui.label(body(format!("{}Hearts refill 1 every 5 minutes. Your lesson progress is saved.", wait), 14.0)); ui.add_space(8.0);
+                    ui.label(body(format!("{}Hearts refill 1 every 5 minutes. Your lesson progress is saved.", wait), 14.0)); ui.add_space(SP_S);
                 });
                 if pbtn(ui, &format!("REFILL ({} GEMS)", REFILL_COST), RED, 0.0).clicked() {
                     match game::buy_refill(&mut self.s) { Ok(()) => { self.persist(); close = true; } Err(e) => self.toast(e.msg()) }
                 }
                 if self.s.free_day != today() && pbtn(ui, "FREE DAILY HEART", GREEN, 0.0).clicked()
                     && game::claim_free_heart(&mut self.s, today()).is_ok() { self.persist(); close = true; }
-                ui.add_space(6.0);
+                ui.add_space(SP_S);
                 if pbtn(ui, "PRACTISE A DUEL (NO HEARTS)", PANEL_HI, 0.0).clicked() { self.tab = Tab::Train; self.sub_train = 1; self.screen = Screen::Main; close = true; }
                 if pbtn(ui, "LATER", PANEL_HI, 0.0).clicked() { close = true; }
             }),
             Modal::Reset => dialog(ctx, "reset", |ui| {
-                ui.label(title("RESET PROGRESS?", 11.0).color(RED)); ui.add_space(6.0);
-                ui.label(body("This erases XP, gems, streak, achievements, saved spells and finished lessons. It cannot be undone.", 14.0)); ui.add_space(8.0);
+                ui.label(title("RESET PROGRESS?", 11.0).color(RED)); ui.add_space(SP_S);
+                ui.label(body("This erases XP, gems, streak, achievements, saved spells and finished lessons. It cannot be undone.", 14.0)); ui.add_space(SP_S);
                 if pbtn(ui, "YES, RESET", RED, 0.0).clicked() {
                     let (n, a) = (self.s.name.clone(), self.s.avatar);
                     self.s = Save::new(); self.s.heart_t = now(); self.s.name = n; self.s.avatar = a; self.s.onboarded = true;
@@ -562,19 +567,19 @@ impl App {
                     self.persist(); self.cur = 0; self.open_mod = self.current_module(0); self.screen = Screen::Main; self.toast("Progress reset");
                     close = true;
                 }
-                ui.add_space(6.0);
+                ui.add_space(SP_S);
                 if pbtn(ui, "CANCEL", PANEL_HI, 0.0).clicked() { close = true; }
             }),
             Modal::Avatar => dialog(ctx, "avatar", |ui| {
-                ui.label(title("CHOOSE YOUR HERO", 11.0).color(GOLD)); ui.add_space(8.0);
+                ui.label(title("CHOOSE YOUR HERO", 11.0).color(GOLD)); ui.add_space(SP_S);
                 if avatar_grid(ui, &mut self.s.avatar) { self.persist(); close = true; }
-                ui.add_space(8.0);
+                ui.add_space(SP_S);
                 if pbtn(ui, "CLOSE", PANEL_HI, 0.0).clicked() { close = true; }
             }),
             Modal::DeleteSpell(i) => dialog(ctx, "delspell", |ui| {
                 let name = self.s.codes.get(i).map(|c| c.0.clone()).unwrap_or_default();
-                ui.label(title("DELETE SPELL?", 11.0).color(RED)); ui.add_space(6.0);
-                ui.label(body(format!("'{}' will be gone for good.", name), 14.0)); ui.add_space(8.0);
+                ui.label(title("DELETE SPELL?", 11.0).color(RED)); ui.add_space(SP_S);
+                ui.label(body(format!("'{}' will be gone for good.", name), 14.0)); ui.add_space(SP_S);
                 if pbtn(ui, "DELETE", RED, 0.0).clicked() {
                     if i < self.s.codes.len() { self.s.codes.remove(i); self.persist(); }
                     self.screen = Screen::Main; close = true;
@@ -643,7 +648,7 @@ fn avatar_grid(ui: &mut egui::Ui, cur: &mut u32) -> bool {
                 });
             }
         });
-        ui.add_space(4.0);
+        ui.add_space(SP_XS);
     }
     picked
 }
@@ -696,7 +701,9 @@ fn main() -> eframe::Result {
                 "settings" => app.screen = Screen::Settings,
                 "editor" => app.screen = Screen::Editor(Editor { idx: None, title: "Royal Banner".into(), lang: "css".into(), code: EXAMPLES[5].code.into(), out: interp::run("css", EXAMPLES[5].code) }),
                 "sql" => app.screen = Screen::Editor(Editor { idx: None, title: "Strongest Heroes".into(), lang: "sql".into(), code: EXAMPLES[6].code.into(), out: interp::run("sql", EXAMPLES[6].code) }),
-                "complete" => app.screen = Screen::Complete(Complete { title: "Tags and Elements".into(), xp: 15, gems: 5, perfect: true, score: 100, best: 100, duel: None, new_streak: true, next: Some((0, 0, 1)) }),
+                "complete" => app.screen = Screen::Complete(Complete { title: "Project: Wanted Poster".into(), xp: 25, gems: 5, perfect: true, score: 100, best: 100, duel: None, new_streak: true, next: Some((0, 1, 0)), project: true }),
+                "preview" => app.screen = Screen::Preview(1),
+                "preview-js" => app.screen = Screen::Preview(2),
                 "shop" => app.modal = Modal::Shop,
                 "notif" => app.modal = Modal::Notif,
                 "avatar" => app.modal = Modal::Avatar,
@@ -842,6 +849,46 @@ mod tests {
         let Screen::Complete(c) = &app.screen else { panic!() };
         assert!(!c.perfect);
         assert!(c.score < 100);
+    }
+
+    #[test]
+    fn course_preview_starts_the_next_lesson() {
+        let ctx = ui_ctx();
+        let mut app = demo_app();
+        app.screen = Screen::Preview(1);
+        frame(&ctx, &mut app, vec![]);
+        assert!(matches!(app.screen, Screen::Preview(1)), "preview stays open until an action");
+        frame(&ctx, &mut app, vec![key(egui::Key::Enter, false)]);
+        let Screen::Run(rs) = &app.screen else { panic!("START did not open a lesson") };
+        assert_eq!(rs.title, app.courses[1].modules[0].lessons[0].title);
+        assert_eq!(app.cur, 1, "previewed course becomes the active course");
+        for c in 0..app.courses.len() { app.screen = Screen::Preview(c); frame(&ctx, &mut app, vec![]); }
+    }
+
+    #[test]
+    fn finishing_a_course_earns_its_badge_once() {
+        let mut app = demo_app();
+        assert!(app.badge_earned(0).is_none());
+        for m in 0..app.courses[0].modules.len() { for l in 0..app.courses[0].modules[m].lessons.len() { let k = app.lkey(0, m, l); app.s.done.insert(k); } }
+        app.award();
+        assert!(app.badge_earned(0).is_some());
+        assert!(app.badge_earned(1).is_none());
+        let n = app.s.log.len();
+        app.award();
+        assert_eq!(app.s.log.len(), n, "badge is granted only once");
+    }
+
+    #[test]
+    fn project_lessons_give_bonus_xp() {
+        let ctx = ui_ctx();
+        let mut app = demo_app();
+        let (m, l) = (0, app.courses[0].modules[0].lessons.len() - 1);
+        assert!(app.courses[0].modules[m].lessons[l].project);
+        let xp0 = app.s.xp;
+        app.open_lesson(0, m, l);
+        frame(&ctx, &mut app, vec![]);
+        play(&ctx, &mut app, false);
+        assert_eq!(app.s.xp - xp0, 15 + game::PROJECT_BONUS);
     }
 
     #[test]

@@ -57,7 +57,7 @@ impl App {
                 ui.label(title(if ok { "CORRECT" } else { "NOT QUITE" }, 12.0).color(if ok { GREEN } else { RED }));
                 ui.add_space(2.0);
                 ui.label(body(why, 14.0));
-                ui.add_space(8.0);
+                ui.add_space(SP_S);
                 if pbtn(ui, "CONTINUE", if ok { GREEN } else { RED }, 0.0).clicked() || go {
                     rs.fb = None; rs.sel = None; rs.text.clear();
                     if rs.queue.is_empty() { finished = true; }
@@ -94,16 +94,17 @@ impl App {
             } else { finished = true; }
         });
 
-        egui::CentralPanel::default().frame(egui::Frame::new().fill(BG).inner_margin(16.0)).show(ctx, |ui| {
+        egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
             floor(ui.painter(), ui.max_rect(), self.s.scan);
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     let (r, _) = ui.allocate_exact_size(Vec2::new(8.0, 14.0), Sense::hover());
                     ui.painter().rect_filled(r, 0.0, GOLD);
                     ui.label(title(phase, 9.0).color(GOLD));
+                    if rs.project { ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| tag(ui, "Checkpoint project", ORANGE)); }
                 });
                 ui.label(body(rs.title.clone(), 13.0).color(DIM));
-                ui.add_space(12.0);
+                ui.add_space(SP_M);
                 if in_slides {
                     let (text, img) = rs.slides[rs.stage];
                     // picture
@@ -117,7 +118,7 @@ impl App {
                     for i in 0..n_slides {
                         p.rect_filled(Rect::from_min_size(Pos2::new(r.center().x - n_slides as f32 * 8.0 + i as f32 * 16.0, r.max.y - 12.0), Vec2::new(10.0, 4.0)), 0.0, if i == rs.stage { GOLD } else { PANEL_HI });
                     }
-                    ui.add_space(12.0);
+                    ui.add_space(SP_M);
                     panel(ui, PARCH, EDGE, |ui| {
                         ui.set_width(ui.available_width());
                         ui.label(RichText::new(text).monospace().size(15.0).color(EDGE));
@@ -127,7 +128,7 @@ impl App {
                     let ok_now = matches!(rs.fb, Some((true, _)));
                     match rs.qs[qi].clone() {
                         Q::Mc { q, opts, right, .. } => {
-                            ui.label(body(q, 19.0)); ui.add_space(12.0);
+                            ui.label(body(q, 19.0)); ui.add_space(SP_M);
                             let struck = if rs.hint_q == Some(qi) { (0..opts.len()).find(|i| *i != right) } else { None };
                             for (i, o) in opts.iter().enumerate() {
                                 let lab = if Some(i) == struck { format!("X  {}", o) } else { o.to_string() };
@@ -136,14 +137,14 @@ impl App {
                         }
                         Q::Fill { prompt, code, opts, right, .. } => {
                             ui.label(body(prompt, 17.0));
-                            ui.add_space(10.0);
+                            ui.add_space(SP_M);
                             let chosen = rs.sel.map(|i| opts[i]);
                             let mut zone = Rect::NOTHING;
                             panel(ui, Color32::from_rgb(0x07, 0x0c, 0x1c), PANEL_HI, |ui| {
                                 ui.set_width(ui.available_width());
                                 for line in code.lines() {
                                     if let Some((a, b)) = line.split_once("___") {
-                                        ui.horizontal(|ui| {
+                                        ui.horizontal_wrapped(|ui| {
                                             ui.spacing_mut().item_spacing.x = 0.0;
                                             ui.label(RichText::new(a).monospace().size(16.0).color(PARCH));
                                             let tw = chosen.map(|c| c.chars().count() as f32 * 10.0 + 16.0).unwrap_or(0.0).max(56.0);
@@ -162,9 +163,9 @@ impl App {
                                     }
                                 }
                             });
-                            ui.add_space(6.0);
+                            ui.add_space(SP_S);
                             ui.label(body("Click a piece (or press 1-4), or drag it into the gap.", 12.0).color(DIM));
-                            ui.add_space(6.0);
+                            ui.add_space(SP_S);
                             let struck = if rs.hint_q == Some(qi) { (0..opts.len()).find(|i| *i != right) } else { None };
                             ui.horizontal_wrapped(|ui| {
                                 ui.spacing_mut().item_spacing = Vec2::new(10.0, 10.0);
@@ -192,7 +193,7 @@ impl App {
                         }
                         Q::Type { prompt, answer, guide, .. } => {
                             ui.label(body(prompt, 17.0));
-                            ui.add_space(10.0);
+                            ui.add_space(SP_M);
                             if guide {
                                 panel(ui, Color32::from_rgb(0x07, 0x0c, 0x1c), PANEL_HI, |ui| {
                                     ui.set_width(ui.available_width());
@@ -200,7 +201,7 @@ impl App {
                                     ui.label(RichText::new(answer).monospace().size(15.0).color(PARCH));
                                 });
                             }
-                            if rs.hint_q == Some(qi) { ui.label(body(format!("Hint: {} characters, starts with '{}'", answer.chars().filter(|c| !c.is_whitespace()).count(), answer.chars().next().unwrap_or(' ')), 14.0).color(GOLD)); ui.add_space(4.0); }
+                            if rs.hint_q == Some(qi) { ui.label(body(format!("Hint: {} characters, starts with '{}'", answer.chars().filter(|c| !c.is_whitespace()).count(), answer.chars().next().unwrap_or(' ')), 14.0).color(GOLD)); ui.add_space(SP_XS); }
                             let multi = answer.contains('\n');
                             panel(ui, Color32::from_rgb(0x07, 0x0c, 0x1c), if locked { if ok_now { GREEN } else { RED } } else { GOLD }, |ui| {
                                 let te = if multi { egui::TextEdit::multiline(&mut rs.text).desired_rows(answer.lines().count() + 1) } else { egui::TextEdit::singleline(&mut rs.text) };
@@ -210,7 +211,7 @@ impl App {
                             ui.label(body(if multi { "Ctrl+Enter to check" } else { "Enter to check" }, 11.0).color(DIM));
                             if locked && ok_now && !self.course_lang(&rs).is_empty() {
                                 let out = interp::run(self.course_lang(&rs), &rs.text);
-                                panel(ui, PANEL, EDGE, |ui| { ui.set_width(ui.available_width()); ui.label(title("OUTPUT", 9.0).color(GOLD)); ui.add_space(4.0); out_view(ui, &out); });
+                                panel(ui, PANEL, EDGE, |ui| { ui.set_width(ui.available_width()); ui.label(title("OUTPUT", 9.0).color(GOLD)); ui.add_space(SP_XS); out_view(ui, &out); });
                             }
                         }
                     }

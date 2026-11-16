@@ -24,6 +24,30 @@ pub fn shade(c: Color32, f: f32) -> Color32 {
     Color32::from_rgb(m(c.r()), m(c.g()), m(c.b()))
 }
 
+// ---------- spacing scale (use these instead of ad-hoc numbers) ----------
+pub const SP_XS: f32 = 4.0;
+pub const SP_S: f32 = 8.0;
+pub const SP_M: f32 = 12.0;
+pub const SP_L: f32 = 16.0;
+pub const SP_XL: f32 = 24.0;
+/// Inner padding of every screen.
+pub const SCREEN_PAD: i8 = 12;
+/// Gap left under each card (includes the 4px drop shadow).
+pub const CARD_GAP: f32 = SP_M;
+
+/// Section heading outside cards: small dim caps with consistent spacing.
+pub fn section(ui: &mut egui::Ui, text: &str) {
+    ui.add_space(SP_XS);
+    ui.label(title(text, 9.0).color(DIM));
+    ui.add_space(SP_S);
+}
+/// Heading inside a card.
+pub fn card_title(ui: &mut egui::Ui, text: &str) {
+    ui.label(title(text, 10.0).color(GOLD));
+    ui.add_space(SP_S);
+}
+pub fn screen_frame(fill: Color32) -> egui::Frame { egui::Frame::new().fill(fill).inner_margin(egui::Margin::same(SCREEN_PAD)) }
+
 // ---------- fonts ----------
 pub fn press() -> FontFamily { FontFamily::Name("press".into()) }
 pub fn title(s: impl Into<String>, size: f32) -> RichText {
@@ -99,11 +123,11 @@ pub fn pbtn(ui: &mut egui::Ui, label: &str, color: Color32, width: f32) -> egui:
 }
 
 pub fn panel<R>(ui: &mut egui::Ui, fill: Color32, edge: Color32, f: impl FnOnce(&mut egui::Ui) -> R) -> R {
-    let out = egui::Frame::new().fill(fill).stroke(Stroke::new(3.0, edge)).corner_radius(0.0).inner_margin(12.0)
+    let out = egui::Frame::new().fill(fill).stroke(Stroke::new(3.0, edge)).corner_radius(0.0).inner_margin(SP_M)
         .shadow(egui::epaint::Shadow { offset: [0, 4], blur: 0, spread: 0, color: EDGE }).show(ui, f);
     let r = out.response.rect;
     ui.painter().rect_filled(Rect::from_min_size(r.min + Vec2::new(3.0, 3.0), Vec2::new(r.width() - 6.0, 2.0)), 0.0, shade(fill, 1.3));
-    ui.add_space(6.0);
+    ui.add_space(CARD_GAP);
     out.inner
 }
 
@@ -181,10 +205,10 @@ pub fn floor(p: &egui::Painter, r: Rect, scan: bool) {
 }
 
 pub fn panel_resp(ui: &mut egui::Ui, fill: Color32, edge: Color32, f: impl FnOnce(&mut egui::Ui)) -> egui::Response {
-    let out = egui::Frame::new().fill(fill).stroke(Stroke::new(3.0, edge)).corner_radius(0.0).inner_margin(12.0)
+    let out = egui::Frame::new().fill(fill).stroke(Stroke::new(3.0, edge)).corner_radius(0.0).inner_margin(SP_M)
         .shadow(egui::epaint::Shadow { offset: [0, 4], blur: 0, spread: 0, color: EDGE }).show(ui, f);
     let rect = out.response.rect;
-    ui.add_space(6.0);
+    ui.add_space(CARD_GAP);
     let r = ui.interact(rect, ui.scope_id().with(("pr", rect.min.x as i32, rect.min.y as i32)), Sense::click());
     r.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
