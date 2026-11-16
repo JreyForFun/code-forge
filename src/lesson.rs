@@ -266,8 +266,11 @@ pub fn explain_page(ui: &mut egui::Ui, text: &str) {
             code.clear();
         };
         let txt = |s: &str| RichText::new(s.to_string()).font(FontId::new(16.0, read())).color(INK_DARK);
-        for line in text.lines() {
+        let lines: Vec<&str> = text.lines().collect();
+        for (k, line) in lines.iter().enumerate() {
             if let Some(c) = line.strip_prefix("    ") { code.push(c); continue; }
+            // a blank line between two code lines belongs to the code block
+            if line.trim().is_empty() && !code.is_empty() && lines.get(k + 1).is_some_and(|n| n.starts_with("    ")) { code.push(""); continue; }
             flush(ui, &mut code);
             let t = line.trim();
             if t.is_empty() { ui.add_space(2.0); }
