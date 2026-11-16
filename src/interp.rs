@@ -157,8 +157,9 @@ fn normalize(src: &str, js: bool) -> Vec<Line> {
         let line = raw[k];
         k += 1;
         let mut t = line.trim().to_string();
-        if t.is_empty() || t.starts_with('#') || t.starts_with("//") { continue; }
-        if let Some(p) = t.find(" //") { if depth_of(&t[..p]) == 0 && !t[..p].contains('"') && !t[..p].contains('\'') { t = t[..p].trim().to_string(); } }
+        if t.is_empty() { continue; }
+        t = strip_comment(&t, js);
+        if t.is_empty() { continue; }
         if js {
             t = t.trim_end_matches(';').trim().to_string();
             while t.starts_with('}') { depth = depth.saturating_sub(1); t = t[1..].trim().trim_start_matches(')').trim_start_matches(';').trim().to_string(); }
@@ -211,6 +212,29 @@ fn normalize(src: &str, js: bool) -> Vec<Line> {
         }
     }
     out
+}
+
+/// Remove a trailing `// ...` (JS) or `# ...` (Python) comment that is outside any string.
+fn strip_comment(t: &str, js: bool) -> String {
+    let c: Vec<char> = t.chars().collect();
+    let mut q: Option<char> = None;
+    let mut i = 0;
+    while i < c.len() {
+        if let Some(qc) = q {
+            if c[i] == '\\' { i += 2; continue; }
+            if c[i] == qc { q = None; }
+            i += 1;
+            continue;
+        }
+        match c[i] {
+            '"' | '\'' | '`' => q = Some(c[i]),
+            '/' if js && i + 1 < c.len() && c[i + 1] == '/' => return c[..i].iter().collect::<String>().trim().to_string(),
+            '#' if !js => return c[..i].iter().collect::<String>().trim().to_string(),
+            _ => {}
+        }
+        i += 1;
+    }
+    t.trim().to_string()
 }
 
 fn braceless(t: &str) -> Option<(String, String)> {
@@ -1259,6 +1283,8 @@ mod tests_v2 {
         assert_eq!(o("python", "hero = {\"name\": \"Ada\", \"hp\": 10}\nhero[\"hp\"] = 7\nprint(hero[\"name\"], hero[\"hp\"])\nprint(hero)"), vec!["Ada 7", "{'name': 'Ada', 'hp': 7}"]);
         assert_eq!(o("python", "name = \"Ada\"\nprint(f\"Hi {name}, {2 + 3}!\")"), vec!["Hi Ada, 5!"]);
         assert_eq!(o("python", "for i in range(10):\n  if i == 2:\n    break\n  print(i)"), vec!["0", "1"]);
+        assert_eq!(o("python", "x = 3  # three\nprint(\"a # b\", x)"), vec!["a # b 3"]);
+        assert_eq!(o("javascript", "console.log(\"Hi\"); // say hi\nconsole.log(\"http://x\");"), vec!["Hi", "http://x"]);
     }
 
     #[test]

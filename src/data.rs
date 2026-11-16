@@ -11,15 +11,30 @@ pub enum Q {
 }
 
 #[derive(Clone)]
-pub struct Lesson { pub title: &'static str, pub slides: Vec<(&'static str, &'static str)>, pub qs: Vec<Q> }
-pub struct Module { pub name: &'static str, pub lessons: Vec<Lesson> }
+pub struct Lesson { pub title: &'static str, pub slides: Vec<(&'static str, &'static str)>, pub qs: Vec<Q>, pub project: bool }
+pub struct Module { pub name: &'static str, pub desc: &'static str, pub lessons: Vec<Lesson> }
+/// A course badge, earned by clearing every lesson in the course.
+pub struct Badge { pub name: &'static str, pub art: &'static str, pub desc: &'static str }
 pub struct Course {
-    pub name: &'static str, pub tag: &'static str, pub color: Color32, pub desc: &'static str, pub lang: &'static str,
-    pub cat: &'static str, pub level: &'static str, pub modules: Vec<Module>,
+    pub name: &'static str, pub tag: &'static str, pub slug: &'static str, pub color: Color32, pub desc: &'static str, pub lang: &'static str,
+    pub cat: &'static str, pub level: &'static str, pub hours: u32, pub teaches: Vec<&'static str>, pub snippet: &'static str, pub badge: Badge,
+    pub modules: Vec<Module>,
 }
 
 impl Course {
     pub fn lesson_count(&self) -> usize { self.modules.iter().map(|m| m.lessons.len()).sum() }
+    pub fn project_count(&self) -> usize { self.modules.iter().flat_map(|m| &m.lessons).filter(|l| l.project).count() }
+    /// Stable progress key for a lesson: `course/lesson-slug`.
+    pub fn lesson_id(&self, m: usize, l: usize) -> String { format!("{}/{}", self.slug, slugify(self.modules[m].lessons[l].title)) }
+    pub fn badge_id(&self) -> String { format!("badge:{}", self.slug) }
+}
+
+pub fn slugify(t: &str) -> String {
+    let mut o = String::new();
+    for c in t.chars() {
+        if c.is_ascii_alphanumeric() { o.push(c.to_ascii_lowercase()); } else if !o.ends_with('-') && !o.is_empty() { o.push('-'); }
+    }
+    o.trim_end_matches('-').to_string()
 }
 
 pub fn mc(q: &'static str, opts: Vec<&'static str>, right: usize, why: &'static str) -> Q { Q::Mc { q, opts, right, why } }

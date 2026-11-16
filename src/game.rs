@@ -7,6 +7,8 @@ pub const REFILL_COST: u32 = 10;
 pub const SAVER_COST: u32 = 20;
 pub const LEAGUE_UP_XP: u32 = 100;
 pub const HINT_COST: u32 = 1;
+/// Extra XP for the first clear of a checkpoint project.
+pub const PROJECT_BONUS: u32 = 10;
 pub const LEAGUES: [&str; 7] = ["Wood", "Stone", "Bronze", "Iron", "Silver", "Gold", "Crystal"];
 
 pub fn day_of(now: u64) -> u64 { now / 86_400 }

@@ -55,12 +55,13 @@ impl App {
     fn new(shot: Option<String>) -> Self {
         let demo = shot.is_some();
         let mut s = if demo { Save::new() } else { Save::load() };
+        content::migrate(&mut s);
         if s.heart_t == 0 { s.heart_t = now(); }
         if demo {
             // In-memory demo profile for screenshots. Never written to disk.
             s.onboarded = true; s.name = "Ada".into(); s.avatar = 1; s.xp = 399; s.gems = 65; s.streak = 3; s.streak_max = 4; s.last_day = today();
             s.week_id = game::week_of(today()); s.week_xp = 120; s.week_mask = 0b0000101; s.league = 2; s.hearts = 4;
-            for k in ["0.0.0", "0.0.1", "0.1.0", "0.1.1"] { s.done.insert(k.into()); }
+            for k in ["html/your-first-tags", "html/headings", "html/paragraphs-and-breaks", "html/bold-italic-and-more"] { s.done.insert(k.into()); }
             s.ach.insert("first_lesson".into(), today() - 3); s.ach.insert("streak3".into(), today() - 1); s.ach.insert("xp100".into(), today() - 2);
             s.codes.push(("Torch Counter".into(), "python".into(), "for i in range(3):\n  print(\"Torch\", i + 1)\n".into()));
             s.add_log(today() - 1, "cleared 'Tags and Elements'");
@@ -103,6 +104,16 @@ impl App {
     fn courses_cleared(&self) -> usize { (0..self.courses.len()).filter(|c| self.progress(*c) >= 1.0).count() }
     /// Grant newly earned achievements, with a toast and log entry for each.
     fn award(&mut self) {
+        for c in 0..self.courses.len() {
+            let id = self.courses[c].badge_id();
+            if self.progress(c) >= 1.0 && !self.s.ach.contains_key(&id) {
+                self.s.ach.insert(id, today());
+                let name = self.courses[c].badge.name;
+                self.toast(format!("Badge earned: {}!", name));
+                self.log(format!("earned the {} badge for {}", name, self.courses[c].name));
+                self.s.notif_read = false;
+            }
+        }
         let ctx = game::Ctx { courses_cleared: self.courses_cleared() };
         for a in game::grant_achievements(&mut self.s, &ctx, today()) {
             self.toast(format!("Achievement: {}", a.title));
@@ -112,8 +123,8 @@ impl App {
     }
 
     fn level(&self) -> u32 { game::level(self.s.xp) }
-    fn key(c: usize, m: usize, l: usize) -> String { format!("{}.{}.{}", c, m, l) }
-    fn is_done(&self, c: usize, m: usize, l: usize) -> bool { self.s.done.contains(&Self::key(c, m, l)) }
+    fn lkey(&self, c: usize, m: usize, l: usize) -> String { self.courses[c].lesson_id(m, l) }
+    fn is_done(&self, c: usize, m: usize, l: usize) -> bool { self.s.done.contains(&self.lkey(c, m, l)) }
     fn module_done(&self, c: usize, m: usize) -> bool { (0..self.courses[c].modules[m].lessons.len()).all(|l| self.is_done(c, m, l)) }
     fn current_module(&self, c: usize) -> Option<usize> { (0..self.courses[c].modules.len()).find(|m| !self.module_done(c, *m)) }
     fn lesson_unlocked(&self, c: usize, m: usize, l: usize) -> bool {
@@ -149,7 +160,7 @@ impl App {
         let n = qs.len();
         let (mut stage, mut queue, mut right) = (0usize, (0..n).collect::<Vec<usize>>(), 0u32);
         if let Kind::Lesson(c, mi, l) = &kind {
-            let k = Self::key(*c, *mi, *l);
+            let k = self.lkey(*c, *mi, *l);
             // An unfinished lesson resumes at the first question not yet answered correctly.
             if !self.s.done.contains(&k)
                 && let Some(d) = self.s.qdone.get(&k)
@@ -161,16 +172,17 @@ impl App {
 
     fn finish(&mut self, rs: &RunState) {
         self.week_check();
-        let (xp, gems);
+        let (mut xp, gems);
         let (mut duel, mut next) = (None, None);
         let perfect = rs.mistakes == 0;
         match rs.kind {
             Kind::Lesson(c, m, l) => {
                 let first = !self.is_done(c, m, l);
-                self.s.qdone.remove(&Self::key(c, m, l));
+                self.s.qdone.remove(&self.lkey(c, m, l));
                 (xp, gems) = game::lesson_reward(first, perfect);
+                if first && self.courses[c].modules[m].lessons[l].project { xp += game::PROJECT_BONUS; }
                 if first {
-                    self.s.done.insert(Self::key(c, m, l));
+                    self.s.done.insert(self.lkey(c, m, l));
                     self.log(format!("cleared '{}' ({})", rs.title, self.courses[c].name));
                     if perfect { self.s.flawless += 1; }
                     if self.progress(c) >= 1.0 { self.log(format!("finished the {} course!", self.courses[c].name)); }
@@ -191,7 +203,7 @@ impl App {
         let score = game::score(rs.total as u32, rs.mistakes);
         let mut best = score;
         if let Kind::Lesson(c, mi, l) = rs.kind {
-            let e = self.s.best.entry(Self::key(c, mi, l)).or_insert((0, 0));
+            let e = self.s.best.entry(self.lkey(c, mi, l)).or_insert((0, 0));
             e.0 = e.0.max(score); e.1 += 1; best = e.0;
         }
         let new_streak = game::bump_streak(&mut self.s, today());
@@ -351,13 +363,21 @@ fn out_view(ui: &mut egui::Ui, out: &[(interp::Kind, String)]) {
             Styled => {
                 let (st, text) = css::Style::decode(t);
                 let size = st.size.unwrap_or(15.0);
-                let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), size + 18.0), Sense::hover());
-                ui.painter().rect_filled(r, 0.0, st.bg.map(c32).unwrap_or(Color32::WHITE));
-                ui.painter().rect_stroke(r, 0.0, Stroke::new(2.0, EDGE), egui::StrokeKind::Inside);
-                let (pos, al) = match st.align.as_deref() { Some("center") => (r.center(), Align2::CENTER_CENTER), Some("right") => (Pos2::new(r.max.x - 10.0, r.center().y), Align2::RIGHT_CENTER), _ => (Pos2::new(r.min.x + 10.0, r.center().y), Align2::LEFT_CENTER) };
+                let pad = st.pad.unwrap_or(0.0);
+                let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), size + 18.0 + pad * 2.0), Sense::hover());
+                ui.painter().rect_filled(r, 0.0, Color32::WHITE);
+                let inner = r.shrink(6.0);
+                ui.painter().rect_filled(inner, 0.0, st.bg.map(c32).unwrap_or(Color32::WHITE));
+                if let Some((w, c)) = st.border { ui.painter().rect_stroke(inner, 0.0, Stroke::new(w, c32(c)), egui::StrokeKind::Inside); }
+                let tr = inner.shrink(pad + 4.0);
+                let (pos, al) = match st.align.as_deref() { Some("center") => (tr.center(), Align2::CENTER_CENTER), Some("right") => (Pos2::new(tr.max.x, tr.center().y), Align2::RIGHT_CENTER), _ => (Pos2::new(tr.min.x, tr.center().y), Align2::LEFT_CENTER) };
                 let col = st.color.map(c32).unwrap_or(Color32::BLACK);
-                ui.painter().with_clip_rect(r).text(pos, al, &text, FontId::new(size, egui::FontFamily::Proportional), col);
-                if st.bold { ui.painter().with_clip_rect(r).text(pos + Vec2::new(1.0, 0.0), al, &text, FontId::new(size, egui::FontFamily::Proportional), col); }
+                let p = ui.painter().with_clip_rect(inner);
+                let font = FontId::new(size, if st.italic { egui::FontFamily::Monospace } else { egui::FontFamily::Proportional });
+                let rect = p.text(pos, al, &text, font.clone(), col);
+                if st.bold { p.text(pos + Vec2::new(1.0, 0.0), al, &text, font, col); }
+                if st.underline { p.rect_filled(Rect::from_min_size(Pos2::new(rect.min.x, rect.max.y - 1.0), Vec2::new(rect.width(), 2.0)), 0.0, col); }
+                ui.painter().rect_stroke(r, 0.0, Stroke::new(2.0, EDGE), egui::StrokeKind::Inside);
                 ui.add_space(4.0);
             }
         }
@@ -729,7 +749,7 @@ mod tests {
         assert_eq!(again.s.name, "Ada");
         assert_eq!(again.s.avatar, 2);
         assert_eq!(again.cur, 3);
-        assert!(again.s.done.contains("3.0.0"));
+        assert!(again.s.done.contains("python/printing"));
         assert_eq!(again.s.xp, 15, "first clear + flawless bonus");
         assert_eq!(again.s.gems, 25);
         assert_eq!(again.s.streak, 1);
@@ -801,7 +821,7 @@ mod tests {
                     app.open_lesson(c, m, l);
                     frame(&ctx, &mut app, vec![]);
                     play(&ctx, &mut app, false);
-                    assert!(app.s.done.contains(&App::key(c, m, l)), "{}.{}.{} not cleared", c, m, l);
+                    assert!(app.s.done.contains(&app.lkey(c, m, l)), "{}.{}.{} not cleared", c, m, l);
                     app.screen = Screen::Main;
                     frame(&ctx, &mut app, vec![]);
                 }

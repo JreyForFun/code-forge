@@ -82,7 +82,7 @@ impl App {
                         if ok {
                             rs.right += 1;
                             if let Kind::Lesson(c, mi, l) = rs.kind {
-                                let e = self.s.qdone.entry(Self::key(c, mi, l)).or_default();
+                                let e = self.s.qdone.entry(self.lkey(c, mi, l)).or_default();
                                 if !e.contains(&qi) { e.push(qi); }
                                 self.persist();
                             }

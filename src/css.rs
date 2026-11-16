@@ -5,19 +5,24 @@
 pub struct Rule { pub selector: String, pub decls: Vec<(String, String)> }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Style { pub color: Option<[u8; 3]>, pub bg: Option<[u8; 3]>, pub size: Option<f32>, pub align: Option<String>, pub bold: bool }
+pub struct Style { pub color: Option<[u8; 3]>, pub bg: Option<[u8; 3]>, pub size: Option<f32>, pub align: Option<String>, pub bold: bool,
+    pub italic: bool, pub underline: bool, pub border: Option<(f32, [u8; 3])>, pub pad: Option<f32> }
 
 impl Style {
     /// Compact text encoding used to pass the style through the interpreter's output list.
     pub fn encode(&self, text: &str) -> String {
         let c = |x: Option<[u8; 3]>| x.map(|v| format!("{:02x}{:02x}{:02x}", v[0], v[1], v[2])).unwrap_or_default();
-        format!("{}|{}|{}|{}|{}|{}", c(self.color), c(self.bg), self.size.map(|s| s.to_string()).unwrap_or_default(), self.align.clone().unwrap_or_default(), self.bold as u8, text)
+        let b = self.border.map(|(w, col)| format!("{}:{}", w, c(Some(col)))).unwrap_or_default();
+        format!("{}|{}|{}|{}|{}{}{}|{}|{}|{}", c(self.color), c(self.bg), self.size.map(|s| s.to_string()).unwrap_or_default(), self.align.clone().unwrap_or_default(),
+            self.bold as u8, self.italic as u8, self.underline as u8, b, self.pad.map(|p| p.to_string()).unwrap_or_default(), text)
     }
     pub fn decode(s: &str) -> (Style, String) {
-        let p: Vec<&str> = s.splitn(6, '|').collect();
-        if p.len() < 6 { return (Style::default(), s.to_string()); }
+        let p: Vec<&str> = s.splitn(8, '|').collect();
+        if p.len() < 8 { return (Style::default(), s.to_string()); }
         let hex = |h: &str| if h.len() == 6 { u32::from_str_radix(h, 16).ok().map(|v| [(v >> 16) as u8, (v >> 8) as u8, v as u8]) } else { None };
-        (Style { color: hex(p[0]), bg: hex(p[1]), size: p[2].parse().ok(), align: if p[3].is_empty() { None } else { Some(p[3].into()) }, bold: p[4] == "1" }, p[5].to_string())
+        let f = |i: usize| p[4].as_bytes().get(i) == Some(&b'1');
+        let border = p[5].split_once(':').and_then(|(w, c)| Some((w.parse().ok()?, hex(c)?)));
+        (Style { color: hex(p[0]), bg: hex(p[1]), size: p[2].parse().ok(), align: if p[3].is_empty() { None } else { Some(p[3].into()) }, bold: f(0), italic: f(1), underline: f(2), border, pad: p[6].parse().ok() }, p[7].to_string())
     }
 }
 
@@ -39,6 +44,10 @@ pub fn color(v: &str) -> Option<[u8; 3]> {
         if h.len() != 6 { return None; }
         let n = u32::from_str_radix(&h, 16).ok()?;
         return Some([(n >> 16) as u8, (n >> 8) as u8, n as u8]);
+    }
+    if let Some(inner) = v.strip_prefix("rgb(").or_else(|| v.strip_prefix("rgba(")).and_then(|x| x.strip_suffix(')')) {
+        let p: Vec<u8> = inner.split(',').take(3).filter_map(|x| x.trim().parse::<f32>().ok().map(|f| f.clamp(0.0, 255.0) as u8)).collect();
+        return if p.len() == 3 { Some([p[0], p[1], p[2]]) } else { None };
     }
     named(&v)
 }
@@ -88,6 +97,15 @@ pub fn style_of(rule: &Rule) -> Style {
             "font-size" => st.size = v.trim_end_matches("px").trim().parse::<f32>().ok().map(|s| s.clamp(8.0, 40.0)),
             "text-align" => st.align = Some(v.to_lowercase()),
             "font-weight" => st.bold = v == "bold" || v.parse::<u32>().map(|w| w >= 600).unwrap_or(false),
+            "font-style" => st.italic = v == "italic",
+            "text-decoration" | "text-decoration-line" => st.underline = v.contains("underline"),
+            "font" => { st.bold |= v.contains("bold"); st.italic |= v.contains("italic"); if let Some(sz) = v.split_whitespace().find_map(|w| w.strip_suffix("px")?.parse::<f32>().ok()) { st.size = Some(sz.clamp(8.0, 40.0)); } }
+            "border" => {
+                let w = v.split_whitespace().find_map(|x| x.strip_suffix("px")?.parse::<f32>().ok()).unwrap_or(1.0).clamp(1.0, 8.0);
+                let c = v.split_whitespace().find_map(color).unwrap_or([0, 0, 0]);
+                if !v.contains("none") { st.border = Some((w, c)); }
+            }
+            "padding" => st.pad = v.split_whitespace().next().and_then(|x| x.strip_suffix("px")?.parse::<f32>().ok()).map(|p| p.clamp(0.0, 30.0)),
             _ => {}
         }
     }
@@ -118,6 +136,7 @@ mod tests {
         assert_eq!(color("Gold"), Some([255, 215, 0]));
         assert_eq!(color("#12"), None);
         assert_eq!(color("sparkly"), None);
+        assert_eq!(color("rgb(255, 0, 10)"), Some([255, 0, 10]));
     }
 
     #[test]
@@ -132,7 +151,7 @@ mod tests {
 
     #[test]
     fn style_encoding_round_trips() {
-        let st = Style { color: Some([1, 2, 3]), bg: None, size: Some(20.0), align: Some("center".into()), bold: true };
+        let st = Style { color: Some([1, 2, 3]), bg: None, size: Some(20.0), align: Some("center".into()), bold: true, italic: false, underline: true, border: Some((2.0, [255, 215, 0])), pad: Some(8.0) };
         let (d, t) = Style::decode(&st.encode("a | b"));
         assert_eq!(d, st);
         assert_eq!(t, "a | b");

@@ -12,7 +12,7 @@ impl App {
         ui.add_space(8.0);
         if let Some((mi, li)) = self.next_lesson(c) {
             let name = self.courses[c].modules[mi].lessons[li].title;
-            let resumed = self.s.qdone.get(&Self::key(c, mi, li)).map(|d| !d.is_empty()).unwrap_or(false);
+            let resumed = self.s.qdone.get(&self.lkey(c, mi, li)).map(|d| !d.is_empty()).unwrap_or(false);
             if pbtn(ui, &format!("{}: {}", if resumed { "RESUME" } else { "NEXT QUEST" }, name.to_uppercase()), GOLD, 0.0).clicked() { self.open_lesson(c, mi, li); }
             ui.add_space(10.0);
         }
@@ -57,7 +57,7 @@ impl App {
                         ui.vertical(|ui| {
                             ui.label(body(format!("Lesson {}", li + 1), 12.0).color(DIM));
                             ui.label(body(if lu { tl } else { "???" }, 15.0).color(if lu { INK } else { DIM }));
-                            let key = Self::key(c, mi, li);
+                            let key = self.lkey(c, mi, li);
                             if !ld && let Some(d) = self.s.qdone.get(&key) && !d.is_empty() { ui.label(body(format!("in progress {}/{}", d.len(), self.courses[c].modules[mi].lessons[li].qs.len()), 11.0).color(GOLD)); }
                             if let Some((b, a)) = self.s.best.get(&key) { ui.label(body(format!("best {}%  -  played {}x", b, a), 11.0).color(DIM)); }
                         });
