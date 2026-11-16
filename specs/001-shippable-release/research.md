@@ -62,3 +62,14 @@
 - **Decision**: Rule functions take `now_secs: u64` or `day: u64` parameters. The UI calls them with
   the real clock. Tests use fixed values, including clocks that go backwards (`saturating_sub`
   everywhere).
+
+## R8. Renderer backend (found during implementation)
+
+- **Finding**: With eframe's default wgpu backend, the app occasionally panicked in
+  `egui-wgpu` ("Failed to create staging buffer for index data"). This happened in 1 of 1 cold
+  release launches and in 4 of 5 parallel launches.
+- **Decision**: Build eframe with `default-features = false` and the `glow` (OpenGL) backend. After
+  the switch, 18 of 18 launches succeeded (13 sequential + 5 parallel) with identical rendering.
+  OpenGL is also more widely available on older Windows GPUs and drivers, and the binary is smaller.
+- **Alternatives**: Keep wgpu and catch the panic (it would still lose a frame or crash the window).
+  Pinning another wgpu version (no fix known, and still heavier).

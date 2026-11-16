@@ -33,7 +33,7 @@ enum Tab { Learn, Train, Ranks, Create, Hero }
 enum Modal { None, Notif, Shop, Courses, NoHearts, Reset, Avatar, DeleteSpell(usize) }
 
 #[derive(Clone)]
-enum Kind { Lesson(usize, usize, usize), Coach(usize), Duel(usize) }
+enum Kind { Lesson(usize, usize, usize), Coach, Duel(usize) }
 
 struct RunState {
     title: String, kind: Kind, lang: &'static str, slides: Vec<(&'static str, &'static str)>, qs: Vec<Q>, stage: usize, queue: Vec<usize>,
@@ -79,9 +79,8 @@ impl App {
     /// Save to disk (atomic). Warns once if the save folder can't be written.
     fn persist(&mut self) {
         if self.demo { return; }
-        if let Err(e) = self.s.store() {
-            if !self.save_warned { self.save_warned = true; self.toast(format!("Can't save progress: {}", e)); }
-        }
+        if let Err(e) = self.s.store()
+            && !self.save_warned { self.save_warned = true; self.toast(format!("Can't save progress: {}", e)); }
     }
     fn toast(&mut self, t: impl Into<String>) {
         let t = t.into();
@@ -152,11 +151,9 @@ impl App {
         if let Kind::Lesson(c, mi, l) = &kind {
             let k = Self::key(*c, *mi, *l);
             // An unfinished lesson resumes at the first question not yet answered correctly.
-            if !self.s.done.contains(&k) {
-                if let Some(d) = self.s.qdone.get(&k) {
-                    if !d.is_empty() { queue.retain(|i| !d.contains(i)); right = d.len() as u32; stage = slides.len(); }
-                }
-            }
+            if !self.s.done.contains(&k)
+                && let Some(d) = self.s.qdone.get(&k)
+                    && !d.is_empty() { queue.retain(|i| !d.contains(i)); right = d.len() as u32; stage = slides.len(); }
         }
         let lang = match &kind { Kind::Lesson(c, _, _) => self.courses[*c].lang, _ => "" };
         self.screen = Screen::Run(Box::new(RunState { title: title.into(), lang, kind, slides, qs, stage, queue, sel: None, text: String::new(), fb: None, mistakes: 0, right, total: n, last: None, hint_q: None }));
@@ -164,7 +161,8 @@ impl App {
 
     fn finish(&mut self, rs: &RunState) {
         self.week_check();
-        let (mut xp, mut gems, mut duel, mut next) = (0, 0, None, None);
+        let (xp, gems);
+        let (mut duel, mut next) = (None, None);
         let perfect = rs.mistakes == 0;
         match rs.kind {
             Kind::Lesson(c, m, l) => {
@@ -180,12 +178,12 @@ impl App {
                 self.open_mod = self.current_module(c).or(Some(m));
                 next = self.next_lesson(c).map(|(m, l)| (c, m, l));
             }
-            Kind::Coach(_) => { xp = 8; gems = 2; self.log(format!("solved the '{}' challenge", rs.title)); }
+            Kind::Coach => { (xp, gems) = (8, 2); self.log(format!("solved the '{}' challenge", rs.title)); }
             Kind::Duel(o) => {
                 let me = rs.right;
                 let bot = opponents()[o].skill.min(rs.total as u32);
                 let won = me > bot || (me == bot && me as usize == rs.total);
-                if won { xp = 20; gems = 5; self.s.duel_wins += 1; } else { xp = 5; }
+                if won { (xp, gems) = (20, 5); self.s.duel_wins += 1; } else { (xp, gems) = (5, 0); }
                 duel = Some((me, bot, opponents()[o].name.to_string(), won));
                 self.log(format!("{} a duel against {}", if won { "won" } else { "lost" }, opponents()[o].name));
             }
@@ -247,7 +245,7 @@ fn header(ctx: &mut egui::Ui, app: &mut App, title_text: &str, back: bool, dropd
         let mut x = r.min.x;
         if back {
             let br = Rect::from_min_size(Pos2::new(x, r.min.y), Vec2::new(30.0, 30.0));
-            let resp = ui.interact(br, ui.id().with("back"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+            let resp = ui.interact(br, ui.scope_id().with("back"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
             ui.painter().text(br.center(), Align2::CENTER_CENTER, "<", FontId::new(16.0, press()), if resp.hovered() { GOLD } else { Color32::WHITE });
             if resp.clicked() { app.screen = Screen::Main; }
             x += 36.0;
@@ -260,10 +258,10 @@ fn header(ctx: &mut egui::Ui, app: &mut App, title_text: &str, back: bool, dropd
         if dropdown {
             let c = Pos2::new(x + tw + 14.0, r.center().y);
             for i in 0..4 { ui.painter().rect_filled(Rect::from_min_size(c + Vec2::new(-8.0 + i as f32 * 2.0, -3.0 + i as f32 * 2.0), Vec2::new(16.0 - i as f32 * 4.0, 2.0)), 0.0, Color32::WHITE); }
-            if ui.interact(tr, ui.id().with("drop"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Choose a course").clicked() { app.modal = Modal::Courses; }
+            if ui.interact(tr, ui.scope_id().with("drop"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Choose a course").clicked() { app.modal = Modal::Courses; }
         }
         let mr = Rect::from_min_size(Pos2::new(r.max.x - 24.0, r.min.y), Vec2::new(24.0, 30.0));
-        let mresp = ui.interact(mr, ui.id().with("menu"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Settings");
+        let mresp = ui.interact(mr, ui.scope_id().with("menu"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Settings");
         for i in 0..3 { ui.painter().rect_filled(Rect::from_min_size(Pos2::new(mr.center().x - 2.0, mr.min.y + 5.0 + i as f32 * 8.0), Vec2::splat(5.0)), 0.0, if mresp.hovered() { GOLD } else { Color32::WHITE }); }
         if mresp.clicked() { app.screen = Screen::Settings; }
         let br = Rect::from_min_size(Pos2::new(r.max.x - 72.0, r.min.y), Vec2::new(36.0, 30.0));
@@ -271,7 +269,7 @@ fn header(ctx: &mut egui::Ui, app: &mut App, title_text: &str, back: bool, dropd
         if !app.s.notif_read {
             ui.painter().rect_filled(Rect::from_min_size(Pos2::new(br.max.x - 8.0, br.min.y - 3.0), Vec2::splat(11.0)), 0.0, RED);
         }
-        if ui.interact(br, ui.id().with("bell"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Messages").clicked() { app.modal = Modal::Notif; app.s.notif_read = true; app.persist(); }
+        if ui.interact(br, ui.scope_id().with("bell"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Messages").clicked() { app.modal = Modal::Notif; app.s.notif_read = true; app.persist(); }
     });
 }
 
@@ -281,7 +279,7 @@ fn subtabs(ui: &mut egui::Ui, labels: &[&str], cur: &mut usize) {
     let n = labels.len() as f32;
     for (i, lab) in labels.iter().enumerate() {
         let tr = Rect::from_min_size(Pos2::new(r.min.x + r.width() / n * i as f32, r.min.y), Vec2::new(r.width() / n, 38.0));
-        let resp = ui.interact(tr, ui.id().with(("st", labels[0], i)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+        let resp = ui.interact(tr, ui.scope_id().with(("st", labels[0], i)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
         let on = *cur == i;
         ui.painter().text(tr.center() - Vec2::new(0.0, 2.0), Align2::CENTER_CENTER, *lab, FontId::new(9.0, press()), if on { Color32::WHITE } else if resp.hovered() { INK } else { DIM });
         if on { ui.painter().rect_filled(Rect::from_min_size(Pos2::new(tr.min.x, tr.max.y - 4.0), Vec2::new(tr.width(), 4.0)), 0.0, GOLD); }
@@ -299,7 +297,7 @@ fn nav(ctx: &mut egui::Ui, app: &mut App) {
         let w = r.width() / 5.0;
         for (i, (t, name, art)) in items.iter().enumerate() {
             let tr = Rect::from_min_size(Pos2::new(r.min.x + w * i as f32, r.min.y), Vec2::new(w, 56.0));
-            let resp = ui.interact(tr, ui.id().with(("nav", i)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+            let resp = ui.interact(tr, ui.scope_id().with(("nav", i)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
             let on = app.tab == *t;
             if on {
                 ui.painter().rect_filled(tr.shrink2(Vec2::new(3.0, 0.0)).translate(Vec2::new(0.0, 3.0)), 0.0, EDGE);
@@ -360,7 +358,7 @@ fn out_view(ui: &mut egui::Ui, out: &[(interp::Kind, String)]) {
 
 fn dim_back(ctx: &egui::Context) {
     let r = ctx.content_rect();
-    egui::Area::new(egui::Id::new("dimmer")).order(egui::Order::Middle).fixed_pos(r.min).show(ctx, |ui| {
+    egui::Area::new(egui::Id::unique("dimmer")).order(egui::Order::Middle).fixed_pos(r.min).show(ctx, |ui| {
         ui.painter().rect_filled(r, 0.0, Color32::from_black_alpha(190));
         let _ = ui.allocate_rect(r, Sense::click());
     });
@@ -369,9 +367,12 @@ fn dim_back(ctx: &egui::Context) {
 fn dialog(ctx: &egui::Context, id: &str, add: impl FnOnce(&mut egui::Ui)) {
     let w = (ctx.content_rect().width() - 40.0).clamp(260.0, 360.0);
     egui::Window::new(id).title_bar(false).collapsible(false).resizable(false).anchor(Align2::CENTER_CENTER, [0.0, 0.0]).order(egui::Order::Foreground)
-        .fixed_size([w, 0.0])
+        .min_width(w).max_width(w)
         .frame(egui::Frame::new().fill(PANEL).stroke(Stroke::new(4.0, GOLD)).inner_margin(16.0).shadow(egui::epaint::Shadow { offset: [0, 6], blur: 0, spread: 0, color: EDGE }))
-        .show(ctx, |ui| { egui::ScrollArea::vertical().max_height(ctx.content_rect().height() - 80.0).show(ui, add); });
+        .show(ctx, |ui| {
+            ui.set_width(w);
+            egui::ScrollArea::vertical().auto_shrink([false, true]).max_height((ctx.content_rect().height() - 90.0).max(200.0)).show(ui, add);
+        });
 }
 
 fn option_btn(ui: &mut egui::Ui, text: &str, selected: bool, locked: bool, sel: &mut Option<usize>, i: usize) {
@@ -440,7 +441,7 @@ impl eframe::App for App {
             }
             Screen::Settings => { self.screen = Screen::Settings; self.settings(ui); }
             Screen::Run(rs) => { if let Some(rs) = self.run_screen(ui, rs) { self.screen = Screen::Run(rs); } }
-            Screen::Complete(c) => { if !self.complete_screen(ui, &c) { if matches!(self.screen, Screen::Main) { self.screen = Screen::Complete(c); } } }
+            Screen::Complete(c) => { if !self.complete_screen(ui, &c) && matches!(self.screen, Screen::Main) { self.screen = Screen::Complete(c); } }
             Screen::Editor(ed) => { if let Some(ed) = self.editor_screen(ui, ed) { self.screen = Screen::Editor(ed); } }
         }
         self.modals(&ctx);
@@ -466,9 +467,8 @@ impl App {
                 ui.horizontal_wrapped(|ui| { icon(ui, "flame", 28.0); ui.label(body(msg_streak, 14.0)); });
                 let hearts = match game::next_heart_in(&self.s, now()) { Some(s) => format!("{} of {} hearts. Next heart in {}:{:02}.", self.s.hearts, MAX_HEARTS, s / 60, s % 60), None => "Your hearts are full.".into() };
                 ui.horizontal_wrapped(|ui| { icon(ui, "heart", 28.0); ui.label(body(hearts, 14.0)); });
-                if let Some((id, d)) = self.s.ach.iter().max_by_key(|(_, d)| **d) {
-                    if let Some(a) = game::achievement(id) { ui.horizontal_wrapped(|ui| { icon(ui, a.icon, 28.0); ui.label(body(format!("Latest achievement: {} ({})", a.title, day_label(*d)), 14.0)); }); }
-                }
+                if let Some((id, d)) = self.s.ach.iter().max_by_key(|(_, d)| **d)
+                    && let Some(a) = game::achievement(id) { ui.horizontal_wrapped(|ui| { icon(ui, a.icon, 28.0); ui.label(body(format!("Latest achievement: {} ({})", a.title, day_label(*d)), 14.0)); }); }
                 if !self.s.last_result.is_empty() {
                     let lr = match self.s.last_result.as_str() { "LEVEL_UP" => "Last week: promoted!", "LEVEL_DOWN" => "Last week: dropped a league.", _ => "Last week: league unchanged." };
                     ui.horizontal_wrapped(|ui| { icon(ui, "banner_royal", 28.0); ui.label(body(lr, 14.0)); });
@@ -477,16 +477,16 @@ impl App {
                 if pbtn(ui, "CLOSE", BLUE, 0.0).clicked() { close = true; }
             }),
             Modal::Shop => dialog(ctx, "shop", |ui| {
-                ui.horizontal(|ui| { icon(ui, "money_bag", 36.0); ui.label(title("SHOP", 12.0).color(GOLD)); ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| { ui.label(title(format!("{}", self.s.gems), 11.0)); icon(ui, "crystal_purple", 28.0); }); });
+                ui.horizontal(|ui| { icon(ui, "money_bag", 36.0); ui.label(title("SHOP", 12.0).color(GOLD)); ui.add_space(12.0); icon(ui, "crystal_purple", 28.0); ui.label(title(format!("{}", self.s.gems), 11.0)); });
                 ui.add_space(10.0);
-                ui.horizontal(|ui| { icon(ui, "heart", 34.0); ui.label(body(format!("Refill all hearts ({} gems)", REFILL_COST), 14.0)); });
+                ui.horizontal_wrapped(|ui| { icon(ui, "heart", 34.0); ui.label(body(format!("Refill all hearts ({} gems)", REFILL_COST), 14.0)); });
                 if pbtn(ui, "BUY HEARTS", RED, 0.0).clicked() { match game::buy_refill(&mut self.s) { Ok(()) => { self.persist(); self.toast("Hearts refilled!"); } Err(e) => self.toast(e.msg()) } }
                 let claimed = self.s.free_day == today();
                 if pbtn(ui, if claimed { "FREE HEART (TOMORROW)" } else { "FREE HEART (1 PER DAY)" }, if claimed { PANEL_HI } else { GREEN }, 0.0).clicked() {
                     match game::claim_free_heart(&mut self.s, today()) { Ok(()) => { self.persist(); self.toast("+1 heart!"); } Err(e) => self.toast(e.msg()) }
                 }
                 ui.add_space(10.0);
-                ui.horizontal(|ui| { icon(ui, "hourglass", 34.0); ui.label(body(format!("Streak saver ({} gems, hold up to 3). Protects your streak if you miss one day.", SAVER_COST), 14.0)); });
+                ui.horizontal_wrapped(|ui| { icon(ui, "hourglass", 34.0); ui.label(body(format!("Streak saver ({} gems, hold up to 3). Protects your streak if you miss one day.", SAVER_COST), 14.0)); });
                 if pbtn(ui, &format!("BUY SAVER ({}/3)", self.s.savers), BLUE, 0.0).clicked() { match game::buy_saver(&mut self.s) { Ok(()) => { self.persist(); self.toast("Streak saver added!"); } Err(e) => self.toast(e.msg()) } }
                 ui.add_space(10.0);
                 ui.label(body("Earn gems by clearing lessons, challenges and duels.", 12.0).color(DIM));
@@ -515,9 +515,8 @@ impl App {
                 if pbtn(ui, &format!("REFILL ({} GEMS)", REFILL_COST), RED, 0.0).clicked() {
                     match game::buy_refill(&mut self.s) { Ok(()) => { self.persist(); close = true; } Err(e) => self.toast(e.msg()) }
                 }
-                if self.s.free_day != today() && pbtn(ui, "FREE DAILY HEART", GREEN, 0.0).clicked() {
-                    if game::claim_free_heart(&mut self.s, today()).is_ok() { self.persist(); close = true; }
-                }
+                if self.s.free_day != today() && pbtn(ui, "FREE DAILY HEART", GREEN, 0.0).clicked()
+                    && game::claim_free_heart(&mut self.s, today()).is_ok() { self.persist(); close = true; }
                 ui.add_space(6.0);
                 if pbtn(ui, "PRACTISE A DUEL (NO HEARTS)", PANEL_HI, 0.0).clicked() { self.tab = Tab::Train; self.sub_train = 1; self.screen = Screen::Main; close = true; }
                 if pbtn(ui, "LATER", PANEL_HI, 0.0).clicked() { close = true; }
@@ -565,7 +564,7 @@ impl App {
         ctx.request_repaint();
         let r = ctx.content_rect();
         let w = (r.width() - 32.0).min(320.0);
-        egui::Area::new(egui::Id::new("toast")).order(egui::Order::Tooltip).fixed_pos(Pos2::new(r.center().x - w / 2.0, r.max.y - 140.0)).interactable(false).show(ctx, |ui| {
+        egui::Area::new(egui::Id::unique("toast")).order(egui::Order::Tooltip).fixed_pos(Pos2::new(r.center().x - w / 2.0, r.max.y - 140.0)).interactable(false).show(ctx, |ui| {
             let (rr, _) = ui.allocate_exact_size(Vec2::new(w, 40.0), Sense::hover());
             bevel(ui.painter(), rr, Color32::from_rgb(0x1f, 0x1a, 0x35), false);
             ui.painter().rect_stroke(rr, 0.0, Stroke::new(2.0, GOLD), egui::StrokeKind::Inside);
@@ -622,6 +621,15 @@ fn main() -> eframe::Result {
     let args: Vec<String> = std::env::args().collect();
     let arg = |k: &str| args.iter().position(|a| a == k).and_then(|i| args.get(i + 1).cloned());
     if args.iter().any(|a| a == "--version") { println!("Pixel Learn {}", VERSION); return Ok(()); }
+    // Release builds have no console: record any crash next to the save so it can be reported.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = std::fs::create_dir_all(Save::dir());
+        let _ = std::fs::write(Save::dir().join("crash.log"), format!("Pixel Learn {} crashed (day {}):
+{}
+", VERSION, today(), info));
+        default_hook(info);
+    }));
     let shot = arg("--screenshot");
     let tab = arg("--tab");
     let screen = arg("--screen");
@@ -675,4 +683,49 @@ fn main() -> eframe::Result {
         }
         Ok(Box::new(app))
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// End-to-end over the real App logic (no window): first launch -> onboarding -> clear a
+    /// lesson -> restart -> everything persisted (US1 + US3).
+    #[test]
+    fn first_launch_to_cleared_lesson_persists() {
+        let dir = std::env::temp_dir().join(format!("pixel_learn_e2e_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // SAFETY: only this test reads or writes APPDATA/HOME in the test binary.
+        unsafe { std::env::set_var("APPDATA", &dir); std::env::set_var("HOME", &dir); }
+
+        let mut app = App::new(None);
+        assert!(app.onboard.is_some(), "first launch shows the welcome flow");
+        app.s.name = Save::clean_name("  Ada  ");
+        app.s.avatar = 2;
+        app.cur = 3; app.s.course = 3; // Python
+        app.s.onboarded = true; app.onboard = None;
+        app.persist();
+
+        app.open_lesson(3, 0, 0);
+        let Screen::Run(mut rs) = std::mem::replace(&mut app.screen, Screen::Main) else { panic!("lesson did not open") };
+        rs.queue.clear(); rs.right = rs.total as u32; // answered everything right first time
+        app.finish(&rs);
+        assert!(matches!(app.screen, Screen::Complete(_)));
+
+        let again = App::new(None);
+        assert!(again.onboard.is_none(), "welcome flow is not shown twice");
+        assert_eq!(again.s.name, "Ada");
+        assert_eq!(again.s.avatar, 2);
+        assert_eq!(again.cur, 3);
+        assert!(again.s.done.contains("3.0.0"));
+        assert_eq!(again.s.xp, 15, "first clear + flawless bonus");
+        assert_eq!(again.s.gems, 25);
+        assert_eq!(again.s.streak, 1);
+        assert!(again.s.ach.contains_key("first_lesson"));
+        assert!(again.s.ach.contains_key("flawless"));
+        assert!(again.s.log.iter().any(|(_, t)| t.contains("cleared")));
+        assert!(dir.join("pixel_learn").join("save.bak").exists(), "previous save kept as backup");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

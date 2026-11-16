@@ -24,12 +24,11 @@ impl App {
         });
         let typing_multiline = matches!(cur_q.map(|i| &rs.qs[i]), Some(Q::Type { answer, .. }) if answer.contains('\n')) && rs.fb.is_none() && !in_slides;
         let go = if typing_multiline { ctrl_enter } else { enter };
-        if !in_slides && rs.fb.is_none() {
-            if let (Some(n), Some(qi)) = (num_key, cur_q) {
+        if !in_slides && rs.fb.is_none()
+            && let (Some(n), Some(qi)) = (num_key, cur_q) {
                 let len = match &rs.qs[qi] { Q::Mc { opts, .. } | Q::Fill { opts, .. } => opts.len(), _ => 0 };
                 if n < len { rs.sel = Some(n); }
             }
-        }
         if ctx.ctx().input(|i| i.key_pressed(egui::Key::Escape)) && self.modal == Modal::None { keep = false; }
 
         egui::Panel::top("rtop").frame(egui::Frame::new().fill(BG2).inner_margin(egui::Margin { left: 16, right: 16, top: 12, bottom: 12 })).show(ctx, |ui| {
@@ -66,11 +65,10 @@ impl App {
                 let can = match &rs.qs[qi] { Q::Type { .. } => !rs.text.trim().is_empty(), _ => rs.sel.is_some() };
                 ui.horizontal(|ui| {
                     let hint_w = 120.0;
-                    if rs.hint_q != Some(qi) {
-                        if pbtn(ui, &format!("HINT {}G", HINT_COST), PANEL_HI, hint_w).clicked() {
+                    if rs.hint_q != Some(qi)
+                        && pbtn(ui, &format!("HINT {}G", HINT_COST), PANEL_HI, hint_w).clicked() {
                             if self.s.gems >= HINT_COST { self.s.gems -= HINT_COST; rs.hint_q = Some(qi); self.persist(); } else { self.toast("Not enough gems"); }
                         }
-                    }
                     let w = ui.available_width();
                     if (pbtn(ui, "CHECK", if can { GOLD } else { PANEL_HI }, w).clicked() || go) && can {
                         let (ok, why) = match &rs.qs[qi] {
@@ -152,7 +150,7 @@ impl App {
                                             let hot = ui.ctx().input(|i| i.pointer.interact_pos()).map(|p| zr.expand(10.0).contains(p)).unwrap_or(false) && ui.ctx().dragged_id().is_some();
                                             let pp = ui.painter();
                                             pp.rect_filled(zr, 0.0, if chosen.is_some() { Color32::from_rgb(0x3a, 0x30, 0x08) } else if hot { PANEL_HI } else { EDGE });
-                                            pp.rect_stroke(zr, 0.0, Stroke::new(2.0, if hot { GOLD } else if chosen.is_some() { GOLD } else { DIM }), egui::StrokeKind::Inside);
+                                            pp.rect_stroke(zr, 0.0, Stroke::new(2.0, if hot || chosen.is_some() { GOLD } else { DIM }), egui::StrokeKind::Inside);
                                             pp.text(zr.center(), Align2::CENTER_CENTER, chosen.unwrap_or("?"), FontId::monospace(15.0), if chosen.is_some() { GOLD } else { DIM });
                                             if zresp.clicked() && !locked { rs.sel = None; }
                                             ui.label(RichText::new(b).monospace().size(16.0).color(PARCH));
@@ -178,17 +176,15 @@ impl App {
                                     ui.painter().text(r.center(), Align2::CENTER_CENTER, *o, FontId::monospace(15.0), if used { PANEL_HI } else { INK });
                                     if locked { continue; }
                                     if resp.clicked() { rs.sel = Some(i); }
-                                    if resp.dragged() {
-                                        if let Some(pos) = ui.ctx().input(|inp| inp.pointer.interact_pos()) {
-                                            let lp = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("dragchip")));
+                                    if resp.dragged()
+                                        && let Some(pos) = ui.ctx().input(|inp| inp.pointer.interact_pos()) {
+                                            let lp = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("dragchip")));
                                             let fr = Rect::from_center_size(pos, Vec2::new(w, 38.0));
                                             bevel(&lp, fr, GOLD, true);
                                             lp.text(fr.center(), Align2::CENTER_CENTER, *o, FontId::monospace(15.0), EDGE);
                                         }
-                                    }
-                                    if resp.drag_stopped() {
-                                        if let Some(pos) = ui.ctx().input(|inp| inp.pointer.interact_pos()) { if zone.expand(14.0).contains(pos) { rs.sel = Some(i); } }
-                                    }
+                                    if resp.drag_stopped()
+                                        && let Some(pos) = ui.ctx().input(|inp| inp.pointer.interact_pos()) && zone.expand(14.0).contains(pos) { rs.sel = Some(i); }
                                 }
                             });
                         }

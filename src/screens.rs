@@ -156,7 +156,7 @@ impl App {
                         self.award();
                         self.persist(); self.toast("Saved to My Spells");
                     }
-                    if let Some(i) = ed.idx { if pbtn(ui, "DELETE", RED, 100.0).clicked() { self.modal = Modal::DeleteSpell(i); } }
+                    if let Some(i) = ed.idx && pbtn(ui, "DELETE", RED, 100.0).clicked() { self.modal = Modal::DeleteSpell(i); }
                 });
                 ui.add_space(8.0);
                 panel(ui, PANEL, EDGE, |ui| {

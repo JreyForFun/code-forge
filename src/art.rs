@@ -42,91 +42,23 @@ pub fn install_fonts(ctx: &egui::Context) {
     ctx.set_fonts(f);
 }
 
-// ---------- sprites ----------
-fn pal(c: char) -> Option<Color32> {
-    Some(match c {
-        'k' => Color32::from_rgb(0x12, 0x0d, 0x1c),
-        'r' => RED,
-        'R' => Color32::from_rgb(0xa1, 0x1f, 0x3a),
-        'p' => Color32::from_rgb(0xff, 0x9a, 0xa8),
-        'g' => GREEN,
-        'G' => Color32::from_rgb(0x2e, 0x8a, 0x2a),
-        'y' => GOLD,
-        'o' => ORANGE,
-        'w' => Color32::WHITE,
-        'b' => BLUE,
-        'B' => Color32::from_rgb(0x23, 0x58, 0xb0),
-        'l' => Color32::from_rgb(0x9f, 0xd0, 0xff),
-        'v' => PURPLE,
-        'V' => Color32::from_rgb(0x6c, 0x3f, 0xb0),
-        's' => Color32::from_rgb(0xa8, 0xaa, 0xb8),
-        'S' => Color32::from_rgb(0x6a, 0x6c, 0x80),
-        'n' => Color32::from_rgb(0x8a, 0x5a, 0x32),
-        'N' => Color32::from_rgb(0x2a, 0x1a, 0x2e),
-        't' => Color32::from_rgb(0xf1, 0xc9, 0xa0),
-        _ => return None,
-    })
-}
-
+// ---------- code-drawn sprites ----------
 #[derive(Clone, Copy, PartialEq)]
-pub enum Spr { Heart, Gem, Bolt, Trophy, Lock, Check, Play, Star, Book, Bell, Hero, People, Chat, Eye, Up }
-
-fn mirror(half: &[&str], sub: &[(char, char)]) -> Vec<String> {
-    half.iter().map(|r| {
-        let right: String = r.chars().rev().map(|c| sub.iter().find(|(a, _)| *a == c).map(|(_, b)| *b).unwrap_or(c)).collect();
-        format!("{}{}", r, right)
-    }).collect()
-}
+pub enum Spr { Check }
 
 pub fn rows(s: Spr) -> Vec<String> {
-    let full = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
     match s {
-        Spr::Heart => mirror(&["......", ".kkk..", "krrrk.", "krprrr", "krrrrr", "krrrrr", ".krrrR", "..krrR", "...krR", "....kR", ".....k", "......"], &[('p', 'r')]),
-        Spr::Gem => mirror(&["......", "...kkk", ".kklll", "klwlvv", "kllvvv", "kvvvvv", ".kvvvV", "..kvvV", "...kvV", "....kV", ".....k", "......"], &[('w', 'l')]),
-        Spr::Trophy => mirror(&["......", ".kkkkk", "kkywyy", "kykyyy", "kykyyy", ".kkkyy", "...kyy", "....ky", "....ko", "..koyy", ".knnnn", ".kkkkk"], &[('w', 'y')]),
-        Spr::Lock => mirror(&["......", "..kkkk", ".kss..", ".ks...", ".ks...", "kkkkkk", "kaaaaa", "kaaaaa", "kaaakk", "kaaaka", "kkkkkk", "......"], &[]),
-        Spr::Star => mirror(&["......", ".....y", "....yy", "....yy", "yyyyyy", ".yyyyy", "..yyyy", "..yyyy", ".yyy..", ".yy...", ".y....", "......"], &[]),
-        Spr::Book => mirror(&["......", ".kkkkk", "kwwwwk", "kwSSwk", "kwwwwk", "kwSSwk", "kwwwwk", ".kkkkk", ".nnnnn", "..kkkk", "......", "......"], &[]),
-        Spr::Bell => mirror(&["......", ".....k", "..kkyy", ".kyyyy", ".kyyyy", ".kyyyy", ".kyyyy", "kkkkkk", ".....k", "......", "......", "......"], &[]),
-        Spr::Chat => mirror(&["......", ".kkkkk", "kwwwww", "kwwwww", "kwSwww", "kwwwwS", "kwwwww", ".kkkkk", "..kw..", "...k..", "......", "......"], &[]),
-        Spr::Eye => mirror(&["......", "......", "...kkk", ".kkwww", "kwwkbb", "kwwkbb", ".kkwww", "...kkk", "......", "......", "......", "......"], &[]),
-        Spr::Up => mirror(&["......", ".....w", "....ww", "...www", "..wwww", ".wwwww", "...www", "...www", "...www", "......", "......", "......"], &[]),
-        Spr::Bolt => full(&[
-            "............", "...kkkkkk...", "..kaaaaaak..", ".kaaaaawwak.", "kaaaaawwaaak", "kaaaawwwwaak",
-            "kaaawwwwwaak", "kaaaaaawwaak", ".kaaaawwaak.", ".kaaawwaaak.", "..kaawaaak..", "...kkkkkk...",
-        ]),
-        Spr::Check => full(&[
-            "............", "..........ww", ".........ww.", "........ww..", "ww.....ww...", ".ww...ww....", "..ww.ww.....", "...www......", "....w.......", "............", "............", "............",
-        ]),
-        Spr::Play => full(&[
-            "............", "............", ".ww.........", ".wwww.......", ".wwwwww.....", ".wwwwwwww...", ".wwwwww.....", ".wwww.......", ".ww.........", "............", "............", "............",
-        ]),
-        Spr::People => mirror(&["......", "...kk.", "..kttk", "..kttk", "...kk.", ".kkkkk", "kbbbbb", "kbbbbb", "kkkkkk", "......", "......", "......"], &[]),
-        Spr::Hero => mirror(&[
-            "........", "...kkkkk", "..kNNNNN", ".kNNNNNN", ".kNNNNNN", ".kNNtttt", ".kNttttt", ".kttkwtt",
-            ".kttktyt", ".ktttttt", "..kttttt", "...kkttt", "..kbbbbb", ".kbbbbbb", ".kbbbBBB", ".kkkkkkk",
-        ], &[('y', 't'), ('w', 't')]),
+        Spr::Check => ["............", "..........ww", ".........ww.", "........ww..", "ww.....ww...", ".ww...ww....", "..ww.ww.....", "...www......", "....w.......", "............", "............", "............"]
+            .iter().map(|x| x.to_string()).collect(),
     }
 }
 
 pub fn draw_spr(p: &egui::Painter, at: Pos2, s: Spr, px: f32, over: &[(char, Color32)]) {
-    let tex = match s { Spr::Heart => Some("potion_red"), Spr::Gem => Some("crystal_purple"), Spr::Bolt => Some("torch"), Spr::Trophy => Some("chest"), Spr::Book => Some("book"), Spr::Star => Some("crystal_blue"), Spr::Bell => Some("scroll_fire"), Spr::People => Some("helmet"), Spr::Lock => Some("key"), Spr::Hero => Some("helmet"), _ => None };
-    if let Some(n) = tex {
-        if TEX.get().is_some() {
-            let off = |c: char| over.iter().find(|(a, _)| *a == c).map(|(_, v)| *v);
-            let grey = |v: Color32| v == Color32::GRAY || v == Color32::from_rgb(0x6b, 0x66, 0x88) || v == Color32::from_rgb(0x55, 0x4a, 0x70);
-            let dull = match s { Spr::Heart => off('r').map(grey).unwrap_or(false), Spr::Bolt => off('a').map(grey).unwrap_or(false), _ => false };
-            let tint = if s == Spr::Lock { Color32::from_gray(110) } else if dull { Color32::from_gray(70) } else { Color32::WHITE };
-            draw_icon(p, Rect::from_min_size(at, spr_size(s, px)), n, tint);
-            return;
-        }
-    }
     for (y, row) in rows(s).iter().enumerate() {
         for (x, c) in row.chars().enumerate() {
-            let col = over.iter().find(|(a, _)| *a == c).map(|(_, c)| *c).or_else(|| pal(c));
+            let col = over.iter().find(|(a, _)| *a == c).map(|(_, c)| *c).or(if c == 'w' { Some(Color32::WHITE) } else { None });
             if let Some(col) = col {
-                let r = Rect::from_min_size(at + Vec2::new(x as f32 * px, y as f32 * px), Vec2::splat(px + 0.5));
-                p.rect_filled(r, 0.0, col);
+                p.rect_filled(Rect::from_min_size(at + Vec2::new(x as f32 * px, y as f32 * px), Vec2::splat(px + 0.5)), 0.0, col);
             }
         }
     }
@@ -177,7 +109,7 @@ pub fn panel<R>(ui: &mut egui::Ui, fill: Color32, edge: Color32, f: impl FnOnce(
 
 pub fn bar(ui: &mut egui::Ui, frac: f32, color: Color32, h: f32) {
     let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), h), Sense::hover());
-    let frac = ui.ctx().animate_value_with_time(egui::Id::new(("bar", r.min.x as i32, r.min.y as i32 / 8)), frac, 0.25);
+    let frac = ui.ctx().animate_value_with_time(egui::Id::unique(("bar", r.min.x as i32, r.min.y as i32 / 8)), frac, 0.25);
     let p = ui.painter();
     p.rect_filled(r.expand(2.0), 0.0, EDGE);
     p.rect_filled(r, 0.0, Color32::from_rgb(0x10, 0x0c, 0x1c));
@@ -253,7 +185,7 @@ pub fn panel_resp(ui: &mut egui::Ui, fill: Color32, edge: Color32, f: impl FnOnc
         .shadow(egui::epaint::Shadow { offset: [0, 4], blur: 0, spread: 0, color: EDGE }).show(ui, f);
     let rect = out.response.rect;
     ui.add_space(6.0);
-    let r = ui.interact(rect, ui.id().with(("pr", rect.min.x as i32, rect.min.y as i32)), Sense::click());
+    let r = ui.interact(rect, ui.scope_id().with(("pr", rect.min.x as i32, rect.min.y as i32)), Sense::click());
     r.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -310,6 +242,7 @@ pub const ART: &[(&str, &[u8])] = &[
     ("amulet", include_bytes!("../assets/art/chest2.png")),
 ];
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn art_exists(name: &str) -> bool { ART.iter().any(|(n, _)| *n == name) }
 
 pub fn load_textures(ctx: &egui::Context) -> Vec<egui::TextureHandle> {

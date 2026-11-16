@@ -90,11 +90,11 @@ struct P { t: Vec<Tok>, i: usize }
 impl P {
     fn peek(&self) -> Option<&Tok> { self.t.get(self.i) }
     fn kw(&mut self, k: &str) -> bool {
-        if let Some(Tok::Word(w)) = self.peek() { if w.eq_ignore_ascii_case(k) { self.i += 1; return true; } }
+        if let Some(Tok::Word(w)) = self.peek() && w.eq_ignore_ascii_case(k) { self.i += 1; return true; }
         false
     }
     fn sym(&mut self, s: &str) -> bool {
-        if let Some(Tok::Sym(x)) = self.peek() { if x == s { self.i += 1; return true; } }
+        if let Some(Tok::Sym(x)) = self.peek() && x == s { self.i += 1; return true; }
         false
     }
     fn word(&mut self, what: &str) -> Result<String, String> {

@@ -120,14 +120,14 @@ impl Save {
                 }
                 "best" => {
                     let p: Vec<&str> = v.split('|').collect();
-                    if p.len() == 3 { if let (Ok(a), Ok(c)) = (p[1].parse(), p[2].parse()) { s.best.insert(p[0].into(), (a, c)); } }
+                    if p.len() == 3 && let (Ok(a), Ok(c)) = (p[1].parse(), p[2].parse()) { s.best.insert(p[0].into(), (a, c)); }
                 }
                 "code" => {
                     let p: Vec<&str> = v.splitn(3, '\u{1f}').collect();
                     if p.len() == 3 { s.codes.push((p[0].into(), p[1].into(), p[2].replace('\u{1e}', "\n"))); }
                 }
                 "ach" => { if let Some((id, d)) = v.split_once('|') { s.ach.insert(id.into(), d.parse().unwrap_or(0)); } }
-                "log" => { if let Some((d, t)) = v.split_once('|') { if let Ok(d) = d.parse() { s.add_log(d, t); } } }
+                "log" => { if let Some((d, t)) = v.split_once('|') && let Ok(d) = d.parse() { s.add_log(d, t); } }
                 _ => {}
             }
         }

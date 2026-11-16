@@ -2,8 +2,8 @@
 use super::*;
 use save::GOALS;
 
+#[derive(Default)]
 pub struct Onboard { pub step: usize, pub name: String }
-impl Default for Onboard { fn default() -> Self { Onboard { step: 0, name: String::new() } } }
 
 const STEPS: usize = 4;
 

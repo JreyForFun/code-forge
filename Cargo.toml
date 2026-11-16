@@ -11,7 +11,7 @@ name = "pixel_learn"
 path = "src/main.rs"
 
 [dependencies]
-eframe = "0.37.0"
+eframe = { version = "0.37.0", default-features = false, features = ["accesskit", "clipboard", "default_fonts", "glow", "links", "wayland", "x11"] }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 
 [target.'cfg(windows)'.build-dependencies]

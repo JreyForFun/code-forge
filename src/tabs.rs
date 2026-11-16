@@ -58,7 +58,7 @@ impl App {
                             ui.label(body(format!("Lesson {}", li + 1), 12.0).color(DIM));
                             ui.label(body(if lu { tl } else { "???" }, 15.0).color(if lu { INK } else { DIM }));
                             let key = Self::key(c, mi, li);
-                            if !ld { if let Some(d) = self.s.qdone.get(&key) { if !d.is_empty() { ui.label(body(format!("in progress {}/{}", d.len(), self.courses[c].modules[mi].lessons[li].qs.len()), 11.0).color(GOLD)); } } }
+                            if !ld && let Some(d) = self.s.qdone.get(&key) && !d.is_empty() { ui.label(body(format!("in progress {}/{}", d.len(), self.courses[c].modules[mi].lessons[li].qs.len()), 11.0).color(GOLD)); }
                             if let Some((b, a)) = self.s.best.get(&key) { ui.label(body(format!("best {}%  -  played {}x", b, a), 11.0).color(DIM)); }
                         });
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -121,7 +121,7 @@ impl App {
             ui.add_space(8.0);
             egui::ScrollArea::horizontal().id_salt("coach").show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    for (i, c) in coaches().into_iter().enumerate() {
+                    for c in coaches() {
                         ui.vertical(|ui| {
                             ui.set_width(110.0);
                             let (r, resp) = ui.allocate_exact_size(Vec2::splat(104.0), Sense::click());
@@ -132,7 +132,7 @@ impl App {
                             let (lr, _) = ui.allocate_exact_size(Vec2::new(70.0, 18.0), Sense::hover());
                             ui.painter().rect_filled(lr, 0.0, lc);
                             ui.painter().text(lr.center(), Align2::CENTER_CENTER, c.level, FontId::new(8.0, press()), Color32::WHITE);
-                            if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.start_run(c.title, Kind::Coach(i), vec![], c.qs.clone()); }
+                            if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.start_run(c.title, Kind::Coach, vec![], c.qs.clone()); }
                         });
                         ui.add_space(8.0);
                     }
@@ -329,7 +329,7 @@ impl App {
         }
         let r = ui.clip_rect();
         let fr = Rect::from_center_size(Pos2::new(r.max.x - 44.0, r.max.y - 44.0), Vec2::splat(54.0));
-        let resp = ui.interact(fr, ui.id().with("fab"), Sense::click()).on_hover_text("New spell").on_hover_cursor(egui::CursorIcon::PointingHand);
+        let resp = ui.interact(fr, ui.scope_id().with("fab"), Sense::click()).on_hover_text("New spell").on_hover_cursor(egui::CursorIcon::PointingHand);
         bevel(ui.painter(), fr, if resp.hovered() { shade(GREEN, 1.15) } else { GREEN }, true);
         ui.painter().rect_filled(Rect::from_center_size(fr.center(), Vec2::new(24.0, 6.0)), 0.0, Color32::WHITE);
         ui.painter().rect_filled(Rect::from_center_size(fr.center(), Vec2::new(6.0, 24.0)), 0.0, Color32::WHITE);
@@ -344,7 +344,7 @@ impl App {
         for i in 0..20 { p.rect_filled(Rect::from_min_size(Pos2::new(r.min.x + (i as f32 * 53.0) % r.width(), r.min.y + (i as f32 * 37.0) % 120.0), Vec2::splat(3.0)), 0.0, Color32::from_rgb(0x6f, 0x8a, 0xf0)); }
         let ar = Rect::from_center_size(Pos2::new(r.center().x, r.min.y + 70.0), Vec2::splat(112.0));
         draw_avatar(p, ar, self.s.avatar);
-        let aresp = ui.interact(ar, ui.id().with("ava"), Sense::click()).on_hover_text("Change avatar").on_hover_cursor(egui::CursorIcon::PointingHand);
+        let aresp = ui.interact(ar, ui.scope_id().with("ava"), Sense::click()).on_hover_text("Change avatar").on_hover_cursor(egui::CursorIcon::PointingHand);
         if aresp.hovered() { ui.painter().rect_stroke(ar.expand(3.0), 0.0, Stroke::new(2.0, GOLD), egui::StrokeKind::Outside); }
         if aresp.clicked() { self.modal = Modal::Avatar; }
         let p = ui.painter();
@@ -352,7 +352,7 @@ impl App {
         p.text(Pos2::new(r.center().x, r.min.y + 176.0), Align2::CENTER_CENTER, format!("{}  *  Lvl {}  *  {} League", avatar(self.s.avatar).name, self.level(), LEAGUES[self.s.league as usize]), FontId::new(8.0, press()), PARCH);
         p.text(Pos2::new(r.center().x, r.min.y + 206.0), Align2::CENTER_CENTER, format!("{} XP", self.s.xp), FontId::new(12.0, press()), GOLD);
         let er = Rect::from_center_size(Pos2::new(r.max.x - 34.0, r.min.y + 30.0), Vec2::new(54.0, 34.0));
-        let eresp = ui.interact(er, ui.id().with("edit"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+        let eresp = ui.interact(er, ui.scope_id().with("edit"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
         bevel(ui.painter(), er, if eresp.hovered() { shade(GOLD, 1.1) } else { GOLD }, false);
         ui.painter().text(er.center(), Align2::CENTER_CENTER, "EDIT", FontId::new(8.0, press()), EDGE);
         if eresp.clicked() { self.screen = Screen::Settings; }
@@ -449,7 +449,7 @@ impl App {
                         ui.horizontal(|ui| { ui.allocate_ui(Vec2::new((ui.available_width() - 48.0).max(40.0), 12.0), |ui| bar(ui, p, GREEN, 10.0)); ui.label(body(format!("{}%", (p * 100.0) as u32), 13.0)); });
                     });
                 }).response;
-                if ui.interact(resp.rect, ui.id().with(("cp", ci)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.select_course(ci); }
+                if ui.interact(resp.rect, ui.scope_id().with(("cp", ci)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.select_course(ci); }
                 ui.add_space(6.0);
             }
         });
@@ -503,7 +503,7 @@ impl App {
                 });
             });
             ui.add_space(8.0);
-            if let Some((mi, li)) = next { if pbtn(ui, "CONTINUE LESSON", GOLD, 0.0).clicked() { self.open_lesson(c, mi, li); } }
+            if let Some((mi, li)) = next && pbtn(ui, "CONTINUE LESSON", GOLD, 0.0).clicked() { self.open_lesson(c, mi, li); }
         });
         ui.label(title("BROWSE COURSES", 9.0).color(DIM));
         ui.add_space(6.0);

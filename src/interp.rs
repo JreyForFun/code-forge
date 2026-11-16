@@ -112,15 +112,14 @@ fn normalize(src: &str, js: bool) -> Vec<Line> {
             while t.starts_with('}') { depth = depth.saturating_sub(1); t = t[1..].trim().to_string(); }
             if t.is_empty() { continue; }
             // one-line bodies: `if (x) { a; }` or `function f(n) { return n * 2; }`
-            if let Some(open) = t.find('{') {
-                if t.trim_end().ends_with('}') && !t.starts_with('{') {
+            if let Some(open) = t.find('{')
+                && t.trim_end().ends_with('}') && !t.starts_with('{') {
                     let head = t[..open].trim().to_string();
                     let body = t[open + 1..t.rfind('}').unwrap_or(t.len())].trim().to_string();
                     out.push(Line { ind: depth, text: head, no: no + 1 });
                     for stmt in body.split(';').map(|x| x.trim()).filter(|x| !x.is_empty()) { out.push(Line { ind: depth + 1, text: stmt.to_string(), no: no + 1 }); }
                     continue;
                 }
-            }
             if t.ends_with('{') {
                 t = t[..t.len() - 1].trim().to_string();
                 out.push(Line { ind: depth, text: t, no: no + 1 });
@@ -355,11 +354,10 @@ impl<'l> Run<'l> {
             "upper" => V::S(self.show(&arg0()?).to_uppercase()),
             "type" | "typeof" => V::S(match arg0()? { V::N(_) => if self.js { "number" } else { "int" }, V::S(_) => if self.js { "string" } else { "str" }, V::B(_) => if self.js { "boolean" } else { "bool" }, V::L(_) => if self.js { "object" } else { "list" }, V::Nil => "None" }.into()),
             _ => {
-                if let Some((base, m)) = f.rsplit_once('.') {
-                    if let Some(V::S(s)) = self.vars.get(base) {
+                if let Some((base, m)) = f.rsplit_once('.')
+                    && let Some(V::S(s)) = self.vars.get(base) {
                         return Ok(match m { "upper" | "toUpperCase" => V::S(s.to_uppercase()), "lower" | "toLowerCase" => V::S(s.to_lowercase()), "strip" | "trim" => V::S(s.trim().into()), _ => return Err(format!("unknown method '{}'", m)) });
                     }
-                }
                 return Err(format!("unknown function '{}'", f));
             }
         })
@@ -400,7 +398,7 @@ impl<'l> Run<'l> {
             if let Some(args) = t.strip_prefix("print(").or_else(|| t.strip_prefix("console.log(")) {
                 let inner = args.strip_suffix(')').ok_or_else(|| e("missing )".into()))?;
                 let mut parts = vec![];
-                for a in split_args(inner) { let v = self.eval(&a).map_err(&e)?; parts.push(self.show(&v)); }
+                for a in split_args(inner) { let v = self.eval(&a).map_err(e)?; parts.push(self.show(&v)); }
                 if self.out.len() >= MAX_OUT { return Err("stopped: too much output".into()); }
                 self.out.push((Kind::Out, parts.join(" ")));
                 i += 1;
@@ -412,7 +410,7 @@ impl<'l> Run<'l> {
                 i = end;
             } else if t == "return" || t.starts_with("return ") {
                 let expr = t["return".len()..].trim();
-                self.ret = Some(if expr.is_empty() { V::Nil } else { self.eval(expr).map_err(&e)? });
+                self.ret = Some(if expr.is_empty() { V::Nil } else { self.eval(expr).map_err(e)? });
                 return Ok(true);
             } else if let Some(c) = hdr(t, "if") {
                 // collect the chain: if / elif / else if / else at the same indent
@@ -427,13 +425,13 @@ impl<'l> Run<'l> {
                     else { break; }
                 }
                 for (cond, a, b) in branches {
-                    let go = match cond { Some(c) => { let v = self.eval(&c).map_err(&e)?; truthy(&v) } None => true };
+                    let go = match cond { Some(c) => { let v = self.eval(&c).map_err(e)?; truthy(&v) } None => true };
                     if go { if self.exec(a, b)? { return Ok(true); } break; }
                 }
                 i = j;
             } else if let Some(c) = hdr(t, "while") {
                 loop {
-                    let v = self.eval(&c).map_err(&e)?;
+                    let v = self.eval(&c).map_err(e)?;
                     if !truthy(&v) { break; }
                     if self.exec(i + 1, end)? { return Ok(true); }
                     self.step()?;
@@ -446,13 +444,13 @@ impl<'l> Run<'l> {
                     let rest = rest.trim();
                     let items: Vec<V> = if let Some(r) = rest.strip_prefix("range(").and_then(|x| x.strip_suffix(')')) {
                         let mut a = vec![];
-                        for x in split_args(r) { let v = self.eval(&x).map_err(&e)?; a.push(num(&v).map_err(&e)?); }
+                        for x in split_args(r) { let v = self.eval(&x).map_err(e)?; a.push(num(&v).map_err(e)?); }
                         let (s, en, st) = match a.len() { 0 => return Err(e("range() needs a number".into())), 1 => (0.0, a[0], 1.0), 2 => (a[0], a[1], 1.0), _ => (a[0], a[1], a[2]) };
                         if st == 0.0 { return Err(e("range() step can't be 0".into())); }
                         let count = (((en - s) / st).ceil().max(0.0) as usize).min(MAX_STEPS as usize + 1);
                         (0..count).map(|k| V::N(s + k as f64 * st)).collect()
                     } else {
-                        match self.eval(rest).map_err(&e)? { V::L(l) => l, V::S(s) => s.chars().map(|c| V::S(c.to_string())).collect(), _ => return Err(e("can only loop over range(), a list or text".into())) }
+                        match self.eval(rest).map_err(e)? { V::L(l) => l, V::S(s) => s.chars().map(|c| V::S(c.to_string())).collect(), _ => return Err(e("can only loop over range(), a list or text".into())) }
                     };
                     for it in items {
                         self.vars.insert(v.trim().to_string(), it);
@@ -462,18 +460,18 @@ impl<'l> Run<'l> {
                 } else {
                     let p: Vec<&str> = c.split(';').collect();
                     if p.len() != 3 { return Err(e("unsupported for loop".into())); }
-                    self.assign(p[0].trim()).map_err(&e)?;
+                    self.assign(p[0].trim()).map_err(e)?;
                     loop {
-                        let v = self.eval(p[1].trim()).map_err(&e)?;
+                        let v = self.eval(p[1].trim()).map_err(e)?;
                         if !truthy(&v) { break; }
                         if self.exec(i + 1, end)? { return Ok(true); }
-                        self.assign(p[2].trim()).map_err(&e)?;
+                        self.assign(p[2].trim()).map_err(e)?;
                         self.step()?;
                     }
                 }
                 i = end;
             } else {
-                self.assign(t).map_err(&e)?;
+                self.assign(t).map_err(e)?;
                 i += 1;
             }
         }
@@ -615,7 +613,7 @@ fn css_out(src: &str) -> Vec<(Kind, String)> {
             for r in &rules {
                 let decls: Vec<String> = r.decls.iter().map(|(k, v)| format!("{}: {}", k, v)).collect();
                 out.push((Kind::Out, format!("{}  ->  {}", r.selector, if decls.is_empty() { "(no properties)".into() } else { decls.join("; ") })));
-                out.push((Kind::Styled, crate::css::style_of(r).encode(&format!("Sample text styled by {}", r.selector))));
+                out.push((Kind::Styled, crate::css::style_of(r).encode("Hello, hero!")));
             }
             out
         }
