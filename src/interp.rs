@@ -276,11 +276,22 @@ fn split_stmts(s: &str) -> Vec<String> {
 enum Flow { Next, Return, Break, Continue }
 
 #[derive(Clone)]
-struct Func { params: Vec<String>, from: usize, to: usize, expr: Option<String> }
+struct Func { params: Vec<String>, defaults: Vec<Option<String>>, from: usize, to: usize, expr: Option<String> }
+
+/// A Python class: its methods and the class-level attribute defaults (`name = expr`).
+#[derive(Clone, Default)]
+struct Class { methods: HashMap<String, Func>, attrs: Vec<(String, String)> }
+
+const CLASS: &str = "__class__";
+/// Functions available after `import math` / `import random`.
+const MODULES: &[(&str, &[&str])] = &[("math", &["sqrt", "floor", "ceil", "pow", "pi", "e", "fabs"]), ("random", &["randint", "choice", "random"])];
 
 struct Run<'l> {
     lines: &'l [Line], vars: HashMap<String, V>, funcs: HashMap<String, Func>, out: Vec<(Kind, String)>,
     steps: u32, js: bool, depth: u32, ret: Option<V>, seed: u64, dom: HashMap<String, Vec<(String, V)>>,
+    classes: HashMap<String, Class>,
+    /// local name -> qualified module name ("math" -> "math", "sqrt" -> "math.sqrt")
+    imports: HashMap<String, String>,
 }
 
 /// Expression evaluator. Holds the runner so it can call user functions.
@@ -394,7 +405,14 @@ impl<'a, 'l> Ev<'a, 'l> {
         let mut v = self.prim()?;
         loop {
             if self.op("[") {
-                let idx = self.expr()?;
+                let start = if matches!(self.peek(), Some(T::Op(o)) if o == ":") { None } else { Some(self.expr()?) };
+                if self.op(":") {
+                    let end = if matches!(self.peek(), Some(T::Op(o)) if o == "]") { None } else { Some(self.expr()?) };
+                    if !self.op("]") { return Err("missing ]".into()); }
+                    v = slice(&v, start.as_ref(), end.as_ref())?;
+                    continue;
+                }
+                let Some(idx) = start else { return Err("missing index".into()) };
                 if !self.op("]") { return Err("missing ]".into()); }
                 v = index(&v, &idx)?;
             } else if self.op(".") {
@@ -484,6 +502,10 @@ impl<'a, 'l> Ev<'a, 'l> {
                     "False" | "false" => return Ok(V::B(false)),
                     "None" | "null" | "undefined" => return Ok(V::Nil),
                     "Math.PI" => return Ok(V::N(std::f64::consts::PI)),
+                    _ if !self.r.js && self.r.module_name(&id).is_some() => {
+                        let q = self.r.module_name(&id).unwrap();
+                        return match q.as_str() { "math.pi" => Ok(V::N(std::f64::consts::PI)), "math.e" => Ok(V::N(std::f64::consts::E)), _ => Ok(V::S(format!("[function {}]", q))) };
+                    }
                     "document" => return Ok(V::O(vec![("__document".into(), V::B(true))])),
                     _ => {}
                 }
@@ -492,6 +514,22 @@ impl<'a, 'l> Ev<'a, 'l> {
             T::Op(o) => Err(format!("unexpected '{}'", o)),
         }
     }
+}
+
+/// Python slices: a[start:end] for lists and text (negative positions count from the end).
+fn slice(v: &V, start: Option<&V>, end: Option<&V>) -> Result<V, String> {
+    let len = match v { V::L(l) => l.len(), V::S(s) => s.chars().count(), _ => return Err("only lists and text can be sliced".into()) } as i64;
+    let pos = |x: Option<&V>, def: i64| -> Result<usize, String> {
+        let k = match x { Some(x) => num(x)? as i64, None => def };
+        let k = if k < 0 { len + k } else { k };
+        Ok(k.clamp(0, len) as usize)
+    };
+    let (a, b) = (pos(start, 0)?, pos(end, len)?);
+    Ok(match v {
+        V::L(l) => V::L(if a < b { l[a..b].to_vec() } else { vec![] }),
+        V::S(s) => V::S(if a < b { s.chars().skip(a).take(b - a).collect() } else { String::new() }),
+        _ => unreachable!(),
+    })
 }
 
 fn index(v: &V, idx: &V) -> Result<V, String> {
@@ -518,6 +556,7 @@ impl<'l> Run<'l> {
             }
             V::O(o) => {
                 if let Some((sel, _)) = el_of(v) { return format!("<element {}>", sel); }
+                if let Some(V::S(c)) = field(o, CLASS) { return format!("<{} object>", c); }
                 let items: Vec<String> = o.iter().map(|(k, x)| if self.js { format!("{}: {}", k, q(x)) } else { format!("'{}': {}", k, q(x)) }).collect();
                 if items.is_empty() { "{}".into() } else if self.js { format!("{{ {} }}", items.join(", ")) } else { format!("{{{}}}", items.join(", ")) }
             }
@@ -525,6 +564,7 @@ impl<'l> Run<'l> {
     }
     fn type_name(&self, v: &V) -> String {
         let js = self.js;
+        if let V::O(o) = v && let Some(V::S(c)) = field(o, CLASS) { return c.clone(); }
         match v { V::N(n) => if js { "number" } else if n.fract() == 0.0 { "int" } else { "float" }, V::S(_) => if js { "string" } else { "str" }, V::B(_) => if js { "boolean" } else { "bool" },
             V::L(_) => if js { "object" } else { "list" }, V::O(_) => if js { "object" } else { "dict" }, V::Nil => if js { "undefined" } else { "NoneType" } }.into()
     }
@@ -612,8 +652,23 @@ impl<'l> Run<'l> {
         self.page(msg)
     }
 
+    /// `math.sqrt` / `sqrt` (after `from math import sqrt`) -> "math.sqrt", if imported.
+    fn module_name(&self, f: &str) -> Option<String> {
+        if let Some(q) = self.imports.get(f) && q.contains('.') { return Some(q.clone()); }
+        let (m, name) = f.split_once('.')?;
+        let q = self.imports.get(m)?;
+        MODULES.iter().find(|(mm, fs)| mm == q && fs.contains(&name)).map(|(mm, _)| format!("{}.{}", mm, name))
+    }
+
     fn call(&mut self, f: &str, a: Vec<V>) -> Result<V, String> {
         if let Some(func) = self.funcs.get(f).cloned() { return self.call_user(f, &func, a); }
+        if !self.js {
+            if let Some(q) = self.module_name(f) { return self.call_module(&q, a); }
+            if let Some((m, _)) = f.split_once('.') && MODULES.iter().any(|(mm, _)| *mm == m) && !self.vars.contains_key(m) && !self.imports.contains_key(m) {
+                return Err(format!("'{}' is not defined - add 'import {}' at the top", m, m));
+            }
+            if let Some(cls) = self.classes.get(f).cloned() { return self.construct(f, &cls, a); }
+        }
         // callable stored in a variable that names a function: const f = greet
         let alias = match self.vars.get(f) { Some(V::S(s)) => s.strip_prefix("[function ").and_then(|x| x.strip_suffix(']')).map(|x| x.to_string()), _ => None };
         if let Some(name) = alias && let Some(func) = self.funcs.get(&name).cloned() { return self.call_user(&name, &func, a); }
@@ -627,7 +682,11 @@ impl<'l> Run<'l> {
             "Math.floor" => V::N(n(0)?.floor()),
             "float" | "Number" | "parseFloat" => V::N(n(0)?),
             "abs" | "Math.abs" => V::N(n(0)?.abs()),
+            "round" if a.len() == 2 => { let p = 10f64.powi(n(1)? as i32); V::N((n(0)? * p).round() / p) }
             "round" | "Math.round" => V::N(n(0)?.round()),
+            "enumerate" => match arg0()? { V::L(l) => V::L(l.into_iter().enumerate().map(|(i, x)| V::L(vec![V::N(i as f64), x])).collect()), V::S(s) => V::L(s.chars().enumerate().map(|(i, c)| V::L(vec![V::N(i as f64), V::S(c.to_string())])).collect()), _ => return Err("enumerate() needs a list".into()) },
+            "bool" => V::B(truthy(&arg0()?)),
+            "isinstance" => { let (o, c) = (arg0()?, a.get(1).cloned().unwrap_or(V::Nil)); V::B(self.type_name(&o) == self.show(&c).trim_start_matches("[class ").trim_end_matches(']')) }
             "Math.sqrt" => V::N(n(0)?.sqrt()),
             "Math.ceil" => V::N(n(0)?.ceil()),
             "Math.pow" | "pow" => V::N(n(0)?.powf(n(1)?)),
@@ -661,17 +720,63 @@ impl<'l> Run<'l> {
     }
 
     fn call_user(&mut self, name: &str, func: &Func, a: Vec<V>) -> Result<V, String> {
-        if a.len() > func.params.len() || (a.len() < func.params.len() && !self.js) { return Err(format!("{}() needs {} value(s), got {}", name, func.params.len(), a.len())); }
+        self.call_bound(name, func, a, None).map(|(r, _)| r)
+    }
+
+    /// Call a user function. With `this`, the first parameter (`self`) is bound to that object and
+    /// its updated value is returned too, so methods can change the object they were called on.
+    fn call_bound(&mut self, name: &str, func: &Func, a: Vec<V>, this: Option<V>) -> Result<(V, Option<V>), String> {
+        let skip = usize::from(this.is_some());
+        let wanted = func.params.len().saturating_sub(skip);
+        let required = func.defaults.iter().skip(skip).filter(|d| d.is_none()).count();
+        if a.len() > wanted || (a.len() < required && !self.js) {
+            return Err(format!("{}() needs {} value(s), got {}", name, if required == wanted { wanted.to_string() } else { format!("{} to {}", required, wanted) }, a.len()));
+        }
+        // defaults are evaluated before the call's own variables exist
+        let mut vals = vec![];
+        for (k, p) in func.params.iter().enumerate().skip(skip) {
+            let v = match a.get(k - skip) { Some(v) => v.clone(), None => match func.defaults.get(k).cloned().flatten() { Some(d) => self.eval(&d)?, None => V::Nil } };
+            vals.push((p.clone(), v));
+        }
         let saved = self.vars.clone();
-        for (k, p) in func.params.iter().enumerate() { self.vars.insert(p.clone(), a.get(k).cloned().unwrap_or(V::Nil)); }
+        if let (Some(obj), Some(p0)) = (this, func.params.first()) { self.vars.insert(p0.clone(), obj); }
+        for (p, v) in vals { self.vars.insert(p, v); }
         let r = if let Some(e) = &func.expr { self.eval(e).map(|v| { self.ret = Some(v); Flow::Return }) } else { self.exec(func.from, func.to) };
         let ret = self.ret.take().unwrap_or(V::Nil);
+        let me = if skip == 1 { func.params.first().and_then(|p| self.vars.get(p).cloned()) } else { None };
         // locals vanish after the call; changes to globals inside functions are kept for objects/lists
         let mut restored = saved;
         for (k, v) in self.vars.drain() { if restored.contains_key(&k) && !func.params.contains(&k) { restored.insert(k, v); } }
         self.vars = restored;
         r?;
-        Ok(ret)
+        Ok((ret, me))
+    }
+
+    /// `Hero("Pix")`: build the object, apply class attributes, then run `__init__`.
+    fn construct(&mut self, name: &str, cls: &Class, a: Vec<V>) -> Result<V, String> {
+        let mut obj = vec![(CLASS.to_string(), V::S(name.to_string()))];
+        for (k, e) in &cls.attrs { let v = self.eval(e)?; obj.push((k.clone(), v)); }
+        let obj = V::O(obj);
+        match cls.methods.get("__init__") {
+            Some(init) => { let (_, me) = self.call_bound(&format!("{}.__init__", name), init, a, Some(obj.clone()))?; Ok(me.unwrap_or(obj)) }
+            None if a.is_empty() => Ok(obj),
+            None => Err(format!("{}() takes no values - add an __init__ method", name)),
+        }
+    }
+
+    fn call_module(&mut self, q: &str, a: Vec<V>) -> Result<V, String> {
+        let n = |i: usize| -> Result<f64, String> { num(a.get(i).ok_or_else(|| format!("{}() needs a value", q))?) };
+        Ok(match q {
+            "math.sqrt" => { let x = n(0)?; if x < 0.0 { return Err("math.sqrt() needs a number that is not negative".into()); } V::N(x.sqrt()) }
+            "math.floor" => V::N(n(0)?.floor()),
+            "math.ceil" => V::N(n(0)?.ceil()),
+            "math.fabs" => V::N(n(0)?.abs()),
+            "math.pow" => V::N(n(0)?.powf(n(1)?)),
+            "random.random" => V::N(self.random()),
+            "random.randint" => { let (lo, hi) = (n(0)?.floor(), n(1)?.floor()); if hi < lo { return Err("randint(a, b) needs a <= b".into()); } V::N(lo + (self.random() * (hi - lo + 1.0)).floor()) }
+            "random.choice" => match a.first() { Some(V::L(l)) if !l.is_empty() => { let k = (self.random() * l.len() as f64) as usize; l[k.min(l.len() - 1)].clone() } Some(V::S(s)) if !s.is_empty() => { let ch: Vec<char> = s.chars().collect(); V::S(ch[(self.random() * ch.len() as f64) as usize % ch.len()].to_string()) } _ => return Err("random.choice() needs a list that is not empty".into()) },
+            _ => return Err(format!("{} is not available here", q)),
+        })
     }
 
     /// Methods on values. `path` is the variable path when the receiver can be mutated.
@@ -694,8 +799,22 @@ impl<'l> Run<'l> {
             };
         }
         if let V::O(o) = &v && field(o, "__document").is_some() { return self.call(&format!("document.{}", m), a); }
+        if let V::O(o) = &v && let Some(V::S(cname)) = field(o, CLASS).cloned() {
+            let Some(func) = self.classes.get(&cname).and_then(|c| c.methods.get(m)).cloned() else {
+                return Err(format!("'{}' object has no method '{}'", cname, m));
+            };
+            let (ret, me) = self.call_bound(&format!("{}.{}", cname, m), &func, a, Some(v.clone()))?;
+            if let (Some(p), Some(me)) = (path, me) { self.set_path(p, me)?; }
+            return Ok(ret);
+        }
         match (&v, m) {
             (V::S(s), "toUpperCase" | "upper") => Ok(V::S(s.to_uppercase())),
+            (V::S(s), "title") => Ok(V::S(s.split(' ').map(|w| { let mut c = w.chars(); match c.next() { Some(f) => f.to_uppercase().collect::<String>() + &c.as_str().to_lowercase(), None => String::new() } }).collect::<Vec<_>>().join(" "))),
+            (V::S(s), "capitalize") => { let mut c = s.chars(); Ok(V::S(match c.next() { Some(f) => f.to_uppercase().collect::<String>() + &c.as_str().to_lowercase(), None => String::new() })) }
+            (V::S(s), "count") => { let t = self.show(&arg(0)?); Ok(V::N(if t.is_empty() { 0.0 } else { s.matches(t.as_str()).count() as f64 })) }
+            (V::S(s), "isdigit") => Ok(V::B(!s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))),
+            (V::S(s), "isalpha") => Ok(V::B(!s.is_empty() && s.chars().all(|c| c.is_alphabetic()))),
+            (V::S(s), "join") if !self.js => match arg(0)? { V::L(l) => Ok(V::S(l.iter().map(|x| self.show(x)).collect::<Vec<_>>().join(s))), _ => Err("join() needs a list".into()) },
             (V::S(s), "toLowerCase" | "lower") => Ok(V::S(s.to_lowercase())),
             (V::S(s), "trim" | "strip") => Ok(V::S(s.trim().into())),
             (V::S(s), "includes") => Ok(V::B(s.contains(&self.show(&arg(0)?)))),
@@ -710,16 +829,23 @@ impl<'l> Run<'l> {
             (V::N(n), "toFixed") => { let d = a.first().map(num).transpose()?.unwrap_or(0.0) as usize; Ok(V::S(format!("{:.*}", d.min(10), n))) }
             (V::N(n), "toString") => Ok(V::S(num_str(*n))),
             (V::L(l), "includes") => Ok(V::B(l.contains(&arg(0)?))),
+            (V::L(l), "count") => { let x = arg(0)?; Ok(V::N(l.iter().filter(|y| **y == x).count() as f64)) }
+            (V::L(l), "copy") => Ok(V::L(l.clone())),
             (V::L(l), "indexOf" | "index") => { let x = arg(0)?; Ok(V::N(l.iter().position(|y| *y == x).map(|i| i as f64).unwrap_or(-1.0))) }
             (V::L(l), "join") => { let sep = a.first().map(|x| self.show(x)).unwrap_or_else(|| ",".into()); Ok(V::S(l.iter().map(|x| self.show(x)).collect::<Vec<_>>().join(&sep))) }
             (V::L(l), "slice") => { let st = (num(&arg(0)?)? as usize).min(l.len()); let en = a.get(1).map(num).transpose()?.map(|e| (e as usize).min(l.len())).unwrap_or(l.len()); Ok(V::L(if st < en { l[st..en].to_vec() } else { vec![] })) }
-            (V::L(_), "push" | "append" | "pop" | "shift" | "unshift" | "reverse" | "sort") => {
+            (V::L(_), "push" | "append" | "pop" | "shift" | "unshift" | "reverse" | "sort" | "insert" | "remove" | "extend" | "clear") => {
                 let p = path.ok_or_else(|| format!(".{}() needs a list stored in a variable", m))?.to_string();
                 let V::L(mut l) = v else { unreachable!() };
                 let ret = match m {
                     "push" | "append" => { if l.len() >= MAX_LIST { return Err("list is too long".into()); } l.extend(a.iter().cloned()); if self.js { V::N(l.len() as f64) } else { V::Nil } }
                     "unshift" => { for x in a.iter().rev() { l.insert(0, x.clone()); } V::N(l.len() as f64) }
+                    "pop" if !a.is_empty() && !self.js => { let k = num(&a[0])?; let i = if k < 0.0 { l.len() as f64 + k } else { k }; if i < 0.0 || i as usize >= l.len() { return Err("pop index out of range".into()); } l.remove(i as usize) }
                     "pop" => l.pop().unwrap_or(V::Nil),
+                    "insert" => { let k = num(&arg(0)?)?; let i = if k < 0.0 { (l.len() as f64 + k).max(0.0) } else { k.min(l.len() as f64) } as usize; l.insert(i, arg(1)?); V::Nil }
+                    "remove" => { let x = arg(0)?; match l.iter().position(|y| *y == x) { Some(i) => { l.remove(i); } None => return Err(format!("remove(): {} is not in the list", self.show(&x))) } V::Nil }
+                    "extend" => { match arg(0)? { V::L(more) => l.extend(more), _ => return Err("extend() needs a list".into()) } V::Nil }
+                    "clear" => { l.clear(); V::Nil }
                     "shift" => if l.is_empty() { V::Nil } else { l.remove(0) },
                     "reverse" => { l.reverse(); V::Nil }
                     _ => { l.sort_by(|x, y| match (x, y) { (V::N(a), V::N(b)) => a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal), _ => self.show(x).cmp(&self.show(y)) }); V::Nil }
@@ -730,6 +856,18 @@ impl<'l> Run<'l> {
             }
             (V::O(o), "keys") => Ok(V::L(o.iter().map(|(k, _)| V::S(k.clone())).collect())),
             (V::O(o), "values") => Ok(V::L(o.iter().map(|(_, v)| v.clone()).collect())),
+            (V::O(o), "items") => Ok(V::L(o.iter().map(|(k, v)| V::L(vec![V::S(k.clone()), v.clone()])).collect())),
+            (V::O(_), "pop" | "update" | "clear") if !self.js => {
+                let p = path.ok_or_else(|| format!(".{}() needs a dictionary stored in a variable", m))?.to_string();
+                let V::O(mut o) = v else { unreachable!() };
+                let ret = match m {
+                    "pop" => { let k = self.show(&arg(0)?); match o.iter().position(|(n, _)| *n == k) { Some(i) => o.remove(i).1, None => match a.get(1) { Some(d) => d.clone(), None => return Err(format!("pop(): no key '{}'", k)) } } }
+                    "update" => { if let V::O(more) = arg(0)? { for (k, x) in more { if let Some(e) = o.iter_mut().find(|(n, _)| *n == k) { e.1 = x; } else { o.push((k, x)); } } } V::Nil }
+                    _ => { o.clear(); V::Nil }
+                };
+                self.set_path(&p, V::O(o))?;
+                Ok(ret)
+            }
             (V::O(o), "get") => { let k = self.show(&arg(0)?); Ok(field(o, &k).cloned().unwrap_or_else(|| a.get(1).cloned().unwrap_or(V::Nil))) }
             (V::O(o), name) => {
                 // an object property holding a function name: obj.greet()
@@ -773,6 +911,67 @@ impl<'l> Run<'l> {
             if t == "break" { return Ok(Flow::Break); }
             if t == "continue" { return Ok(Flow::Continue); }
             if t == "pass" { i += 1; continue; }
+            if !self.js && let Some(rest) = t.strip_prefix("class ").and_then(|r| r.strip_suffix(':')) {
+                let name = rest.split('(').next().unwrap_or("").trim().to_string();
+                if !is_ident(&name) { return Err(e(format!("bad class name '{}'", rest))); }
+                if end == i + 1 { return Err(e("this class has no body".into())); }
+                let mut cls = Class::default();
+                let body_ind = self.lines[i + 1].ind;
+                let mut j = i + 1;
+                while j < end {
+                    let bt = self.lines[j].text.clone();
+                    let be = self.block_end(j, end);
+                    if self.lines[j].ind == body_ind {
+                        if let Some((mname, params, defaults, expr)) = func_header(&bt) {
+                            if params.is_empty() { return Err(format!("line {}: method {}() needs 'self' as its first parameter", self.lines[j].no, mname)); }
+                            cls.methods.insert(mname, Func { params, defaults, from: j + 1, to: be, expr });
+                        } else if let Some((k, v)) = bt.split_once('=').filter(|(k, v)| is_ident(k.trim()) && !v.starts_with('=')) {
+                            cls.attrs.push((k.trim().to_string(), v.trim().to_string()));
+                        } else if bt != "pass" && !bt.starts_with("\"\"\"") {
+                            return Err(format!("line {}: a class body holds methods (def) and attributes", self.lines[j].no));
+                        }
+                    }
+                    j = be;
+                }
+                self.classes.insert(name.clone(), cls);
+                self.vars.insert(name.clone(), V::S(format!("[class {}]", name)));
+                i = end;
+                continue;
+            }
+            if !self.js && (t.starts_with("import ") || t.starts_with("from ")) {
+                if let Some(rest) = t.strip_prefix("import ") {
+                    for m in rest.split(',') {
+                        let m = m.trim();
+                        if !MODULES.iter().any(|(mm, _)| *mm == m) { return Err(e(format!("module '{}' is not available here (try math or random)", m))); }
+                        self.imports.insert(m.to_string(), m.to_string());
+                    }
+                } else if let Some((m, names)) = t.strip_prefix("from ").and_then(|r| r.split_once(" import ")) {
+                    let m = m.trim();
+                    let Some((_, fs)) = MODULES.iter().find(|(mm, _)| *mm == m) else { return Err(e(format!("module '{}' is not available here (try math or random)", m))) };
+                    for n in names.split(',') {
+                        let n = n.trim();
+                        if !fs.contains(&n) { return Err(e(format!("'{}' is not in the {} module here", n, m))); }
+                        self.imports.insert(n.to_string(), format!("{}.{}", m, n));
+                    }
+                } else { return Err(e("write: from module import name".into())); }
+                i += 1;
+                continue;
+            }
+            if let Some(target) = t.strip_prefix("del ") {
+                let target = target.trim();
+                let Some(open) = target.rfind('[').filter(|_| target.ends_with(']')) else { return Err(e("del needs an item, like del bag[0] or del stats[\"hp\"]".into())) };
+                let base = target[..open].trim().to_string();
+                let idx = self.eval(&target[open + 1..target.len() - 1]).map_err(e)?;
+                let mut cur = self.get_path(&base).map_err(e)?;
+                match (&mut cur, &idx) {
+                    (V::L(l), _) => { let k = num(&idx).map_err(e)?; let k = if k < 0.0 { l.len() as f64 + k } else { k }; if k < 0.0 || k as usize >= l.len() { return Err(e("index out of range".into())); } l.remove(k as usize); }
+                    (V::O(o), k) => { let k = self.show(k); match o.iter().position(|(n, _)| *n == k) { Some(p) => { o.remove(p); } None => return Err(e(format!("no key '{}'", k))) } }
+                    _ => return Err(e(format!("can't delete from {}", base))),
+                }
+                self.set_path(&base, cur).map_err(e)?;
+                i += 1;
+                continue;
+            }
             if let Some(args) = t.strip_prefix("print(").or_else(|| t.strip_prefix("console.log(")).filter(|a| depth_of(a) == -1 && a.ends_with(')')) {
                 let inner = &args[..args.len() - 1];
                 let mut parts = vec![];
@@ -780,9 +979,9 @@ impl<'l> Run<'l> {
                 if self.out.len() >= MAX_OUT { return Err("stopped: too much output".into()); }
                 self.out.push((Kind::Out, parts.join(" ")));
                 i += 1;
-            } else if let Some((name, params, expr)) = func_header(t) {
+            } else if let Some((name, params, defaults, expr)) = func_header(t) {
                 if expr.is_none() && end == i + 1 { return Err(e("this function has no body".into())); }
-                self.funcs.insert(name.clone(), Func { params, from: i + 1, to: end, expr });
+                self.funcs.insert(name.clone(), Func { params, defaults, from: i + 1, to: end, expr });
                 self.vars.remove(&name);
                 i = end;
             } else if let Some((target, evt, params)) = listener_header(t) {
@@ -843,8 +1042,14 @@ impl<'l> Run<'l> {
                             _ => return Err(e("can only loop over range(), a list, text or an object".into())),
                         }
                     };
+                    let names: Vec<String> = v.split(',').map(|x| x.trim().to_string()).collect();
                     for it in items {
-                        self.vars.insert(v.trim().to_string(), it);
+                        if names.len() > 1 {
+                            match &it {
+                                V::L(parts) if parts.len() == names.len() => { for (nm, pv) in names.iter().zip(parts) { self.vars.insert(nm.clone(), pv.clone()); } }
+                                _ => return Err(e(format!("can't unpack {} into {} names", self.show(&it), names.len()))),
+                            }
+                        } else { self.vars.insert(v.trim().to_string(), it); }
                         match self.exec(i + 1, end)? { Flow::Return => return Ok(Flow::Return), Flow::Break => break, _ => {} }
                         self.step()?;
                     }
@@ -881,6 +1086,8 @@ impl<'l> Run<'l> {
         for o in ["+=", "-=", "*=", "/=", "%="] {
             if let Some((n, r)) = t.split_once(o) {
                 let n = n.trim();
+                // item targets: bag["gold"] += 10  ->  bag["gold"] = (bag["gold"]) + (10)
+                if n.ends_with(']') && n.contains('[') { return self.assign(&format!("{} = ({}) {} ({})", n, n, &o[..1], r)); }
                 if !is_path(n) { break; }
                 let cur = self.get_path(n)?;
                 let rv = self.eval(r)?;
@@ -975,31 +1182,46 @@ fn kebab(p: &str) -> String {
 
 fn is_ident(s: &str) -> bool { !s.is_empty() && s.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '$') && !s.chars().next().unwrap().is_ascii_digit() }
 
-fn params_of(s: &str) -> Option<Vec<String>> {
+fn params_of(s: &str) -> Option<Vec<String>> { params_full(s).map(|(p, _)| p) }
+
+/// Parameter names plus their default expressions: `(name, amount = 10)`.
+fn params_full(s: &str) -> Option<(Vec<String>, Vec<Option<String>>)> {
     let s = s.trim();
     let inner = if s.starts_with('(') && s.ends_with(')') { &s[1..s.len() - 1] } else if is_ident(s) { s } else { return None };
-    let ps: Vec<String> = inner.split(',').map(|p| p.trim().split('=').next().unwrap_or("").trim().to_string()).filter(|p| !p.is_empty()).collect();
-    if ps.iter().all(|p| is_ident(p)) { Some(ps) } else { None }
+    let mut ps = vec![];
+    let mut ds = vec![];
+    for p in split_args(inner) {
+        let p = p.trim();
+        if p.is_empty() { continue; }
+        let (n, d) = match p.split_once('=') { Some((n, d)) => (n.trim(), Some(d.trim().to_string())), None => (p, None) };
+        if !is_ident(n) { return None; }
+        ps.push(n.to_string());
+        ds.push(d);
+    }
+    Some((ps, ds))
 }
 
+type Header = (String, Vec<String>, Vec<Option<String>>, Option<String>);
+
 /// def f(a): / function f(a) / const f = function(a) / const f = (a) => / const f = (a) => a * 2
-fn func_header(t: &str) -> Option<(String, Vec<String>, Option<String>)> {
+fn func_header(t: &str) -> Option<Header> {
     let t = t.trim().trim_end_matches(':').trim();
     for kw in ["def ", "function ", "async function "] {
         if let Some(r) = t.strip_prefix(kw) {
             let (name, ps) = r.split_once('(')?;
-            return Some((name.trim().to_string(), params_of(&format!("({}", ps))?, None));
+            let (p, d) = params_full(&format!("({}", ps))?;
+            return Some((name.trim().to_string(), p, d, None));
         }
     }
     let r = ["const ", "let ", "var "].iter().find_map(|k| t.strip_prefix(k))?;
     let (name, rhs) = r.split_once('=')?;
     let (name, rhs) = (name.trim(), rhs.trim());
     if !is_ident(name) { return None; }
-    if let Some(ps) = rhs.strip_prefix("function") { return Some((name.into(), params_of(ps.trim())?, None)); }
+    if let Some(ps) = rhs.strip_prefix("function") { let (p, d) = params_full(ps.trim())?; return Some((name.into(), p, d, None)); }
     let (ps, body) = rhs.split_once("=>")?;
-    let ps = params_of(ps)?;
+    let (p, d) = params_full(ps)?;
     let body = body.trim();
-    if body.is_empty() { Some((name.into(), ps, None)) } else { Some((name.into(), ps, Some(body.to_string()))) }
+    if body.is_empty() { Some((name.into(), p, d, None)) } else { Some((name.into(), p, d, Some(body.to_string()))) }
 }
 
 /// el.addEventListener("click", function() / () => / (event) =>
@@ -1020,7 +1242,20 @@ fn balanced(s: &str) -> bool {
     d == 0
 }
 
+/// Run a program. Interpreting is recursive (nested blocks and function calls), so each run gets
+/// its own thread with a roomy stack; the bounded step/depth limits keep it short-lived.
 pub fn run(lang: &str, src: &str) -> Vec<(Kind, String)> {
+    let (l, s) = (lang.to_string(), src.to_string());
+    std::thread::Builder::new()
+        .name("interp".into())
+        .stack_size(64 << 20)
+        .spawn(move || run_here(&l, &s))
+        .ok()
+        .and_then(|h| h.join().ok())
+        .unwrap_or_else(|| vec![(Kind::Err, "Something went wrong while running this code.".into())])
+}
+
+fn run_here(lang: &str, src: &str) -> Vec<(Kind, String)> {
     if src.len() > MAX_SRC { return vec![(Kind::Err, format!("This program is too long to run ({} characters, limit {}).", src.len(), MAX_SRC))]; }
     match lang {
         "html" => return html(src),
@@ -1032,7 +1267,7 @@ pub fn run(lang: &str, src: &str) -> Vec<(Kind, String)> {
     let lines = normalize(src, js);
     let n = lines.len();
     let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(42) | 1;
-    let mut r = Run { lines: &lines, vars: HashMap::new(), funcs: HashMap::new(), out: vec![], steps: 0, js, depth: 0, ret: None, seed, dom: HashMap::new() };
+    let mut r = Run { lines: &lines, vars: HashMap::new(), funcs: HashMap::new(), out: vec![], steps: 0, js, depth: 0, ret: None, seed, dom: HashMap::new(), classes: HashMap::new(), imports: HashMap::new() };
     match r.exec(0, n) {
         Err(e) => r.out.push((Kind::Err, e)),
         Ok(Flow::Return) => r.out.push((Kind::Err, "'return' only works inside a function".into())),
@@ -1125,10 +1360,13 @@ fn css_out(src: &str) -> Vec<(Kind, String)> {
 
 fn sql_out(src: &str) -> Vec<(Kind, String)> {
     let mut out = vec![];
-    for stmt in src.split(';').map(|s| s.trim()).filter(|s| !s.is_empty()) {
-        match crate::sql::query(stmt) {
+    // one database per run, so CREATE / INSERT / UPDATE are visible to later statements
+    let mut db = crate::sql::Db::default();
+    for stmt in split_sql(src) {
+        match db.exec(&stmt) {
             Err(e) => { out.push((Kind::Err, e)); break; }
-            Ok(rows) => {
+            Ok(crate::sql::Outcome::Done(msg)) => out.push((Kind::Out, msg)),
+            Ok(crate::sql::Outcome::Rows(rows)) => {
                 let n = rows.len() - 1;
                 out.push((Kind::Table, rows.iter().map(|r| r.join("\u{1f}")).collect::<Vec<_>>().join("\n")));
                 out.push((Kind::Out, format!("{} row{}", n, if n == 1 { "" } else { "s" })));
@@ -1136,6 +1374,24 @@ fn sql_out(src: &str) -> Vec<(Kind, String)> {
         }
     }
     if out.is_empty() { out.push((Kind::Err, "Type a query, for example: SELECT * FROM heroes;".into())); }
+    out
+}
+
+/// Split SQL on semicolons that are not inside quotes.
+fn split_sql(src: &str) -> Vec<String> {
+    let mut out = vec![];
+    let mut cur = String::new();
+    let mut q: Option<char> = None;
+    for ch in src.chars() {
+        match (q, ch) {
+            (Some(c), x) if x == c => { q = None; cur.push(x); }
+            (Some(_), x) => cur.push(x),
+            (None, '\'' | '"') => { q = Some(ch); cur.push(ch); }
+            (None, ';') => { if !cur.trim().is_empty() { out.push(cur.trim().to_string()); } cur.clear(); }
+            (None, x) => cur.push(x),
+        }
+    }
+    if !cur.trim().is_empty() { out.push(cur.trim().to_string()); }
     out
 }
 
@@ -1294,5 +1550,38 @@ mod tests_v2 {
         let out = run("html", "<header><h1>Log</h1><nav><a href=\"#\">Home</a></nav></header><main><article><h2>Day 1</h2><p>Hi</p></article></main><footer>(c) me</footer>");
         assert_eq!(out.len(), 5);
         assert!(out.iter().all(|(k, _)| *k != Kind::Err));
+    }
+}
+
+#[cfg(test)]
+mod tests_v3 {
+    fn o(src: &str) -> Vec<String> { super::run("python", src).into_iter().map(|(k, t)| format!("{}{}", if k == super::Kind::Err { "!" } else { "" }, t)).collect() }
+
+    #[test]
+    fn python_slices_unpacking_del_and_methods() {
+        assert_eq!(o("a = [1,2,3,4]\nprint(a[1:3], a[:2], a[2:], a[-1])"), ["[2, 3] [1, 2] [3, 4] 4"]);
+        assert_eq!(o("print(\"dragon\"[0:3])"), ["dra"]);
+        assert_eq!(o("d = {\"hp\": 3, \"mp\": 2}\nfor k, v in d.items():\n    print(k, v)"), ["hp 3", "mp 2"]);
+        assert_eq!(o("for i, w in enumerate([\"a\", \"b\"]):\n    print(i, w)"), ["0 a", "1 b"]);
+        assert_eq!(o("d = {\"hp\": 3}\nd[\"mp\"] = 5\ndel d[\"hp\"]\nprint(d)"), ["{'mp': 5}"]);
+        assert_eq!(o("x = [3, 1, 2]\nx.sort()\nx.insert(0, 9)\nx.remove(1)\ndel x[0]\nprint(x)"), ["[2, 3]"]);
+        assert_eq!(o("print(\"-\".join([\"a\", \"b\"]), \"hi there\".title(), \"banana\".count(\"a\"))"), ["a-b Hi There 3"]);
+        assert_eq!(o("print(round(3.14159, 2))"), ["3.14"]);
+        assert_eq!(o("bag = {\"gold\": 5}\ng = bag.pop(\"gold\")\nprint(g, bag)"), ["5 {}"]);
+    }
+
+    #[test]
+    fn python_defaults_modules_and_classes() {
+        assert_eq!(o("def heal(hp, amount=10):\n    return hp + amount\nprint(heal(5), heal(5, 1))"), ["15 6"]);
+        assert!(o("def f(a):\n    return a\nprint(f())")[0].starts_with('!'));
+        assert_eq!(o("import math\nprint(math.sqrt(16), math.floor(2.7))"), ["4 2"]);
+        assert_eq!(o("from math import pi\nprint(round(pi, 2))"), ["3.14"]);
+        assert!(o("print(math.sqrt(4))")[0].contains("import math"));
+        assert_eq!(o("import random\nr = random.randint(1, 6)\nprint(r >= 1 and r <= 6)"), ["True"]);
+        let bank = "class Account:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n    def deposit(self, amount):\n        self.balance += amount\n    def report(self):\n        return f\"{self.owner}: {self.balance}\"\na = Account(\"Pix\")\na.deposit(50)\na.deposit(25)\nprint(a.report())\nprint(type(a))";
+        assert_eq!(o(bank), ["Pix: 75", "Account"]);
+        let two = "class Slime:\n    hp = 10\n    def hit(self, d):\n        self.hp -= d\n        return self.hp\ns1 = Slime()\ns2 = Slime()\nprint(s1.hit(3))\nprint(s1.hp, s2.hp)";
+        assert_eq!(o(two), ["7", "7 10"]);
+        assert!(o("class A:\n    def go():\n        pass")[0].contains("self"));
     }
 }
