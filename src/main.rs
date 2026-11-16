@@ -326,6 +326,14 @@ fn out_view(ui: &mut egui::Ui, out: &[(interp::Kind, String)]) {
             P => { ui.label(body(t.clone(), 15.0)); }
             Li => { ui.label(body(format!("  * {}", t), 15.0)); }
             Btn => { let _ = pbtn(ui, t, BLUE, 180.0); }
+            Page => {
+                ui.horizontal_wrapped(|ui| {
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(46.0, 18.0), Sense::hover());
+                    ui.painter().rect_filled(r, 0.0, TEAL);
+                    ui.painter().text(r.center(), Align2::CENTER_CENTER, "PAGE", FontId::new(8.0, press()), EDGE);
+                    ui.label(RichText::new(t).monospace().size(14.0).color(TEAL));
+                });
+            }
             Img => {
                 ui.horizontal(|ui| { icon(ui, "map", 34.0); ui.label(body(format!("[picture: {}]", t), 14.0).color(DIM)); });
             }
