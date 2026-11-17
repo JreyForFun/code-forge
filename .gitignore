@@ -3,3 +3,5 @@ shots/
 dist/
 assets/*.zip
 design/audio/
+MECHANICS.md
+mechanics.json
