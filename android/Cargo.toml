@@ -1,0 +1,33 @@
+# Android build of Code Forge: compiles the same game (../src/main.rs) as a native library that the
+# Android app loads. Build the .apk with:  python scripts/build_android.py
+[package]
+name = "code_forge_android"
+version = "1.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "code_forge"
+path = "../src/main.rs"
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+[dependencies]
+eframe = { version = "0.37.0", default-features = false, features = ["default_fonts", "glow", "android-native-activity"] }
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+rodio = { version = "0.19", default-features = false }
+# Android audio goes through Oboe; ship the shared C++ runtime with the app
+cpal = { version = "0.15", features = ["oboe-shared-stdcxx"] }
+winit = { version = "0.30", default-features = false }
+# to open the on-screen keyboard through Android's InputMethodManager
+jni = "0.21"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+
+# its own workspace, separate from the desktop package
+[workspace]

@@ -339,18 +339,16 @@ impl App {
                 let w = ui.available_width();
                 if earned.is_some() {
                     if pbtn(ui, "SAVE AS IMAGE", GOLD, w).clicked() {
-                        let base = std::env::var("USERPROFILE").map(|h| std::path::Path::new(&h).join("Pictures")).ok().filter(|p| p.is_dir()).unwrap_or_else(crate::save::Save::dir);
-                        let path = base.join(format!("CodeForge-{}-Certificate.png", cs_name.replace(' ', "")));
-                        let shown = path.display().to_string();
+                        let file = format!("CodeForge-{}-Certificate.png", cs_name.replace(' ', ""));
                         let rect = CERT_RECT.with(|r| r.get());
                         let ppp = ui.ctx().pixels_per_point();
                         ui.ctx().send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::ScreenshotCallback::new(move |img| {
                             let img = if rect.is_positive() { img.region(&rect, Some(ppp)) } else { (*img).clone() };
                             let (w, h) = (img.width() as u32, img.height() as u32);
                             let raw: Vec<u8> = img.pixels.iter().flat_map(|c| c.to_array()).collect();
-                            if let Some(b) = image::RgbaImage::from_raw(w, h, raw) { let _ = b.save(&path); }
+                            if let Some(b) = image::RgbaImage::from_raw(w, h, raw) { let _ = crate::platform::save_png(&file, &b); }
                         })));
-                        self.toast(format!("Saved to {}", shown));
+                        self.toast(if crate::platform::IS_WEB { "Your certificate is downloading".to_string() } else { "Certificate saved to your Pictures folder".to_string() });
                     }
                 } else if pbtn(ui, "CONTINUE THE COURSE", GOLD, w).clicked() { self.screen = Screen::Preview(c); }
             }));
@@ -485,7 +483,7 @@ impl App {
                     }
                     ui.add(egui::Label::new(body("Your badge grows with your progress (bronze, silver, gold). The certificate is awarded once, when the whole course is done.", 12.0).color(DIM)).wrap());
                 });
-                ui.ctx().request_repaint(); // torches flicker
+                ui.ctx().request_repaint_after(std::time::Duration::from_millis(50)); // torches flicker (20 fps is plenty)
             });
         });
     }

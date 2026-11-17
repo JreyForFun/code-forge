@@ -6,6 +6,9 @@ use std::path::{Path, PathBuf};
 pub const SAVE_VERSION: u32 = 4;
 /// Header line of an exported progress file.
 pub const EXPORT_TAG: &str = "codeforge-export=1";
+/// Local-storage key of the save in the web version.
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+pub const WEB_KEY: &str = "code_forge_save";
 pub const MAX_HEARTS: u32 = 5;
 pub const MAX_SAVERS: u32 = 3;
 pub const MAX_LOG: usize = 100;
@@ -311,6 +314,7 @@ impl Save {
 
     pub fn dir() -> PathBuf {
         let base = std::env::var("APPDATA").or_else(|_| std::env::var("HOME")).unwrap_or_else(|_| ".".into());
+        if let Some(d) = crate::platform::android_data_dir() { return d.join("code_forge"); }
         let new = Path::new(&base).join("code_forge");
         // the app used to be called Pixel Learn: bring an existing save across (the old folder stays as a backup)
         let old = Path::new(&base).join("pixel_learn");
@@ -323,7 +327,27 @@ impl Save {
     pub fn path() -> PathBuf { Self::dir().join("save.txt") }
 
     /// Load from disk. Missing file -> fresh save. Unreadable main file -> try the backup.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load() -> Self { Self::load_from(&Self::path()) }
+
+    /// On the web the save lives in the browser's local storage (one per browser and site).
+    #[cfg(target_arch = "wasm32")]
+    pub fn load() -> Self {
+        match crate::platform::load_text(WEB_KEY).or_else(|| crate::platform::load_text(&format!("{}.bak", WEB_KEY))) { Some(t) => Save::parse(&t), None => Save::new() }
+    }
+    #[cfg(target_arch = "wasm32")]
+    pub fn store(&self) -> std::io::Result<()> {
+        if let Some(old) = crate::platform::load_text(WEB_KEY) { let _ = crate::platform::store_text(&format!("{}.bak", WEB_KEY), &old); }
+        crate::platform::store_text(WEB_KEY, &self.serialize()).map_err(std::io::Error::other)
+    }
+
+    /// Keep a copy of the current progress before an import replaces it.
+    pub fn backup_before_import(&self) {
+        #[cfg(target_arch = "wasm32")]
+        { let _ = crate::platform::store_text(&format!("{}.before-import", WEB_KEY), &self.serialize()); }
+        #[cfg(not(target_arch = "wasm32"))]
+        { let _ = self.store_to(&Self::dir().join("save.before-import.txt")); }
+    }
 
     pub fn load_from(path: &Path) -> Self {
         match std::fs::read_to_string(path) {
@@ -335,6 +359,7 @@ impl Save {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn store(&self) -> std::io::Result<()> { self.store_to(&Self::path()) }
 
     /// Atomic write: tmp file, keep the previous save as .bak, then rename into place.

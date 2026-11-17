@@ -9,6 +9,7 @@ mod game;
 mod interp;
 mod lesson;
 mod onboarding;
+mod platform;
 mod preview;
 mod save;
 mod screens;
@@ -27,7 +28,7 @@ use std::collections::VecDeque;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const HDR: Color32 = Color32::from_rgb(0x0b, 0x12, 0x28);
 
-fn now() -> u64 { std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0) }
+fn now() -> u64 { platform::now_secs() }
 /// The furthest day already seen in this save: turning the clock back can't replay a day.
 static DAY_FLOOR: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 /// Seconds since 1970 in the player's own time zone, so days change at local midnight.
@@ -84,6 +85,9 @@ struct App {
     pending_import: Option<Box<Save>>,
     /// The name being typed for a certificate.
     cert_input: String,
+    /// Android: whether we asked for the on-screen keyboard.
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    kb_open: bool,
 }
 
 impl App {
@@ -109,7 +113,7 @@ impl App {
         let cur = (s.course as usize).min(courses.len() - 1);
         let onboard = if s.onboarded { None } else { Some(onboarding::Onboard::default()) };
         let mut a = App { s, tab: Tab::Learn, screen: Screen::Main, modal: Modal::None, courses, cur, open_mod: None, opp: 0, sub_train: 0, sub_create: 0,
-            input: String::new(), cat: 0, query: String::new(), view_key: 999, view_t0: 0.0, toasts: VecDeque::new(), demo, shot, frames: 0, save_warned: false, onboard, audio: None, pending_import: None, cert_input: String::new() };
+            input: String::new(), cat: 0, query: String::new(), view_key: 999, view_t0: 0.0, toasts: VecDeque::new(), demo, shot, frames: 0, save_warned: false, onboard, audio: None, pending_import: None, cert_input: String::new(), kb_open: false };
         if a.shot.is_none() && !cfg!(test) { a.audio = audio::Audio::new(); }
         if tampered {
             a.log("the save file was changed outside Code Forge; gems were reset");
@@ -161,20 +165,20 @@ impl App {
             self.persist();
         }
     }
-    /// Write the progress file the player chose.
+    /// Save the progress to a file the player keeps (a download on the web).
     fn export_progress(&mut self) {
         let name: String = self.s.name.chars().filter(|c| c.is_alphanumeric()).collect();
         let file = format!("CodeForge-{}-{}.codeforge", if name.is_empty() { "Hero".into() } else { name }, preview::ymd(today()));
-        let Some(path) = rfd::FileDialog::new().set_title("Save your Code Forge progress").set_file_name(&file).add_filter("Code Forge progress", &["codeforge"]).save_file() else { return };
-        match std::fs::write(&path, self.s.export_text()) {
-            Ok(()) => { self.toast(format!("Progress saved to {}", path.display())); audio::play(audio::Sfx::Coin); }
-            Err(e) => self.toast(format!("Couldn't save the file: {}", e)),
+        match platform::export(&file, &self.s.export_text()) {
+            Ok(msg) => { self.toast(msg); audio::play(audio::Sfx::Coin); }
+            Err(e) if !e.is_empty() => self.toast(e),
+            Err(_) => {} // cancelled
         }
     }
 
-    /// Read a progress file and ask before replacing the current hero.
-    fn load_import(&mut self, path: &std::path::Path) {
-        match std::fs::read_to_string(path).map_err(|_| "Couldn't read that file.").and_then(|t| Save::import_text(&t)) {
+    /// Check a loaded progress file and ask before replacing the current hero.
+    fn offer_import(&mut self, text: Result<String, String>) {
+        match text.and_then(|t| Save::import_text(&t).map_err(|e| e.to_string())) {
             Ok(s) => { self.pending_import = Some(Box::new(s)); self.modal = Modal::Import; }
             Err(e) => self.toast(e),
         }
@@ -183,7 +187,7 @@ impl App {
     fn apply_import(&mut self) {
         let Some(mut s) = self.pending_import.take() else { return };
         // keep a copy of what is being replaced, just in case
-        if !self.demo { let _ = self.s.store_to(&Save::dir().join("save.before-import.txt")); }
+        if !self.demo { self.s.backup_before_import(); }
         content::migrate(&mut s);
         App::validate(&mut s, &self.courses);
         if s.heart_t == 0 { s.heart_t = now(); }
@@ -227,6 +231,8 @@ impl App {
     /// Returns true while the music is fading (the caller keeps repainting).
     fn update_audio(&mut self) -> bool {
         let sounds = audio::take();
+        #[cfg(target_arch = "wasm32")]
+        if let Some(a) = &mut self.audio && !sounds.is_empty() { a.unlock(); }
         let want = if self.onboard.is_some() { audio::Track::Title } else {
             match &self.screen {
                 Screen::Run(rs) if matches!(rs.kind, Kind::Duel(_)) => audio::Track::Battle,
@@ -616,12 +622,37 @@ impl App {
     fn frame_ui(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         if self.update_audio() { ctx.request_repaint(); }
+        // the phone's Back button (and a mouse's back button): close, leave, or return to Learn
+        if ctx.input(|i| i.key_pressed(egui::Key::BrowserBack)) && self.onboard.is_none() {
+            if self.modal != Modal::None { self.modal = Modal::None; }
+            else { match &self.screen {
+                Screen::Main => self.tab = Tab::Learn,
+                Screen::Notes(c, _, _) | Screen::Certificate(c) => { let c = *c; self.screen = Screen::Preview(c); }
+                _ => self.screen = Screen::Main,
+            } }
+            audio::play(audio::Sfx::Back);
+        }
+        #[cfg(target_os = "android")]
+        {
+            // open the phone keyboard while a text box has focus, close it otherwise
+            let want = ctx.egui_wants_keyboard_input();
+            if want != self.kb_open { self.kb_open = want; platform::soft_keyboard(want); }
+            // keep the bottom buttons (NEXT, CHECK...) above the keyboard, and clear of the gesture bar
+            if !self.kb_open { egui::Panel::bottom("gesture_space").exact_size(14.0).resizable(false).frame(egui::Frame::new().fill(BG2)).show(ui, |_| {}); }
+            if self.kb_open {
+                let ppp = ctx.pixels_per_point();
+                let h = ctx.content_rect().height();
+                let inset = platform::keyboard_inset_px(h * ppp).map(|px| px / ppp).unwrap_or(h * 0.42);
+                egui::Panel::bottom("keyboard_space").exact_size(inset).resizable(false).frame(egui::Frame::new().fill(BG)).show(ui, |_| {});
+            }
+        }
         if self.onboard.is_none() && self.modal == Modal::None && matches!(self.screen, Screen::Main) && !self.s.res_seen && self.s.res_place > 0 {
             self.modal = Modal::WeekResult;
             audio::play(if self.s.res_to > self.s.res_from { audio::Sfx::Victory } else if self.s.res_to < self.s.res_from { audio::Sfx::Defeat } else { audio::Sfx::Complete });
         }
-        let dropped: Vec<std::path::PathBuf> = ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).filter(|p| !p.as_os_str().is_empty()).collect());
-        if let Some(p) = dropped.first() { self.load_import(p); }
+        let dropped = ctx.input(|i| i.raw.dropped_files.first().cloned());
+        if let Some(f) = dropped { platform::dropped(f.as_ref()); }
+        if let Some(t) = platform::take_import() { self.offer_import(t); }
         // text size setting (applies from the next frame)
         let z = self.s.zoom.clamp(100, 130) as f32 / 100.0;
         if (ctx.zoom_factor() - z).abs() > 0.01 { ctx.set_zoom_factor(z); }
@@ -903,6 +934,36 @@ fn avatar_grid(ui: &mut egui::Ui, cur: &mut u32) -> bool {
     picked
 }
 
+/// Fonts, pictures and style shared by the desktop and web versions.
+fn setup(cc: &eframe::CreationContext<'_>) {
+    install_fonts(&cc.egui_ctx);
+    Box::leak(Box::new(load_textures(&cc.egui_ctx)));
+    setup_style(&cc.egui_ctx);
+}
+
+/// Android entry point: the app's NativeActivity calls this when it starts.
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+fn android_main(app: winit::platform::android::activity::AndroidApp) {
+    platform::set_android_dirs(app.internal_data_path(), app.external_data_path());
+    platform::set_app(app.clone());
+    let opts = eframe::NativeOptions { android_app: Some(app), ..Default::default() };
+    let _ = eframe::run_native("Code Forge", opts, Box::new(|cc| { setup(cc); Ok(Box::new(App::new(None))) }));
+}
+
+/// Web entry point: the page has a <canvas id="code_forge"> that the game draws into.
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    use wasm_bindgen::JsCast;
+    wasm_bindgen_futures::spawn_local(async {
+        let doc = web_sys::window().and_then(|w| w.document()).expect("no page");
+        let canvas = doc.get_element_by_id("code_forge").and_then(|e| e.dyn_into::<web_sys::HtmlCanvasElement>().ok()).expect("no canvas");
+        let started = eframe::WebRunner::new().start(canvas, eframe::WebOptions::default(), Box::new(|cc| { setup(cc); Ok(Box::new(App::new(None))) })).await;
+        if let Some(el) = doc.get_element_by_id("loading") { if started.is_ok() { el.remove(); } else { el.set_inner_html("Code Forge couldn't start in this browser. Try Chrome, Edge, Safari or Firefox."); } }
+    });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
     let args: Vec<String> = std::env::args().collect();
     let arg = |k: &str| args.iter().position(|a| a == k).and_then(|i| args.get(i + 1).cloned());
@@ -935,9 +996,7 @@ fn main() -> eframe::Result {
     if let Some(sz) = arg("--size").and_then(|s| s.split_once('x').and_then(|(w, h)| Some((w.parse::<f32>().ok()?, h.parse::<f32>().ok()?)))) { vp = vp.with_inner_size([sz.0, sz.1]); }
     if shot.is_some() { vp = vp.with_active(false).with_window_level(egui::WindowLevel::AlwaysOnBottom); }
     eframe::run_native("Code Forge", eframe::NativeOptions { viewport: vp, ..Default::default() }, Box::new(move |cc| {
-        install_fonts(&cc.egui_ctx);
-        Box::leak(Box::new(load_textures(&cc.egui_ctx)));
-        setup_style(&cc.egui_ctx);
+        setup(cc);
         let mut app = App::new(shot);
         if force_onboarding { app.onboard = Some(onboarding::Onboard::default()); }
         if let Some(t) = tab { if t == "practice" { app.sub_train = 1; } app.tab = match t.as_str() { "train" | "practice" | "community" => Tab::Train, "ranks" | "leader" => Tab::Ranks, "create" => Tab::Create, "hero" | "profile" => Tab::Hero, _ => Tab::Learn }; }

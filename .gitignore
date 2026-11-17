@@ -5,3 +5,6 @@ assets/*.zip
 design/audio/
 MECHANICS.md
 mechanics.json
+android/target/
+android/*.keystore
+android/build/

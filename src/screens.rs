@@ -135,8 +135,7 @@ impl App {
                     ui.horizontal(|ui| {
                         let w = (ui.available_width() - SP_S) / 2.0;
                         if pbtn(ui, "EXPORT", BLUE, w).on_hover_text("Save your progress to a file").clicked() && !self.demo { self.export_progress(); }
-                        if pbtn(ui, "IMPORT", BLUE, w).on_hover_text("Load progress from a file").clicked() && !self.demo
-                            && let Some(p) = rfd::FileDialog::new().set_title("Open Code Forge progress").add_filter("Code Forge progress", &["codeforge"]).pick_file() { self.load_import(&p); }
+                        if pbtn(ui, "IMPORT", BLUE, w).on_hover_text("Load progress from a file").clicked() && !self.demo { platform::pick_import(); }
                     });
                     ui.add_space(SP_S);
                     if pbtn(ui, "RESET PROGRESS", RED, 0.0).clicked() { self.modal = Modal::Reset; }

@@ -13,9 +13,20 @@ path = "src/main.rs"
 [dependencies]
 eframe = { version = "0.37.0", default-features = false, features = ["accesskit", "clipboard", "default_fonts", "glow", "links", "wayland", "x11"] }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "wasmbind"] }
+
+# desktop: native audio output and file dialogs
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rodio = { version = "0.19", default-features = false }
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
 rfd = "0.15"
+
+# web only (phones, tablets and laptops in a browser)
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "HtmlInputElement", "FileList", "File", "Blob", "BlobPropertyBag", "Url", "Storage", "AudioContext", "AudioContextState", "BaseAudioContext", "AudioBuffer", "AudioBufferSourceNode", "AudioScheduledSourceNode", "AudioNode", "AudioDestinationNode", "GainNode", "AudioParam"] }
 
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"

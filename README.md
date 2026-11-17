@@ -68,6 +68,18 @@ Nothing to install, no account, no internet needed.
 | Leagues | Top 3 of 7 move up (10 / 6 / 3 gems), bottom 2 move down, no XP at all also drops you |
 | Days | A new day starts at your local midnight. Turning the clock back does not give a day back |
 
+## On your Android phone
+
+1. Copy `CodeForge-1.0.0-android.apk` to the phone (USB, Google Drive, a chat app...).
+2. Tap it. If Android asks, allow *Install unknown apps* for the app you opened it with.
+3. Open **Code Forge** from your app drawer. Everything works offline, the same as on Windows.
+
+The keyboard opens when you tap a text box, the phone's Back button leaves a screen, and progress moves
+between the laptop and the phone with *Settings → Export / Import* (on the phone, Export saves to
+Downloads when allowed, otherwise to `Android/data/com.codeforge.game/files`, which you can reach over
+USB; Import picks up the newest `.codeforge` file from either place). Works on Android 8.0 and newer
+(arm64 phones, plus x86_64 emulators and Chromebooks). iPhones can't install `.apk` files.
+
 ## Your data
 
 Progress is saved to `%APPDATA%\code_forge\save.txt` (saves from Pixel Learn 1.x in `%APPDATA%\pixel_learn` are copied over automatically). Every save is written safely: the previous
@@ -91,6 +103,8 @@ cargo test            # rules, saves, interpreters and course-content checks
 cargo run             # debug build
 cargo run --release   # optimized build, no console window
 powershell -ExecutionPolicy Bypass -File scripts/package.ps1   # dist/CodeForge-<ver>-windows.zip
+python scripts/build_android.py      # dist/CodeForge-<ver>-android.apk (needs Android SDK + NDK, a JDK,
+                                     # and: rustup target add aarch64-linux-android x86_64-linux-android)
 ```
 
 QA helpers: `--screenshot out.png [--tab learn|train|ranks|create|hero] [--tab practice] [--scroll N] [--screen settings|editor|sql|complete|shop|notif|avatar|nohearts|preview|notes|cert] [--lesson C.M.L --stage N] [--onboarding] [--size 360x600]`.

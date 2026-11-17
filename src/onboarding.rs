@@ -100,7 +100,8 @@ fn forge_logo(ui: &mut egui::Ui, t: f32, fired: &mut u8) {
     for (i, (b, s)) in BEATS.iter().enumerate() {
         if t >= *b && *fired & (1 << i) == 0 { *fired |= 1 << i; audio::play(*s); }
     }
-    ui.ctx().request_repaint(); // keeps the parts moving and the embers drifting
+    // full speed while the logo is being forged, then a gentle 30 fps for the drifting embers
+    if t < 3.0 { ui.ctx().request_repaint(); } else { ui.ctx().request_repaint_after(std::time::Duration::from_millis(33)); }
 }
 
 
@@ -167,8 +168,7 @@ impl App {
                         ui.add_space(SP_L);
                         ui.label(body("Played on another device? Bring your hero here.", 13.0).color(DIM));
                         ui.add_space(SP_XS);
-                        if mini_btn(ui, "IMPORT PROGRESS", BLUE).clicked() && !self.demo
-                            && let Some(p) = rfd::FileDialog::new().set_title("Open Code Forge progress").add_filter("Code Forge progress", &["codeforge"]).pick_file() { self.load_import(&p); }
+                        if mini_btn(ui, "IMPORT PROGRESS", BLUE).clicked() && !self.demo { platform::pick_import(); }
                     }
                     1 => {
                         ui.label(title("CHOOSE YOUR HERO", 12.0).color(GOLD));

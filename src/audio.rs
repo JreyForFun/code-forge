@@ -381,6 +381,7 @@ fn add_line(b: &mut Vec<f32>, line: &[f32], t0: f32, e: f32, w: Wave, vol: f32) 
 }
 
 /// Write every track and sound effect as 16-bit WAV files (for listening outside the game).
+#[cfg(not(target_arch = "wasm32"))]
 pub fn export(dir: &std::path::Path) -> std::io::Result<usize> {
     std::fs::create_dir_all(dir)?;
     let wav = |name: &str, v: &[f32]| -> std::io::Result<()> {
@@ -404,6 +405,7 @@ pub const ALL_SFX: [Sfx; 22] = [Sfx::Click, Sfx::Confirm, Sfx::Go, Sfx::Back, Sf
 
 // ---------------------------------------------------------------- playback
 /// Live audio output. `None` when there is no sound device.
+#[cfg(not(target_arch = "wasm32"))]
 pub struct Audio {
     _stream: rodio::OutputStream,
     handle: rodio::OutputStreamHandle,
@@ -415,6 +417,7 @@ pub struct Audio {
     tracks: Arc<std::sync::Mutex<HashMap<Track, Arc<Vec<f32>>>>>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Audio {
     pub fn new() -> Option<Audio> {
         let (stream, handle) = rodio::OutputStream::try_default().ok()?;
@@ -464,6 +467,87 @@ impl Audio {
         }
         self.level = (self.level + 0.03).min(1.0);                 // fade in
         self.music.set_volume(volume * 0.55 * self.level);
+        self.level < 1.0
+    }
+}
+
+
+/// Web audio output (browsers): the same synthesised sounds through the Web Audio API.
+/// Browsers only allow sound after the player has tapped or clicked, so the audio context is created
+/// on the first sound request, which always follows a tap.
+#[cfg(target_arch = "wasm32")]
+pub struct Audio {
+    ctx: Option<web_sys::AudioContext>,
+    music: Option<(web_sys::AudioBufferSourceNode, web_sys::GainNode)>,
+    current: Option<Track>,
+    level: f32,
+    buffers: HashMap<Sfx, web_sys::AudioBuffer>,
+    tracks: HashMap<Track, web_sys::AudioBuffer>,
+    touched: bool,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Audio {
+    pub fn new() -> Option<Audio> { Some(Audio { ctx: None, music: None, current: None, level: 0.0, buffers: HashMap::new(), tracks: HashMap::new(), touched: false }) }
+
+    /// Call when the player has interacted with the page (tap, click or key).
+    pub fn unlock(&mut self) { self.touched = true; }
+
+    fn ctx(&mut self) -> Option<web_sys::AudioContext> {
+        if !self.touched { return None; }
+        if self.ctx.is_none() { self.ctx = web_sys::AudioContext::new().ok(); }
+        let c = self.ctx.clone()?;
+        if c.state() == web_sys::AudioContextState::Suspended { let _ = c.resume(); }
+        Some(c)
+    }
+
+    fn buffer(ctx: &web_sys::AudioContext, data: &[f32]) -> Option<web_sys::AudioBuffer> {
+        let b = ctx.create_buffer(1, data.len().max(1) as u32, RATE as f32).ok()?;
+        b.copy_to_channel(data, 0).ok()?;
+        Some(b)
+    }
+
+    pub fn sfx(&mut self, s: Sfx, volume: f32) {
+        if volume <= 0.0 { return; }
+        let Some(ctx) = self.ctx() else { return };
+        if !self.buffers.contains_key(&s) { if let Some(b) = Self::buffer(&ctx, &render_sfx(s)) { self.buffers.insert(s, b); } }
+        let Some(buf) = self.buffers.get(&s) else { return };
+        let (Ok(src), Ok(gain)) = (ctx.create_buffer_source(), ctx.create_gain()) else { return };
+        src.set_buffer(Some(buf));
+        gain.gain().set_value(volume);
+        let _ = src.connect_with_audio_node(&gain);
+        let _ = gain.connect_with_audio_node(&ctx.destination());
+        let _ = src.start();
+    }
+
+    /// Keep the wanted music playing, crossfading between tracks. Returns true while fading.
+    pub fn music(&mut self, t: Option<Track>, volume: f32) -> bool {
+        let stop = |m: &mut Option<(web_sys::AudioBufferSourceNode, web_sys::GainNode)>| { if let Some((s, _)) = m.take() { let _ = s.stop(); } };
+        if volume <= 0.0 || t.is_none() { stop(&mut self.music); self.current = None; self.level = 0.0; return false; }
+        if t != self.current && self.current.is_some() {
+            self.level -= 0.05;
+            if self.level > 0.0 { if let Some((_, g)) = &self.music { g.gain().set_value(volume * 0.55 * self.level); } return true; }
+            stop(&mut self.music);
+            self.current = None;
+        }
+        if self.current.is_none() {
+            let Some(ctx) = self.ctx() else { return false };
+            let t = t.unwrap();
+            if !self.tracks.contains_key(&t) { if let Some(b) = Self::buffer(&ctx, &render_track(t)) { self.tracks.insert(t, b); } }
+            let Some(buf) = self.tracks.get(&t) else { return false };
+            let (Ok(src), Ok(gain)) = (ctx.create_buffer_source(), ctx.create_gain()) else { return false };
+            src.set_buffer(Some(buf));
+            src.set_loop(true);
+            gain.gain().set_value(0.0);
+            let _ = src.connect_with_audio_node(&gain);
+            let _ = gain.connect_with_audio_node(&ctx.destination());
+            let _ = src.start();
+            self.music = Some((src, gain));
+            self.current = Some(t);
+            self.level = 0.0;
+        }
+        self.level = (self.level + 0.03).min(1.0);
+        if let Some((_, g)) = &self.music { g.gain().set_value(volume * 0.55 * self.level); }
         self.level < 1.0
     }
 }

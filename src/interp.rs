@@ -1258,14 +1258,17 @@ pub fn run(lang: &str, src: &str) -> Vec<(Kind, String)> { run_with_input(lang, 
 
 /// Run a program; `input` holds the answers for input() / prompt(), one per line.
 pub fn run_with_input(lang: &str, src: &str, input: &str) -> Vec<(Kind, String)> {
-    let (l, s, inp) = (lang.to_string(), src.to_string(), input.to_string());
+    #[cfg(target_arch = "wasm32")]
+    { run_here(lang, src, input) }
+    #[cfg(not(target_arch = "wasm32"))]
+    { let (l, s, inp) = (lang.to_string(), src.to_string(), input.to_string());
     std::thread::Builder::new()
         .name("interp".into())
         .stack_size(64 << 20)
         .spawn(move || run_here(&l, &s, &inp))
         .ok()
         .and_then(|h| h.join().ok())
-        .unwrap_or_else(|| vec![(Kind::Err, "Something went wrong while running this code.".into())])
+        .unwrap_or_else(|| vec![(Kind::Err, "Something went wrong while running this code.".into())]) }
 }
 
 fn run_here(lang: &str, src: &str, input: &str) -> Vec<(Kind, String)> {
@@ -1279,7 +1282,7 @@ fn run_here(lang: &str, src: &str, input: &str) -> Vec<(Kind, String)> {
     let js = lang == "javascript";
     let lines = normalize(src, js);
     let n = lines.len();
-    let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(42) | 1;
+    let seed = crate::platform::seed() | 1;
     let mut r = Run { lines: &lines, vars: HashMap::new(), funcs: HashMap::new(), out: vec![], steps: 0, js, depth: 0, ret: None, seed, dom: HashMap::new(), classes: HashMap::new(), imports: HashMap::new(), stdin: input.lines().map(|l| l.to_string()).collect() };
     match r.exec(0, n) {
         Err(e) => r.out.push((Kind::Err, e)),
