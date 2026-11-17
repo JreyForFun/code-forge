@@ -50,7 +50,9 @@ pub enum Sfx {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Track { Title, Dungeon, Battle }
+pub enum Track { Title, Hub, Study, Battle }
+
+pub const ALL_TRACKS: [Track; 4] = [Track::Title, Track::Hub, Track::Study, Track::Battle];
 
 thread_local! {
     /// Sounds requested by widgets this frame: (sound, specific). Generic button clicks are dropped
@@ -200,31 +202,56 @@ pub fn render_sfx(s: Sfx) -> Vec<f32> {
 pub fn render_track(t: Track) -> Vec<f32> {
     let mut b = vec![];
     match t {
-        Track::Dungeon => {
-            // A minor, slow and mysterious: Am F G Em, torch-lit corridors
-            let bpm = 92.0; let e = 60.0 / bpm / 2.0; // eighth note
-            let chords: [[f32; 3]; 4] = [[57.0, 60.0, 64.0], [53.0, 57.0, 60.0], [55.0, 59.0, 62.0], [52.0, 55.0, 59.0]];
-            let lead: [&[f32]; 8] = [
-                &[76.0, -1.0, 0.0, 72.0, 74.0, -1.0, 76.0, -1.0], &[77.0, -1.0, -1.0, 76.0, 74.0, -1.0, 72.0, -1.0],
-                &[74.0, -1.0, 0.0, 71.0, 72.0, -1.0, 74.0, -1.0], &[71.0, -1.0, -1.0, -1.0, 0.0, 0.0, 0.0, 0.0],
-                &[76.0, -1.0, 79.0, -1.0, 77.0, 76.0, 74.0, -1.0], &[72.0, -1.0, 74.0, 72.0, 69.0, -1.0, -1.0, 0.0],
-                &[71.0, 72.0, 74.0, -1.0, 76.0, -1.0, 74.0, 71.0], &[69.0, -1.0, -1.0, -1.0, -1.0, -1.0, 0.0, 0.0],
+        Track::Hub => {
+            // lo-fi for the hub: Dm9 G13 Cmaj9 Am7 at 74 bpm, swung, soft and warm
+            let bpm = 74.0; let q = 60.0 / bpm; let e = q / 2.0;
+            let sw = |i: usize| if i % 2 == 1 { e * 0.16 } else { 0.0 };           // swing the off-beats
+            let chords: [&[f32]; 4] = [&[50.0, 53.0, 57.0, 60.0, 64.0], &[43.0, 53.0, 57.0, 59.0, 64.0], &[48.0, 52.0, 55.0, 59.0, 62.0], &[45.0, 52.0, 55.0, 60.0, 64.0]];
+            let bells: [&[f32]; 8] = [
+                &[0.0, 0.0, 76.0, -1.0, 0.0, 74.0, 0.0, 0.0], &[0.0, 0.0, 0.0, 0.0, 71.0, -1.0, 74.0, 0.0],
+                &[72.0, -1.0, 0.0, 0.0, 0.0, 0.0, 76.0, 0.0], &[0.0, 0.0, 72.0, -1.0, -1.0, 0.0, 0.0, 0.0],
+                &[0.0, 0.0, 81.0, -1.0, 79.0, 0.0, 76.0, 0.0], &[0.0, 0.0, 0.0, 77.0, -1.0, -1.0, 0.0, 0.0],
+                &[76.0, 0.0, 74.0, 0.0, 72.0, -1.0, 0.0, 0.0], &[0.0, 0.0, 0.0, 0.0, 69.0, -1.0, -1.0, 0.0],
             ];
             for bar in 0..16 {
-                let t0 = bar as f32 * 8.0 * e;
+                let t0 = bar as f32 * 4.0 * q;
                 let ch = chords[bar % 4];
-                for s in 0..8 {
-                    let at = t0 + s as f32 * e;
-                    // arpeggio, quiet and thin
-                    let m = ch[[0, 1, 2, 1, 0, 1, 2, 1][s]] + 12.0;
-                    tone(&mut b, at, e * 0.9, midi(m), midi(m), Wave::Square(0.125), 0.07, 0.003, 0.05);
-                    if s % 4 == 0 { tone(&mut b, at, e * 3.6, midi(ch[0] - 12.0), midi(ch[0] - 12.0), Wave::Tri, 0.32, 0.005, 0.2); }
-                    if s == 0 { kick(&mut b, at, 0.35); }
-                    if s % 2 == 1 { hat(&mut b, at, 0.06); }
-                    if s == 4 && bar % 2 == 1 { snare(&mut b, at, 0.16); }
+                // electric piano: chord on beat 1, a soft re-strike on the "and" of 2
+                for (k, m) in ch.iter().enumerate().skip(1) { epiano(&mut b, t0 + k as f32 * 0.012, 2.6 * q, *m, 0.07); }
+                for m in ch.iter().skip(2) { epiano(&mut b, t0 + 3.0 * e + sw(3), 1.4 * q, *m, 0.04); }
+                // round sine bass
+                tone(&mut b, t0, 1.8 * q, midi(ch[0] - 12.0), midi(ch[0] - 12.0), Wave::Sine, 0.34, 0.01, 0.3);
+                tone(&mut b, t0 + 2.5 * q, 1.2 * q, midi(ch[0] - 5.0), midi(ch[0] - 5.0), Wave::Sine, 0.22, 0.01, 0.3);
+                // brushed beat
+                for i in 0..8 {
+                    let at = t0 + i as f32 * e + sw(i);
+                    if i == 0 || i == 5 { soft_kick(&mut b, at, 0.32); }
+                    if i == 2 || i == 6 { noise(&mut b, at, 0.18, 0.11, 0.18, 16.0, 900 + i as u32); }
+                    hat(&mut b, at, if i % 2 == 0 { 0.025 } else { 0.015 });
                 }
-                if bar >= 4 { add_line(&mut b, lead[(bar - 4) % 8], t0, e, Wave::Square(0.5), 0.14); }
+                if bar >= 2 { add_bells(&mut b, bells[bar % 8], t0, e, 0.08); }
             }
+            crackle(&mut b, 0.02, 11);
+            b = lowpass(b, 0.35);
+        }
+        Track::Study => {
+            // calm focus for lessons: Cmaj7 Am9 Fmaj7 G6 at 62 bpm, no drums, soft rain
+            let bpm = 62.0; let q = 60.0 / bpm;
+            let chords: [&[f32]; 4] = [&[48.0, 52.0, 55.0, 59.0, 64.0], &[45.0, 52.0, 55.0, 59.0, 60.0], &[41.0, 52.0, 57.0, 60.0, 64.0], &[43.0, 52.0, 55.0, 59.0, 62.0]];
+            for bar in 0..16 {
+                let t0 = bar as f32 * 4.0 * q;
+                let ch = chords[bar % 4];
+                for m in ch.iter().skip(1) { pad(&mut b, t0, 4.0 * q + 0.6, *m, 0.035); }
+                tone(&mut b, t0, 4.0 * q, midi(ch[0] - 12.0), midi(ch[0] - 12.0), Wave::Sine, 0.22, 0.4, 1.0);
+                // a slow rolled electric piano, like someone thinking at the keys
+                let roll = [1usize, 2, 3, 4, 3, 2];
+                for (k, idx) in roll.iter().enumerate() {
+                    if bar % 2 == 1 && k > 3 { break; }
+                    epiano(&mut b, t0 + k as f32 * q * 0.66, 1.8 * q, ch[*idx] + 12.0, 0.045);
+                }
+            }
+            rain(&mut b, 0.03, 5);
+            b = lowpass(b, 0.28);
         }
         Track::Title => {
             // D minor, slow and grand: Dm Bb C Am, a forge glowing in the deep
@@ -273,6 +300,71 @@ pub fn render_track(t: Track) -> Vec<f32> {
     finish(b, 0.8)
 }
 
+/// Soft electric piano: sine with a little bell harmonic, fast attack, long exponential decay.
+fn epiano(b: &mut Vec<f32>, at: f32, dur: f32, m: f32, vol: f32) {
+    let f = midi(m);
+    let start = secs(at);
+    let n = secs(dur);
+    if b.len() < start + n { b.resize(start + n, 0.0); }
+    for i in 0..n {
+        let t = i as f32 / RATE as f32;
+        let env = (t / 0.006).min(1.0) * (-t * 2.2).exp() * ((dur - t) / 0.08).min(1.0);
+        let trem = 1.0 + 0.08 * (t * 5.5 * std::f32::consts::TAU).sin();
+        let w = (t * f * std::f32::consts::TAU).sin() + 0.25 * (t * f * 2.0 * std::f32::consts::TAU).sin() * (-t * 6.0).exp() + 0.08 * (t * f * 4.01 * std::f32::consts::TAU).sin() * (-t * 9.0).exp();
+        b[start + i] += w * env * trem * vol;
+    }
+}
+
+/// Warm pad: two slightly detuned triangles with a slow swell.
+fn pad(b: &mut Vec<f32>, at: f32, dur: f32, m: f32, vol: f32) {
+    tone(b, at, dur, midi(m) * 0.998, midi(m) * 0.998, Wave::Tri, vol, dur * 0.35, dur * 0.4);
+    tone(b, at, dur, midi(m) * 1.003, midi(m) * 1.003, Wave::Sine, vol, dur * 0.4, dur * 0.4);
+}
+
+fn soft_kick(b: &mut Vec<f32>, at: f32, vol: f32) { tone(b, at, 0.22, 110.0, 45.0, Wave::Sine, vol, 0.004, 0.12); }
+
+/// Bell-like melody notes (sine with a quick shimmer), for the lo-fi track.
+fn add_bells(b: &mut Vec<f32>, line: &[f32], t0: f32, e: f32, vol: f32) {
+    for (i, m) in line.iter().enumerate() {
+        if *m <= 0.0 { continue; }
+        let mut len = 1;
+        while i + len < line.len() && line[i + len] == -1.0 { len += 1; }
+        epiano(b, t0 + i as f32 * e, len as f32 * e + 0.4, m + 12.0, vol);
+    }
+}
+
+/// Vinyl crackle: sparse soft clicks plus a whisper of noise.
+fn crackle(b: &mut [f32], vol: f32, seed: u32) {
+    let mut ng = Noise(seed | 1);
+    let mut lp = 0.0f32;
+    for x in b.iter_mut() {
+        lp += (ng.next() - lp) * 0.05;
+        *x += lp * vol * 0.6;
+        if ng.next() > 0.9993 { *x += ng.next() * vol * 6.0; }
+    }
+}
+
+/// Gentle rain: filtered noise that slowly breathes.
+fn rain(b: &mut [f32], vol: f32, seed: u32) {
+    let mut ng = Noise(seed | 1);
+    let (mut lp, mut hp) = (0.0f32, 0.0f32);
+    for (i, x) in b.iter_mut().enumerate() {
+        let n = ng.next();
+        lp += (n - lp) * 0.3;
+        hp = lp - hp * 0.0 - (lp * 0.02);
+        let breathe = 0.75 + 0.25 * (i as f32 / RATE as f32 * 0.21).sin();
+        *x += hp * vol * breathe;
+        if ng.next() > 0.9995 { *x += ng.next() * vol * 3.0; }
+    }
+}
+
+/// One-pole low-pass over a whole track, to make it warm and soft.
+fn lowpass(mut v: Vec<f32>, k: f32) -> Vec<f32> {
+    let mut y = 0.0f32;
+    for x in &mut v { y += (*x - y) * k; *x = y; }
+    v
+}
+
 fn add_line(b: &mut Vec<f32>, line: &[f32], t0: f32, e: f32, w: Wave, vol: f32) {
     let mut i = 0;
     while i < line.len() {
@@ -302,7 +394,7 @@ pub fn export(dir: &std::path::Path) -> std::io::Result<usize> {
         std::fs::write(dir.join(format!("{}.wav", name)), b)
     };
     let mut n = 0;
-    for t in [Track::Title, Track::Dungeon, Track::Battle] { wav(&format!("music_{:?}", t).to_lowercase(), &render_track(t))?; n += 1; }
+    for t in ALL_TRACKS { wav(&format!("music_{:?}", t).to_lowercase(), &render_track(t))?; n += 1; }
     for s in ALL_SFX { wav(&format!("sfx_{:?}", s).to_lowercase(), &render_sfx(s))?; n += 1; }
     Ok(n)
 }
@@ -317,6 +409,8 @@ pub struct Audio {
     handle: rodio::OutputStreamHandle,
     music: rodio::Sink,
     current: Option<Track>,
+    /// music fade level 0..1, used to crossfade between tracks
+    level: f32,
     cache: HashMap<Sfx, Arc<Vec<f32>>>,
     tracks: Arc<std::sync::Mutex<HashMap<Track, Arc<Vec<f32>>>>>,
 }
@@ -329,12 +423,12 @@ impl Audio {
         // compose the music in the background so start-up stays instant
         let t2 = tracks.clone();
         std::thread::spawn(move || {
-            for t in [Track::Title, Track::Dungeon, Track::Battle] {
+            for t in ALL_TRACKS {
                 let v = Arc::new(render_track(t));
                 if let Ok(mut m) = t2.lock() { m.insert(t, v); }
             }
         });
-        Some(Audio { _stream: stream, handle, music, current: None, cache: HashMap::new(), tracks })
+        Some(Audio { _stream: stream, handle, music, current: None, level: 0.0, cache: HashMap::new(), tracks })
     }
 
     pub fn sfx(&mut self, s: Sfx, volume: f32) {
@@ -345,19 +439,32 @@ impl Audio {
         let _ = self.handle.play_raw(src.convert_samples());
     }
 
-    /// Switch the looping music (no-op if it is already playing). `None` stops it.
-    pub fn music(&mut self, t: Option<Track>, volume: f32) {
-        self.music.set_volume(volume * 0.55);
-        if volume <= 0.0 { if self.current.is_some() { self.music.stop(); self.current = None; } return; }
-        if t == self.current { return; }
-        let Some(t) = t else { self.music.stop(); self.current = None; return };
-        let Some(data) = self.tracks.lock().ok().and_then(|m| m.get(&t).cloned()) else { return }; // still composing
-        use rodio::Source;
-        self.music.stop();
-        self.music = match rodio::Sink::try_new(&self.handle) { Ok(s) => s, Err(_) => return };
-        self.music.set_volume(volume * 0.55);
-        self.music.append(rodio::buffer::SamplesBuffer::new(1, RATE, (*data).clone()).repeat_infinite());
-        self.current = Some(t);
+    /// Keep the wanted music playing. Changing track fades the old one out and the new one in.
+    /// Call every frame; returns true while a fade is in progress (keep repainting).
+    pub fn music(&mut self, t: Option<Track>, volume: f32) -> bool {
+        if volume <= 0.0 || t.is_none() {
+            if self.current.is_some() { self.music.stop(); self.current = None; self.level = 0.0; }
+            return false;
+        }
+        if t != self.current && self.current.is_some() {
+            self.level -= 0.05;                                    // fade out the old track
+            if self.level > 0.0 { self.music.set_volume(volume * 0.55 * self.level); return true; }
+            self.music.stop();
+            self.current = None;
+        }
+        if self.current.is_none() {
+            let t = t.unwrap();
+            let Some(data) = self.tracks.lock().ok().and_then(|m| m.get(&t).cloned()) else { return true }; // still composing
+            use rodio::Source;
+            self.music = match rodio::Sink::try_new(&self.handle) { Ok(s) => s, Err(_) => return false };
+            self.level = 0.0;
+            self.music.set_volume(0.0);
+            self.music.append(rodio::buffer::SamplesBuffer::new(1, RATE, (*data).clone()).repeat_infinite());
+            self.current = Some(t);
+        }
+        self.level = (self.level + 0.03).min(1.0);                 // fade in
+        self.music.set_volume(volume * 0.55 * self.level);
+        self.level < 1.0
     }
 }
 
@@ -373,7 +480,7 @@ mod tests {
             assert!(v.iter().all(|x| x.is_finite() && x.abs() <= 1.0), "{:?} clips", s);
             assert!(v.iter().any(|x| x.abs() > 0.1), "{:?} is silent", s);
         }
-        for t in [Track::Title, Track::Dungeon, Track::Battle] {
+        for t in ALL_TRACKS {
             let v = render_track(t);
             assert!(v.len() > RATE as usize * 15, "{:?} too short", t);
             assert!(v.iter().all(|x| x.is_finite() && x.abs() <= 1.0));

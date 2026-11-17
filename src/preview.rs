@@ -117,7 +117,7 @@ impl App {
         let mut cert = false;
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
             if self.s.floor { floor(ui.painter(), ui.clip_rect(), self.s.scan); }
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            scroll_centered(ui, |ui| {
                 let cs = &self.courses[c];
                 // hero block
                 panel(ui, PANEL, EDGE, |ui| {
@@ -245,7 +245,7 @@ impl App {
         });
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
             if self.s.floor { floor(ui.painter(), ui.clip_rect(), self.s.scan); }
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            scroll_centered(ui, |ui| {
                 let ls = &self.courses[c].modules[m].lessons[l];
                 ui.label(title(format!("{}  *  {}", self.courses[c].name.to_uppercase(), self.courses[c].modules[m].name.to_uppercase()), 8.0).color(DIM));
                 ui.add_space(SP_S);
@@ -309,7 +309,7 @@ impl App {
         });
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
             if self.s.floor { floor(ui.painter(), ui.clip_rect(), self.s.scan); }
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            scroll_centered(ui, |ui| {
                 let cs = &self.courses[c];
                 let ink = INK_DARK;
                 let w = ui.available_width().min(560.0);

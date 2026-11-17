@@ -49,6 +49,28 @@ pub fn card_title(ui: &mut egui::Ui, text: &str) {
     ui.label(title(text, 10.0).color(GOLD));
     ui.add_space(SP_S);
 }
+/// Widest a column of content gets. Phones use the full width; tablets and desktops get a centred
+/// column so text lines and cards stay comfortable to read.
+pub const MAX_W: f32 = 720.0;
+
+/// Lay `f` out in a column of at most `MAX_W`, centred in the space available.
+pub fn centered<R>(ui: &mut egui::Ui, f: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let avail = ui.available_rect_before_wrap();
+    let w = avail.width().min(MAX_W);
+    let inner = Rect::from_min_size(Pos2::new(avail.center().x - w / 2.0, avail.min.y), Vec2::new(w, avail.height().max(0.0)));
+    ui.scope_builder(egui::UiBuilder::new().max_rect(inner), f).inner
+}
+
+/// The standard scrolling page: vertical scroll with the content in a centred column.
+pub fn scroll_centered(ui: &mut egui::Ui, f: impl FnOnce(&mut egui::Ui)) {
+    egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| centered(ui, f));
+}
+
+/// How many columns a grid of cards should use at this width (phones 1-2, tablets 3, wide 4).
+pub fn grid_cols(width: f32, min_card: f32, max_cols: usize) -> usize {
+    ((width / min_card).floor() as usize).clamp(1, max_cols)
+}
+
 pub fn screen_frame(fill: Color32) -> egui::Frame { egui::Frame::new().fill(fill).inner_margin(egui::Margin::same(SCREEN_PAD)) }
 
 // ---------- fonts ----------

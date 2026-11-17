@@ -52,6 +52,7 @@ impl App {
         let bot_fill = match &rs.fb { Some((true, _)) => Color32::from_rgb(0x10, 0x32, 0x1c), Some((false, _)) => Color32::from_rgb(0x3a, 0x12, 0x1e), None => BG2 };
         egui::Panel::bottom("rbot").frame(egui::Frame::new().fill(bot_fill).inner_margin(16.0)).show(ctx, |ui| {
             if bot_fill == BG2 { ledge(ui, false); }
+            centered(ui, |ui| {
             if in_slides {
                 ui.horizontal(|ui| {
                     if rs.stage > 0 && pbtn(ui, "BACK", PANEL_HI, 100.0).clicked() { slide_step = -1; audio::play(audio::Sfx::Page); }
@@ -98,11 +99,12 @@ impl App {
                     }
                 });
             } else { finished = true; }
+            });
         });
 
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
             floor(ui.painter(), ui.clip_rect(), self.s.scan);
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            scroll_centered(ui, |ui| {
                 ui.horizontal(|ui| {
                     let (r, _) = ui.allocate_exact_size(Vec2::new(8.0, 14.0), Sense::hover());
                     ui.painter().rect_filled(r, 0.0, GOLD);

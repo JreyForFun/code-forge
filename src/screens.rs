@@ -7,7 +7,7 @@ impl App {
         let enter = ctx.ctx().input(|i| i.key_pressed(egui::Key::Enter));
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
             floor(ui.painter(), ui.clip_rect(), self.s.scan);
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            scroll_centered(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(SP_M);
                     let lost = c.duel.as_ref().map(|d| !d.3).unwrap_or(false);
@@ -60,7 +60,7 @@ impl App {
         header(ctx, self, "Settings", true, false);
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
             floor(ui.painter(), ui.clip_rect(), self.s.scan);
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            scroll_centered(ui, |ui| {
                 panel(ui, PANEL, EDGE, |ui| {
                     ui.set_width(ui.available_width());
                     card_title(ui, "HERO");
@@ -160,7 +160,7 @@ impl App {
         });
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
             floor(ui.painter(), ui.clip_rect(), self.s.scan);
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            scroll_centered(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
                     let w = ((ui.available_width() - 24.0) / 5.0).max(56.0);

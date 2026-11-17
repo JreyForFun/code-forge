@@ -145,20 +145,24 @@ impl App {
 
     /// Play this frame's sounds and keep the right music on: the title theme while onboarding,
     /// the battle theme in duels, the dungeon theme everywhere else.
-    fn update_audio(&mut self) {
+    /// Returns true while the music is fading (the caller keeps repainting).
+    fn update_audio(&mut self) -> bool {
         let sounds = audio::take();
         let want = if self.onboard.is_some() { audio::Track::Title } else {
             match &self.screen {
                 Screen::Run(rs) if matches!(rs.kind, Kind::Duel(_)) => audio::Track::Battle,
                 Screen::Complete(c) if c.duel.is_some() => audio::Track::Battle,
-                _ => audio::Track::Dungeon,
+                // learning: lessons, practice runs, course pages, notes, certificates and the code editor
+                Screen::Run(_) | Screen::Complete(_) | Screen::Preview(_) | Screen::Notes(..) | Screen::Certificate(_) | Screen::Editor(_) => audio::Track::Study,
+                _ => audio::Track::Hub,
             }
         };
         let (mv, sv) = (self.s.music as f32 / 100.0, self.s.sfx as f32 / 100.0);
         if let Some(a) = &mut self.audio {
             for s in sounds { a.sfx(s, sv); }
-            a.music(Some(want), mv);
+            return a.music(Some(want), mv);
         }
+        false
     }
     fn lkey(&self, c: usize, m: usize, l: usize) -> String { self.courses[c].lesson_id(m, l) }
     fn is_done(&self, c: usize, m: usize, l: usize) -> bool { self.s.done.contains(&self.lkey(c, m, l)) }
@@ -390,7 +394,8 @@ fn subtabs(ui: &mut egui::Ui, labels: &[&str], cur: &mut usize) {
 fn nav(ctx: &mut egui::Ui, app: &mut App) {
     egui::Panel::bottom("nav").frame(egui::Frame::new().fill(Color32::from_rgb(0x1d, 0x16, 0x32)).inner_margin(egui::Margin { left: 4, right: 4, top: 6, bottom: 6 })).show(ctx, |ui| {
         ledge(ui, false);
-        let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 64.0), Sense::hover());
+        let (full, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 64.0), Sense::hover());
+        let r = Rect::from_center_size(full.center(), Vec2::new(full.width().min(MAX_W), 64.0));
         let items = [(Tab::Learn, "LEARN", "book"), (Tab::Train, "TRAIN", "sword"), (Tab::Ranks, "RANKS", "banner_royal"), (Tab::Create, "CREATE", "staff"), (Tab::Hero, "HERO", "helmet")];
         let w = r.width() / 5.0;
         for (i, (t, name, art)) in items.iter().enumerate() {
@@ -525,7 +530,7 @@ impl App {
     fn frame_ui(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         // text size setting (applies from the next frame)
-        self.update_audio();
+        if self.update_audio() { ctx.request_repaint(); }
         let z = self.s.zoom.clamp(100, 130) as f32 / 100.0;
         if (ctx.zoom_factor() - z).abs() > 0.01 { ctx.set_zoom_factor(z); }
         self.tick();
@@ -554,13 +559,13 @@ impl App {
                     ui.set_opacity(alpha);
                     let mut sa = egui::ScrollArea::vertical().id_salt(("main", tab as u32)).auto_shrink([false, false]);
                     if let Some(y) = SHOT_SCROLL.get() && self.frames < 100 { sa = sa.vertical_scroll_offset(*y); }
-                    sa.show(ui, |ui| match tab {
+                    sa.show(ui, |ui| centered(ui, |ui| match tab {
                         Tab::Learn => self.learn(ui),
                         Tab::Train => self.train(ui),
                         Tab::Ranks => self.ranks(ui),
                         Tab::Create => self.create(ui),
                         Tab::Hero => self.hero(ui),
-                    });
+                    }));
                 });
             }
             Screen::Settings => { self.screen = Screen::Settings; self.settings(ui); }
@@ -776,7 +781,7 @@ fn main() -> eframe::Result {
     let force_onboarding = args.iter().any(|a| a == "--onboarding");
     let num = |k: &str| arg(k).and_then(|v| v.parse::<usize>().ok()).unwrap_or(0);
     let (stage, skip) = (num("--stage"), num("--skip"));
-    let mut vp = egui::ViewportBuilder::default().with_inner_size([440.0, 780.0]).with_min_inner_size([360.0, 600.0]).with_title(format!("Code Forge {}", VERSION)).with_app_id("pixel_learn");
+    let mut vp = egui::ViewportBuilder::default().with_inner_size([440.0, 780.0]).with_min_inner_size([320.0, 480.0]).with_title(format!("Code Forge {}", VERSION)).with_app_id("code_forge");
     if let Ok(icon) = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png")) { vp = vp.with_icon(std::sync::Arc::new(icon)); }
     if let Some(sz) = arg("--size").and_then(|s| s.split_once('x').and_then(|(w, h)| Some((w.parse::<f32>().ok()?, h.parse::<f32>().ok()?)))) { vp = vp.with_inner_size([sz.0, sz.1]); }
     if shot.is_some() { vp = vp.with_active(false).with_window_level(egui::WindowLevel::AlwaysOnBottom); }

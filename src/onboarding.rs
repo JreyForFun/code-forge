@@ -127,7 +127,7 @@ impl App {
             if ob.step != ob.last_step || ob.step_t0 == 0.0 { ob.step_t0 = now_s; ob.last_step = ob.step; }
             let appear = ease_out(((now_s - ob.step_t0) / 0.35) as f32);
             if appear < 1.0 { ui.ctx().request_repaint(); }
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            scroll_centered(ui, |ui| {
                 // step dots
                 ui.set_opacity(appear);
                 ui.horizontal(|ui| {

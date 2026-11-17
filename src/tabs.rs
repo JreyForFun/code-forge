@@ -122,7 +122,7 @@ impl App {
         enum Act { Daily, Review(usize), Coach(usize), Duel }
         let mut act: Option<Act> = None;
         let t = today();
-        let wide = ui.available_width() > 520.0;
+        let w = ui.available_width();
 
         // ---- Daily Quest: one big wooden banner
         let done_today = self.s.daily_day == t;
@@ -154,7 +154,7 @@ impl App {
         ui.label(body("8 questions from lessons you've already cleared. Reviewing is the fastest way to remember for good.", 13.0).color(DIM));
         ui.add_space(SP_S);
         let n = self.courses.len();
-        let cols = if wide { 3 } else { 2 };
+        let cols = grid_cols(w, 150.0, 3);
         for row in 0..n.div_ceil(cols) {
             ui.columns(cols, |cs| {
                 for (k, col) in cs.iter_mut().enumerate() {
@@ -179,7 +179,7 @@ impl App {
         let list = coaches();
         let solved = list.iter().filter(|c| self.s.solved.contains(c.title)).count();
         section(ui, &format!("QUICK CHALLENGES  {} / {} SOLVED", solved, list.len()));
-        let cols = if wide { 3 } else { 2 };
+        let cols = grid_cols(w, 210.0, 3);
         for row in 0..list.len().div_ceil(cols) {
             ui.columns(cols, |cs| {
                 for (k, col) in cs.iter_mut().enumerate() {
@@ -216,7 +216,7 @@ impl App {
             ui.set_width(ui.available_width());
             ui.label(body(format!("{} quick questions against a computer champion. Beat their score to win +20 XP and +5 gems. Duels never cost hearts.", DUEL_LEN), 13.0).color(DIM));
             ui.add_space(SP_S);
-            let cols = if wide { 4 } else { 2 };
+            let cols = grid_cols(ui.available_width(), 140.0, 4);
             for row in 0..opps.len().div_ceil(cols) {
                 ui.columns(cols, |cs| {
                     for (k, col) in cs.iter_mut().enumerate() {
@@ -534,7 +534,7 @@ impl App {
             ui.set_width(ui.available_width());
             let got = game::ACHIEVEMENTS.iter().filter(|a| self.s.ach.contains_key(a.id)).count();
             card_title(ui, &format!("ACHIEVEMENTS  {} / {}", got, game::ACHIEVEMENTS.len()));
-            let cols = if ui.available_width() > 420.0 { 4 } else { 3 };
+            let cols = grid_cols(ui.available_width(), 100.0, 5);
             let cw = (ui.available_width() - (cols as f32 - 1.0) * 8.0) / cols as f32;
             for row in game::ACHIEVEMENTS.chunks(cols) {
                 ui.horizontal(|ui| {

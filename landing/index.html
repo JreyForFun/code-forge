@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en" data-type="software">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code Forge: learn to code in a pixel-art dungeon</title>
+  <meta name="description" content="Code Forge is a pixel-art RPG for learning to code. 181 short lessons in HTML, CSS, JavaScript, Python and SQL. Runs on Windows, works offline, no account.">
+  <meta name="page-type" content="software">
+  <meta name="site-kind" content="software">
+  <meta name="theme-color" content="#0c101c">
+  <meta property="og:title" content="Code Forge: learn to code in a pixel-art dungeon">
+  <meta property="og:description" content="181 short lessons in HTML, CSS, JavaScript, Python and SQL. Read the scroll, fill in the code, watch it run.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="assets/shots/learn.png">
+  <link rel="icon" type="image/png" href="assets/logo/logo_mark.png">
+  <link rel="preload" href="assets/fonts/PressStart2P.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="assets/fonts/PixelifySans.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('js-motion');
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <div class="wrap nav__row">
+      <a class="brand" href="#top" aria-label="Code Forge, back to top">
+        <img src="assets/logo/logo_mark.png" width="36" height="36" alt="">
+        <span class="wordmark"><span class="wordmark__a">CODE</span> <span class="wordmark__b">FORGE</span></span>
+      </a>
+      <nav class="nav__links" aria-label="Sections">
+        <a href="#quest">How it works</a>
+        <a href="#courses">Courses</a>
+        <a href="#rules">Rules</a>
+      </nav>
+      <a class="btn btn--gold btn--sm" href="#download">Download</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- 1. HERO -->
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="wrap hero__grid">
+        <div class="hero__copy">
+          <button class="forge" type="button" aria-label="Strike the hammer" data-forge>
+            <span class="forge__glow" aria-hidden="true"></span>
+            <span class="forge__stack" aria-hidden="true">
+              <img class="forge__layer" data-part="handle" src="assets/logo/logo_handle.png" alt="" width="48" height="48">
+              <img class="forge__layer" data-part="head" src="assets/logo/logo_head.png" alt="" width="48" height="48">
+              <img class="forge__layer" data-part="lt" src="assets/logo/logo_lt.png" alt="" width="48" height="48">
+              <img class="forge__layer" data-part="sl" src="assets/logo/logo_sl.png" alt="" width="48" height="48">
+              <img class="forge__layer" data-part="gt" src="assets/logo/logo_gt.png" alt="" width="48" height="48">
+            </span>
+            <span class="forge__sparks" aria-hidden="true"></span>
+          </button>
+
+          <h1 id="hero-title" data-enter>Learn to code in a <span class="nowrap">pixel-art dungeon.</span></h1>
+          <p class="lead" data-enter>Pick a quest, read a short scroll, fill in the missing code, then type it yourself and watch it run. 181 lessons in HTML, CSS, JavaScript, Python and SQL.</p>
+          <div class="actions" data-enter>
+            <a class="btn btn--gold" href="#download">Download for Windows</a>
+            <a class="btn btn--stone" href="#quest">Try the first quest</a>
+          </div>
+          <ul class="facts" data-enter>
+            <li>Works offline</li>
+            <li>No account</li>
+            <li>Nothing to install</li>
+          </ul>
+        </div>
+
+        <figure class="device device--hero" data-enter>
+          <img src="assets/shots/learn.png" width="500" height="900" alt="The Code Forge Learn screen: the HTML course with 4 of 27 lessons cleared, hearts, torches and crystals, and the next quest, Elements: Lists.">
+        </figure>
+      </div>
+    </section>
+
+    <!-- 2. HOW A QUEST WORKS -->
+    <section class="quest band" id="quest" aria-labelledby="quest-title">
+      <div class="wrap quest__grid">
+        <div class="quest__intro">
+          <h2 id="quest-title">Every lesson runs the same four steps.</h2>
+          <p class="lead">Lessons are short on purpose. You read, you check, you write, and the code runs on the spot. A wrong answer costs one heart, not an evening.</p>
+
+          <div class="steps" role="tablist" aria-label="Lesson steps" aria-orientation="vertical">
+            <button class="step" role="tab" id="tab-read" aria-controls="panel-read" aria-selected="true">
+              <span class="step__n" aria-hidden="true">1</span>
+              <span class="step__body">
+                <span class="step__title">Read the scroll</span>
+                <span class="step__text">Picture slides, then The Full Scroll: plain language, examples and the mistakes beginners make most.</span>
+              </span>
+            </button>
+            <button class="step" role="tab" id="tab-check" aria-controls="panel-check" aria-selected="false" tabindex="-1">
+              <span class="step__n" aria-hidden="true">2</span>
+              <span class="step__body">
+                <span class="step__title">Check what stuck</span>
+                <span class="step__text">Quick questions. Wrong answers come back at the end, so you leave knowing every step.</span>
+              </span>
+            </button>
+            <button class="step" role="tab" id="tab-fill" aria-controls="panel-fill" aria-selected="false" tabindex="-1">
+              <span class="step__n" aria-hidden="true">3</span>
+              <span class="step__body">
+                <span class="step__title">Complete the code</span>
+                <span class="step__text">Fill the gap in real code. Try it here: this is the first exercise of the HTML course.</span>
+              </span>
+            </button>
+            <button class="step" role="tab" id="tab-run" aria-controls="panel-run" aria-selected="false" tabindex="-1">
+              <span class="step__n" aria-hidden="true">4</span>
+              <span class="step__body">
+                <span class="step__title">Type it, then run it</span>
+                <span class="step__text">Write it yourself, then from memory. Python and JavaScript really run, HTML and CSS render, SQL queries a sample database.</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="quest__stage">
+          <div class="device" role="tabpanel" id="panel-read" aria-labelledby="tab-read">
+            <img src="assets/shots/stage2.png" width="500" height="900" loading="lazy" alt="The Full Scroll for the CSS lesson on units: a parchment page explaining px, percent, em and rem with a code example.">
+          </div>
+          <div class="device" role="tabpanel" id="panel-check" aria-labelledby="tab-check" hidden>
+            <img src="assets/shots/stage4.png" width="500" height="900" loading="lazy" alt="A quiz step asking what width: 50% means, with three answers to pick from.">
+          </div>
+          <div class="device device--live" role="tabpanel" id="panel-fill" aria-labelledby="tab-fill" hidden>
+            <div class="mini" data-fill>
+              <div class="mini__bar">
+                <span class="mini__x" aria-hidden="true">&times;</span>
+                <span class="mini__progress" aria-hidden="true"><span></span></span>
+                <span class="mini__hearts" aria-live="polite"><svg class="heart" viewBox="0 0 7 6" width="21" height="18" role="img" aria-label="Hearts" shape-rendering="crispEdges"><path fill="#1a0a0e" d="M1 0h2v1h1V0h2v1h1v2H6v1H5v1H4v1H3V5H2V4H1V3H0V1h1z"/><path fill="#e53b44" d="M1 1h2v1h1V1h2v2H5v1H4v1H3V4H2V3H1z"/><path fill="#ff8a8a" d="M1 1h1v1H1z"/></svg> <span data-hearts>5</span></span>
+              </div>
+              <p class="mini__label">Complete the code</p>
+              <p class="mini__task">Close the heading.</p>
+              <pre class="mini__code"><code>&lt;h1&gt;Hello, hero!&lt;/<span class="slot" data-slot>___</span>&gt;</code></pre>
+              <div class="mini__opts" role="group" aria-label="Answers">
+                <button class="opt" type="button" data-opt="h1" data-correct><span class="opt__k">1</span>h1</button>
+                <button class="opt" type="button" data-opt="/h1"><span class="opt__k">2</span>/h1</button>
+                <button class="opt" type="button" data-opt="h1/"><span class="opt__k">3</span>h1/</button>
+              </div>
+              <p class="mini__hint" data-hint aria-live="polite"></p>
+              <div class="mini__out" data-out hidden>
+                <span class="mini__outlabel">Output</span>
+                <div class="parch"><span class="parch__h1">Hello, hero!</span></div>
+                <div class="mini__reward"><span class="xp" data-xp>+10 XP</span><button class="btn btn--stone btn--sm" type="button" data-reset>Try it again</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="device" role="tabpanel" id="panel-run" aria-labelledby="tab-run" hidden>
+            <img src="assets/shots/editor.png" width="500" height="900" loading="lazy" alt="Spell Forge, the code editor: CSS for a royal banner with Run and Save buttons, and the styled result below.">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. COURSES -->
+    <section class="courses" id="courses" aria-labelledby="courses-title">
+      <div class="wrap">
+        <div class="courses__head">
+          <h2 id="courses-title">Five courses. Each one ends in a gold badge.</h2>
+          <p class="lead">Every chapter closes with a checkpoint project worth 10 bonus XP. Badges grow with you: bronze after the first chapter, silver at halfway, gold when the course is done.</p>
+        </div>
+
+        <table class="ledger">
+          <caption class="sr-only">Code Forge courses with chapters, lessons, estimated hours and badge</caption>
+          <tbody>
+            <tr data-badge="shield">
+              <th scope="row"><img class="ledger__badge" src="assets/badges/bronze_shield.png" width="32" height="30" alt=""><span class="ledger__name">HTML</span></th>
+              <td class="ledger__learn">Tags, links and pictures, the skeleton of a page, forms people can fill in</td>
+              <td class="ledger__num">4 chapters</td>
+              <td class="ledger__num">27 lessons</td>
+              <td class="ledger__num">About 10 hours</td>
+              <td class="ledger__title">Stonemason</td>
+            </tr>
+            <tr data-badge="star">
+              <th scope="row"><img class="ledger__badge" src="assets/badges/bronze_star.png" width="32" height="30" alt=""><span class="ledger__name">CSS</span></th>
+              <td class="ledger__learn">Selectors, colours and fonts, the box model, positioning and Flexbox</td>
+              <td class="ledger__num">5 chapters</td>
+              <td class="ledger__num">31 lessons</td>
+              <td class="ledger__num">About 12 hours</td>
+              <td class="ledger__title">Prism Painter</td>
+            </tr>
+            <tr data-badge="crown">
+              <th scope="row"><img class="ledger__badge" src="assets/badges/bronze_crown.png" width="32" height="30" alt=""><span class="ledger__name">JavaScript</span></th>
+              <td class="ledger__learn">Variables, decisions, loops, arrays, functions, objects and changing a page with the DOM</td>
+              <td class="ledger__num">8 chapters</td>
+              <td class="ledger__num">48 lessons</td>
+              <td class="ledger__num">About 20 hours</td>
+              <td class="ledger__title">Lightning Mage</td>
+            </tr>
+            <tr data-badge="trophy">
+              <th scope="row"><img class="ledger__badge" src="assets/badges/bronze_trophy.png" width="32" height="30" alt=""><span class="ledger__name">Python</span></th>
+              <td class="ledger__learn">Printing and maths, loops, lists and dictionaries, functions, classes, math and random</td>
+              <td class="ledger__num">9 chapters</td>
+              <td class="ledger__num">42 lessons</td>
+              <td class="ledger__num">About 24 hours</td>
+              <td class="ledger__title">Serpent Sage</td>
+            </tr>
+            <tr data-badge="medal">
+              <th scope="row"><img class="ledger__badge" src="assets/badges/bronze_medal.png" width="32" height="30" alt=""><span class="ledger__name">SQL</span></th>
+              <td class="ledger__learn">SELECT and WHERE, sorting, totals with GROUP BY, changing data, joining tables</td>
+              <td class="ledger__num">7 chapters</td>
+              <td class="ledger__num">33 lessons</td>
+              <td class="ledger__num">About 16 hours</td>
+              <td class="ledger__title">Vault Keeper</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 class="between__title">Between quests</h3>
+        <dl class="between">
+          <div><dt>Daily Quest</dt><dd>Five mixed questions, +15 XP once a day.</dd></div>
+          <div><dt>Duel Arena</dt><dd>Four computer champions. Duels never cost hearts.</dd></div>
+          <div><dt>Spell Forge</dt><dd>Write, run and save your own programs in all five languages.</dd></div>
+          <div><dt>Certificates</dt><dd>Finish a course and save its certificate as an image.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- 4. DOWNLOAD -->
+    <section class="download" id="download" aria-labelledby="download-title">
+      <div class="wrap download__grid">
+        <div class="download__copy">
+          <h2 id="download-title">Unzip it, <span class="nowrap">double-click,</span> start your first quest.</h2>
+          <p class="lead">Code Forge is one small program for Windows. No installer, no account, no internet. Your progress is saved on your own computer, and the previous save is always kept as a backup.</p>
+          <div class="actions">
+            <!-- Update this link when the build is hosted (currently the local dist build). -->
+            <a class="btn btn--gold btn--lg" href="../dist/CodeForge-1.5.0-windows.zip" download>Download Code Forge 1.5.0</a>
+          </div>
+          <p class="download__meta">For Windows &middot; 4&nbsp;MB zip</p>
+        </div>
+
+        <div class="rules" id="rules">
+          <h3 class="rules__title">Rules at a glance</h3>
+          <dl class="rules__list">
+            <div><dt>Hearts</dt><dd>Five at most. A wrong answer costs one; one refills every 5 minutes, and one is free each day.</dd></div>
+            <div><dt>XP</dt><dd>10 XP for a first clear, +5 if flawless. Every 100 XP is a new level.</dd></div>
+            <div><dt>Streak</dt><dd>Clear one lesson a day. A streak saver covers one missed day.</dd></div>
+            <div><dt>Leagues</dt><dd>Seven weekly leagues. Earn 100 XP in a week to move up.</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__row">
+      <a class="brand" href="#top" aria-label="Code Forge, back to top">
+        <img src="assets/logo/logo_mark.png" width="28" height="28" alt="">
+        <span class="wordmark wordmark--sm"><span class="wordmark__a">CODE</span> <span class="wordmark__b">FORGE</span></span>
+      </a>
+      <p class="footer__credits">Screens from Code Forge 1.5.0. Fonts: Press Start 2P, Pixelify Sans and Silkscreen (SIL OFL). Wall texture by Kenney (CC0). Badges from the Achievement Icon Pack by GTORAVERSE.</p>
+    </div>
+  </footer>
+
+  <script src="vendor/motion.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

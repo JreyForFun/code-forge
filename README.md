@@ -6,7 +6,7 @@ computer.
 
 ## Quick start (players)
 
-1. Unzip `CodeForge-1.5.0-windows.zip` anywhere.
+1. Unzip `CodeForge-1.6.0-windows.zip` anywhere.
 2. Double-click **CodeForge.exe**.
 3. Choose a name, a hero and your first course, then start learning.
 
@@ -39,7 +39,10 @@ Nothing to install, no account, no internet needed.
 - **Certificates**: finish a course to earn its certificate (name, course, skills, date, number), which
   you can save as an image. Separate from the badge, which grows bronze → silver → gold as you go.
 - **Text size**: Normal, Large or Huge in Settings.
-- **Music and sound**: a title theme, a dungeon theme and a fast battle theme for duels, plus distinct
+- **Fits any screen**: from small phones (320 px wide) to tablets and desktops; on wide screens the content
+  sits in a centred column and card grids gain columns.
+- **Music and sound**: a grand title theme, a chill lo-fi theme around the hub, a calm study theme while
+  you learn (lessons, course pages, notes, the code editor), a fast battle theme for duels, plus distinct
   sounds for every kind of button, right and wrong answers, rewards, level-ups and duel hits. All of it
   is synthesised by the app itself (no audio files). Volumes in Settings; `--export-audio <dir>` writes
   everything as WAV files.
