@@ -38,11 +38,11 @@ impl App {
                 match ob.step {
                     0 => {
                         ui.vertical_centered(|ui| {
-                            let (r, _) = ui.allocate_exact_size(Vec2::new(200.0, 120.0), Sense::hover());
-                            draw_icon(ui.painter(), Rect::from_center_size(r.center() - Vec2::new(54.0, 0.0), Vec2::splat(90.0)), "spellbook", Color32::WHITE);
-                            draw_icon(ui.painter(), Rect::from_center_size(r.center() + Vec2::new(56.0, 4.0), Vec2::splat(84.0)), "lantern", Color32::WHITE);
+                            let (r, _) = ui.allocate_exact_size(Vec2::new(160.0, 140.0), Sense::hover());
+                            let bob = (ui.ctx().input(|i| i.time) as f32 * 2.0).sin() * 3.0;
+                            draw_icon(ui.painter(), Rect::from_center_size(r.center() + Vec2::new(0.0, bob), Vec2::splat(128.0)), "logo_mark", Color32::WHITE);
                             ui.add_space(SP_S);
-                            ui.label(title("PIXEL LEARN", 20.0).color(GOLD));
+                            ui.label(title("CODE FORGE", 20.0).color(GOLD));
                             ui.add_space(SP_S);
                             ui.label(body("Learn to code one quest at a time. Read a scroll, fill in the missing code, then cast it yourself.", 16.0));
                         });

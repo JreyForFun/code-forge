@@ -126,7 +126,7 @@ impl App {
                     ui.label(body("Fonts: Press Start 2P (CodeMan38) and Silkscreen (Jason Kottke), SIL Open Font License 1.1.", 13.0).color(DIM));
                     ui.label(body("Python and HTML chapter topics follow common beginner outlines. All lesson text is original.", 13.0).color(DIM));
                     ui.add_space(SP_S);
-                    ui.label(title(format!("PIXEL LEARN v{}", VERSION), 9.0).color(DIM));
+                    ui.label(title(format!("CODE FORGE v{}", VERSION), 9.0).color(DIM));
                 });
             });
         });

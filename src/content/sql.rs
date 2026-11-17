@@ -46,7 +46,7 @@ A table looks like a spreadsheet:
 - The id column gives every row a unique number.
 
 ## Your practice database
-Pixel Learn has four tables you can query: heroes, items, guilds and quests. The Spell Forge shows their columns when you pick SQL.
+Code Forge has four tables you can query: heroes, items, guilds and quests. The Spell Forge shows their columns when you pick SQL.
 
 ## Your first query
     SELECT * FROM heroes;
@@ -326,7 +326,7 @@ WHERE name LIKE 'D%'"#, "spellbook"),
 When you type in a shop's search box, the app often runs something like WHERE name LIKE '%sword%' behind the scenes.
 
 ## Case
-In many databases (including Pixel Learn's), LIKE ignores upper and lower case for simple letters, so 'd%' also finds Dara.
+In many databases (including Code Forge's), LIKE ignores upper and lower case for simple letters, so 'd%' also finds Dara.
 
 ## NOT LIKE
     SELECT name FROM items WHERE name NOT LIKE '%o%';
@@ -495,7 +495,7 @@ ORDER BY comes after WHERE: first pick the rows, then sort them.
 You can sort by a column you did not select: SELECT name FROM heroes ORDER BY level DESC; shows only names, but in level order.
 
 ## NULLs
-Rows with NULL usually sort first in ascending order (they count as "smallest") in Pixel Learn's database. Other databases may differ."##,
+Rows with NULL usually sort first in ascending order (they count as "smallest") in Code Forge's database. Other databases may differ."##,
         &["ORDER BY column sorts the result.", "ASC (default) is small to large; DESC is large to small.", "Several columns: ORDER BY a, b DESC.", "ORDER BY comes after WHERE."]),
         l("LIMIT", &[
             (r#"LIMIT keeps only the first rows:
@@ -535,7 +535,7 @@ Without ORDER BY, LIMIT 3 gives "some" three rows, not the best three.
     ORDER BY column
     LIMIT n;
 
-This order is fixed. Putting LIMIT before WHERE is an error, and Pixel Learn's message reminds you of the order.
+This order is fixed. Putting LIMIT before WHERE is an error, and Code Forge's message reminds you of the order.
 
 ## Previews
 SELECT * FROM table LIMIT 5 is the classic way to peek at a huge table: you see the columns and a few example rows without waiting for millions of results.
@@ -793,7 +793,7 @@ WHERE filters individual rows. But what if you want to filter by a total, such a
 - Condition about one row (price > 4)? WHERE.
 - Condition about a total (COUNT, SUM, AVG...)? HAVING.
 
-Writing WHERE COUNT(*) > 1 is an error, and Pixel Learn's message points you to HAVING.
+Writing WHERE COUNT(*) > 1 is an error, and Code Forge's message points you to HAVING.
 
 ## Order of parts
 SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT."##,
@@ -868,7 +868,7 @@ Querying reads data. INSERT writes new data:
 - Text needs quotes; numbers do not.
 
 ## Columns you skip
-Columns you leave out get NULL (or a default value the table defines). Above, id is skipped, so it is NULL in Pixel Learn's simple database; real databases usually fill in the next id automatically.
+Columns you leave out get NULL (or a default value the table defines). Above, id is skipped, so it is NULL in Code Forge's simple database; real databases usually fill in the next id automatically.
 
 ## Many rows at once
     INSERT INTO items (name, type, price)
@@ -879,7 +879,7 @@ Columns you leave out get NULL (or a default value the table defines). Above, id
 INSERT INTO guilds VALUES (4, 'Sky Watch', 'Cloudreach'); works only if you give a value for EVERY column in the table's order. Listing columns is safer and clearer.
 
 ## See the change
-In Pixel Learn each run starts from a fresh copy of the database, so add a SELECT after your INSERT in the same answer to see the new row:
+In Code Forge each run starts from a fresh copy of the database, so add a SELECT after your INSERT in the same answer to see the new row:
 
     INSERT INTO items (name, type, price) VALUES ('Rope', 'tool', 4);
     SELECT * FROM items;"##,
@@ -1102,7 +1102,7 @@ Two pets can both be called Pip, but they will never share an id. Other tables p
 ## NOT NULL
 NOT NULL makes a column required: inserting a row without a name would be refused by a full database.
 
-## Pixel Learn's database
+## Code Forge's database
 Our practice engine reads these words but does not enforce every rule. Real databases like SQLite, PostgreSQL and MySQL enforce them strictly."##,
         &["Pick a type per column: INTEGER, REAL, TEXT, BOOLEAN, DATE.", "A PRIMARY KEY uniquely identifies each row.", "NOT NULL makes a value required.", "Columns that point at another table's key are foreign keys."]),
         l("ALTER TABLE", &[
@@ -1251,7 +1251,7 @@ JOIN guilds ON heroes.guild_id = guilds.id;"#, "banner"),
 JOIN and INNER JOIN mean the same thing.
 
 ## table.column
-Both tables have columns called name and id. Writing just name is ambiguous, and Pixel Learn's message asks you to choose. Prefix the table: heroes.name, guilds.name.
+Both tables have columns called name and id. Writing just name is ambiguous, and Code Forge's message asks you to choose. Prefix the table: heroes.name, guilds.name.
 
 ## Only matches survive
 An INNER JOIN keeps only rows that have a partner. Finn has no guild (NULL), so he disappears from the result. The Haunted Mill quest has no hero, so it disappears from a quests-heroes join. If you need those rows, use a LEFT JOIN (two lessons ahead).

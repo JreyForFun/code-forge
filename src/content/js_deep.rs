@@ -17,7 +17,7 @@ HTML builds a page and CSS styles it. JavaScript makes it DO things: react to cl
 - The semicolon marks the end of the instruction, like a full stop.
 
 ## Where does it appear?
-In a browser, press F12 and open the Console tab: that is where console.log writes. Players never see it, so it is the programmer's notebook for checking what the code is doing. In Pixel Learn, the output appears right under your code.
+In a browser, press F12 and open the Console tab: that is where console.log writes. Players never see it, so it is the programmer's notebook for checking what the code is doing. In Code Forge, the output appears right under your code.
 
 ## Programs run in order
     console.log("Ready");
@@ -620,7 +620,7 @@ Loops repeat code so you do not have to copy it. A while loop repeats as long as
 With hp = 3, the block runs for 3, 2 and 1, then hp is 0, the condition is false and the loop ends.
 
 ## The infinite loop
-If nothing inside the loop ever makes the condition false, it runs forever and the page freezes. Always make sure something changes: here, hp-- moves hp towards 0. (Pixel Learn stops runaway loops for you, but real browsers may hang.)
+If nothing inside the loop ever makes the condition false, it runs forever and the page freezes. Always make sure something changes: here, hp-- moves hp towards 0. (Code Forge stops runaway loops for you, but real browsers may hang.)
 
 ## When to use while
 Use while when you do not know in advance how many times to repeat: keep rolling until you get a 6, keep asking until the answer is valid, keep fighting until someone wins."##,

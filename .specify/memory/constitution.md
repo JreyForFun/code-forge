@@ -8,13 +8,13 @@ Sync Impact Report
 - Deferred TODOs: none
 -->
 
-# Pixel Learn Constitution
+# Code Forge Constitution
 
 ## Core Principles
 
 ### I. Honest, Original Product
 
-Pixel Learn is an original, RPG-themed app for learning to code. Every name, lesson text, character
+Code Forge is an original, RPG-themed app for learning to code. Every name, lesson text, character
 and screen layout MUST be our own work or a properly licensed asset.
 
 - The app MUST NOT use another product's name, logo, branding, copied lesson text or copied art.

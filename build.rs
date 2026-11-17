@@ -5,9 +5,9 @@ fn main() {
     {
         let mut res = winresource::WindowsResource::new();
         res.set_icon("assets/icon.ico")
-            .set("ProductName", "Pixel Learn")
-            .set("FileDescription", "Pixel Learn - learn to code in a pixel-art RPG")
-            .set("OriginalFilename", "PixelLearn.exe");
+            .set("ProductName", "Code Forge")
+            .set("FileDescription", "Code Forge - learn to code in a pixel-art RPG")
+            .set("OriginalFilename", "CodeForge.exe");
         if let Err(e) = res.compile() {
             // A missing Windows SDK must not break the build; the exe just keeps the default icon.
             println!("cargo:warning=could not embed icon: {e}");

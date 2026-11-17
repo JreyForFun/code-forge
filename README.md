@@ -1,13 +1,13 @@
-# Pixel Learn
+# Code Forge
 
 Learn to code in a pixel-art RPG. Pick a quest, read a short scroll, fill in the missing code, then
-type it yourself and watch it run. Pixel Learn works fully offline and keeps your progress on your
+type it yourself and watch it run. Code Forge works fully offline and keeps your progress on your
 computer.
 
 ## Quick start (players)
 
-1. Unzip `PixelLearn-1.3.0-windows.zip` anywhere.
-2. Double-click **PixelLearn.exe**.
+1. Unzip `CodeForge-1.4.0-windows.zip` anywhere.
+2. Double-click **CodeForge.exe**.
 3. Choose a name, a hero and your first course, then start learning.
 
 Nothing to install, no account, no internet needed.
@@ -55,7 +55,7 @@ Nothing to install, no account, no internet needed.
 
 ## Your data
 
-Progress is saved to `%APPDATA%\pixel_learn\save.txt`. Every save is written safely: the previous
+Progress is saved to `%APPDATA%\code_forge\save.txt` (saves from Pixel Learn 1.x in `%APPDATA%\pixel_learn` are copied over automatically). Every save is written safely: the previous
 save is kept as `save.bak`. Delete the folder to start over, or use *Settings → Reset progress*.
 
 ## Building from source
@@ -67,7 +67,7 @@ Requirements: Rust 1.85+ (`rustup`). On Windows, the Windows SDK lets the build 
 cargo test            # rules, saves, interpreters and course-content checks
 cargo run             # debug build
 cargo run --release   # optimized build, no console window
-powershell -ExecutionPolicy Bypass -File scripts/package.ps1   # dist/PixelLearn-<ver>-windows.zip
+powershell -ExecutionPolicy Bypass -File scripts/package.ps1   # dist/CodeForge-<ver>-windows.zip
 ```
 
 QA helpers: `--screenshot out.png [--tab learn|train|ranks|create|hero] [--tab practice] [--scroll N] [--screen settings|editor|sql|complete|shop|notif|avatar|nohearts|preview|notes|cert] [--lesson C.M.L --stage N] [--onboarding] [--size 360x600]`.

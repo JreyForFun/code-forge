@@ -75,8 +75,8 @@ print("***")"#, "chest"),
         ]).with(r##"## Strings
 A string is any text wrapped in quotes. Python accepts double quotes or single quotes:
 
-    print("Pixel Learn")
-    print('Pixel Learn')
+    print("Code Forge")
+    print('Code Forge')
 
 Both print the same thing. Pick one style and stay consistent, but use the other kind when your text contains a quote:
 
@@ -353,7 +353,7 @@ input() asks the user to type something and returns it as text, ALWAYS, even if 
     age = int(age)
     print(age + 1)
 
-You can do both steps in one line: age = int(input("Age? ")). (In Pixel Learn, input() returns empty text, so the lessons give the values directly.)
+You can do both steps in one line: age = int(input("Age? ")). (In Code Forge, input() returns empty text, so the lessons give the values directly.)
 
 ## When conversion fails
 int("hello") is an error: there is no number in that text. Programs that read input often check it first, for example with "42".isdigit(), which is True only when every character is a digit."##,
@@ -699,7 +699,7 @@ A loop runs the same block again and again. while repeats as long as its conditi
 Here the block runs with count = 3, 2 and 1. Then count is 0, the condition is False, and the loop ends.
 
 ## The endless loop
-If nothing inside the loop ever makes the condition False, it runs forever. Always ask: "what changes each time round, and will it eventually stop the loop?" (Pixel Learn stops runaway loops, but real programs can freeze.)
+If nothing inside the loop ever makes the condition False, it runs forever. Always ask: "what changes each time round, and will it eventually stop the loop?" (Code Forge stops runaway loops, but real programs can freeze.)
 
 ## When to use while
 Use while when you cannot know in advance how many repeats you need: keep asking until the password is right, keep rolling until you get a six, keep fighting until one side wins.

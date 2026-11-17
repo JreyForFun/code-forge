@@ -195,7 +195,14 @@ impl Save {
 
     pub fn dir() -> PathBuf {
         let base = std::env::var("APPDATA").or_else(|_| std::env::var("HOME")).unwrap_or_else(|_| ".".into());
-        Path::new(&base).join("pixel_learn")
+        let new = Path::new(&base).join("code_forge");
+        // the app used to be called Pixel Learn: bring an existing save across (the old folder stays as a backup)
+        let old = Path::new(&base).join("pixel_learn");
+        if !new.join("save.txt").exists() && old.join("save.txt").exists() {
+            let _ = std::fs::create_dir_all(&new);
+            for f in ["save.txt", "save.bak"] { if old.join(f).exists() { let _ = std::fs::copy(old.join(f), new.join(f)); } }
+        }
+        new
     }
     pub fn path() -> PathBuf { Self::dir().join("save.txt") }
 
@@ -305,7 +312,7 @@ mod tests {
 
     #[test]
     fn atomic_store_keeps_backup_and_loads_back() {
-        let dir = std::env::temp_dir().join(format!("pixel_learn_test_{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("code_forge_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let p = dir.join("save.txt");
         let mut s = sample();

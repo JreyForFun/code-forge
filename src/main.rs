@@ -1,5 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-//! Pixel Learn: learn to code in a pixel-art RPG. Offline, single player.
+//! Code Forge: learn to code in a pixel-art RPG. Offline, single player.
 mod art;
 mod content;
 mod css;
@@ -724,12 +724,12 @@ fn avatar_grid(ui: &mut egui::Ui, cur: &mut u32) -> bool {
 fn main() -> eframe::Result {
     let args: Vec<String> = std::env::args().collect();
     let arg = |k: &str| args.iter().position(|a| a == k).and_then(|i| args.get(i + 1).cloned());
-    if args.iter().any(|a| a == "--version") { println!("Pixel Learn {}", VERSION); return Ok(()); }
+    if args.iter().any(|a| a == "--version") { println!("Code Forge {}", VERSION); return Ok(()); }
     // Release builds have no console: record any crash next to the save so it can be reported.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let _ = std::fs::create_dir_all(Save::dir());
-        let _ = std::fs::write(Save::dir().join("crash.log"), format!("Pixel Learn {} crashed (day {}):
+        let _ = std::fs::write(Save::dir().join("crash.log"), format!("Code Forge {} crashed (day {}):
 {}
 ", VERSION, today(), info));
         default_hook(info);
@@ -742,11 +742,11 @@ fn main() -> eframe::Result {
     let force_onboarding = args.iter().any(|a| a == "--onboarding");
     let num = |k: &str| arg(k).and_then(|v| v.parse::<usize>().ok()).unwrap_or(0);
     let (stage, skip) = (num("--stage"), num("--skip"));
-    let mut vp = egui::ViewportBuilder::default().with_inner_size([440.0, 780.0]).with_min_inner_size([360.0, 600.0]).with_title(format!("Pixel Learn {}", VERSION)).with_app_id("pixel_learn");
+    let mut vp = egui::ViewportBuilder::default().with_inner_size([440.0, 780.0]).with_min_inner_size([360.0, 600.0]).with_title(format!("Code Forge {}", VERSION)).with_app_id("pixel_learn");
     if let Ok(icon) = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png")) { vp = vp.with_icon(std::sync::Arc::new(icon)); }
     if let Some(sz) = arg("--size").and_then(|s| s.split_once('x').and_then(|(w, h)| Some((w.parse::<f32>().ok()?, h.parse::<f32>().ok()?)))) { vp = vp.with_inner_size([sz.0, sz.1]); }
     if shot.is_some() { vp = vp.with_active(false).with_window_level(egui::WindowLevel::AlwaysOnBottom); }
-    eframe::run_native("Pixel Learn", eframe::NativeOptions { viewport: vp, ..Default::default() }, Box::new(move |cc| {
+    eframe::run_native("Code Forge", eframe::NativeOptions { viewport: vp, ..Default::default() }, Box::new(move |cc| {
         install_fonts(&cc.egui_ctx);
         Box::leak(Box::new(load_textures(&cc.egui_ctx)));
         setup_style(&cc.egui_ctx);
@@ -790,7 +790,7 @@ mod tests {
     /// lesson -> restart -> everything persisted (US1 + US3).
     #[test]
     fn first_launch_to_cleared_lesson_persists() {
-        let dir = std::env::temp_dir().join(format!("pixel_learn_e2e_{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("code_forge_e2e_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         // SAFETY: only this test reads or writes APPDATA/HOME in the test binary.
@@ -822,7 +822,7 @@ mod tests {
         assert!(again.s.ach.contains_key("first_lesson"));
         assert!(again.s.ach.contains_key("flawless"));
         assert!(again.s.log.iter().any(|(_, t)| t.contains("cleared")));
-        assert!(dir.join("pixel_learn").join("save.bak").exists(), "previous save kept as backup");
+        assert!(dir.join("code_forge").join("save.bak").exists(), "previous save kept as backup");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

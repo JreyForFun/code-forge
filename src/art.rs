@@ -403,6 +403,8 @@ pub const ART: &[(&str, &[u8])] = &[
     ("scroll_lightning", include_bytes!("../assets/art/scroll_lightning.png")),
     ("spellbook", include_bytes!("../assets/art/spellbook.png")),
     ("amulet", include_bytes!("../assets/art/chest2.png")),
+    // Code Forge logo mark: the "/" of </> is a forge hammer (original pixel art, design/logo-variants)
+    ("logo_mark", include_bytes!("../assets/art/logo_mark.png")),
 ];
 
 /// Dungeon skin tiles (Kenney "Tiny Dungeon" and "UI Pack: Pixel Adventure", CC0). `true` = repeat-wrapped.

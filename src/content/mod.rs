@@ -5,7 +5,7 @@
 //!
 //! Every chapter ends with a checkpoint project. The HTML, CSS and JavaScript chapter topics follow
 //! the beginner path used by popular free curricula (e.g. Codédex). All wording, examples and
-//! project themes are original to Pixel Learn.
+//! project themes are original to Code Forge.
 pub use crate::data::*;
 
 mod css;

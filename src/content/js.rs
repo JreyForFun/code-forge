@@ -704,7 +704,7 @@ The page itself is the object called document."##, "map"),
 
 const title = document.getElementById("title");
 
-Pixel Learn simulates a page so you can see each change."##, "keyhole"),
+Code Forge simulates a page so you can see each change."##, "keyhole"),
         ], vec![
             quiz("document.getElementById(\"title\") finds...", &["every h1", "the element with id=\"title\"", "the page title bar"], 1, "It matches the id."),
             fill("Find by id.", "document.___(\"title\");", &["getElementById", "getId", "find"], 0, "getElementById."),
@@ -750,7 +750,7 @@ btn.addEventListener("click", () => {
   console.log("You swing your sword!");
 });
 
-Pixel Learn simulates one click so you see the result."##, "axe"),
+Code Forge simulates one click so you see the result."##, "axe"),
         ], vec![
             quiz("addEventListener(\"click\", fn) runs fn...", &["right away, once", "every time it's clicked", "never"], 1, "On each click."),
             fill("Listen for clicks.", "btn.addEventListener(\"___\", () => {", &["click", "onclick", "press"], 0, "The event name is \"click\"."),

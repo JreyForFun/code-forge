@@ -277,7 +277,7 @@ pub fn ymd(day: u64) -> String {
 pub fn cert_no(name: &str, slug: &str, day: u64) -> String {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for b in name.bytes().chain(slug.bytes()).chain(day.to_le_bytes()) { h ^= b as u64; h = h.wrapping_mul(0x0100_0000_01b3); }
-    format!("PL-{}-{:04X}-{:04X}", slug.to_uppercase().chars().take(4).collect::<String>(), (h >> 16) & 0xffff, h & 0xffff)
+    format!("CF-{}-{:04X}-{:04X}", slug.to_uppercase().chars().take(4).collect::<String>(), (h >> 16) & 0xffff, h & 0xffff)
 }
 
 impl App {
@@ -295,7 +295,7 @@ impl App {
                 if earned.is_some() {
                     if pbtn(ui, "SAVE AS IMAGE", GOLD, w).clicked() {
                         let base = std::env::var("USERPROFILE").map(|h| std::path::Path::new(&h).join("Pictures")).ok().filter(|p| p.is_dir()).unwrap_or_else(crate::save::Save::dir);
-                        let path = base.join(format!("PixelLearn-{}-Certificate.png", cs_name.replace(' ', "")));
+                        let path = base.join(format!("CodeForge-{}-Certificate.png", cs_name.replace(' ', "")));
                         let shown = path.display().to_string();
                         ui.ctx().send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::ScreenshotCallback::new(move |img| {
                             let (w, h) = (img.width() as u32, img.height() as u32);
@@ -322,7 +322,7 @@ impl App {
                             ribbon(ui, "CERTIFICATE");
                             ui.label(title("OF COMPLETION", 10.0).color(ink));
                             ui.add_space(SP_XS);
-                            ui.label(body("Pixel Learn Guild Academy", 13.0).color(Color32::from_rgb(0x7a, 0x5a, 0x30)));
+                            ui.label(body("Code Forge Academy", 13.0).color(Color32::from_rgb(0x7a, 0x5a, 0x30)));
                             ui.add_space(SP_L);
                             ui.label(RichText::new("This certifies that").font(FontId::new(16.0, read())).italics().color(ink));
                             ui.add_space(SP_XS);
