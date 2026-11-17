@@ -330,6 +330,7 @@ impl App {
     pub fn certificate_screen(&mut self, ctx: &mut egui::Ui, c: usize) {
         header(ctx, self, "Certificate", true, false);
         let earned = self.badge_earned(c);
+        if earned.is_some() && !self.s.cert_names.contains_key(self.courses[c].slug) { self.cert_name_screen(ctx, c); return; }
         let cs_name = self.courses[c].name;
         egui::Panel::bottom("cert_bot").frame(egui::Frame::new().fill(BG2).inner_margin(egui::Margin::same(SCREEN_PAD))).show(ctx, |ui| {
             ledge(ui, false);
@@ -374,11 +375,12 @@ impl App {
                     loop { let g = p.layout_no_wrap(text.to_string(), FontId::new(s, family.clone()), col); if g.size().x <= inner_w || s < 8.0 { return g; } s *= 0.9; }
                 };
                 // text
-                let no = earned.map(|d| cert_no(&self.s.name, cs.slug, d)).unwrap_or_else(|| "PREVIEW".into());
+                let holder = self.s.cert_names.get(cs.slug).cloned().unwrap_or_else(|| self.s.name.clone());
+                let no = earned.map(|d| cert_no(&holder, cs.slug, d)).unwrap_or_else(|| "PREVIEW".into());
                 let g_brand = lay("Code Forge".into(), FontId::new(13.0 * k, press()), ink, f32::INFINITY);
                 let g_no = lay(format!("Certificate No. {}", no), FontId::new(11.0 * k, read()), brown, f32::INFINITY);
                 let g_intro = lay("This Certificate of Achievement is awarded to".into(), FontId::new(15.0 * k, read()), ink, inner_w);
-                let g_name = fit(&self.s.name, press(), 26.0 * k, Color32::from_rgb(0x5a, 0x1e, 0x0c));
+                let g_name = fit(&holder, press(), 26.0 * k, Color32::from_rgb(0x5a, 0x1e, 0x0c));
                 let g_for = lay("for forging through every lesson and project of".into(), FontId::new(15.0 * k, read()), ink, inner_w);
                 let g_course = fit(cs.name, press(), 24.0 * k, shade(cs.color, 0.7));
                 let skills = cs.teaches.iter().map(|s| s.to_lowercase()).collect::<Vec<_>>().join(", ");
@@ -484,6 +486,50 @@ impl App {
                     ui.add(egui::Label::new(body("Your badge grows with your progress (bronze, silver, gold). The certificate is awarded once, when the whole course is done.", 12.0).color(DIM)).wrap());
                 });
                 ui.ctx().request_repaint(); // torches flicker
+            });
+        });
+    }
+}
+
+impl App {
+    /// Before the first look at an earned certificate: ask for the name to print on it.
+    fn cert_name_screen(&mut self, ctx: &mut egui::Ui, c: usize) {
+        if self.cert_input.is_empty() && self.modal == Modal::None { self.cert_input = self.s.name.clone(); }
+        let cs_name = self.courses[c].name;
+        let typed = Save::clean_cert_name(&self.cert_input);
+        let ok = typed.chars().filter(|ch| ch.is_alphabetic()).count() >= 2;
+        egui::Panel::bottom("certname_bot").frame(egui::Frame::new().fill(BG2).inner_margin(egui::Margin::same(SCREEN_PAD))).show(ctx, |ui| {
+            ledge(ui, false);
+            centered(ui, |ui| {
+                if pbtn(ui, "LOCK IN THIS NAME", if ok { GOLD } else { PANEL_HI }, 0.0).clicked() && ok { self.modal = Modal::CertName(c); }
+            });
+        });
+        egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
+            if self.s.floor { floor(ui.painter(), ui.clip_rect(), self.s.scan); }
+            scroll_centered(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(SP_M);
+                    ribbon(ui, "YOU DID IT!");
+                    badge(ui, &self.courses[c], 3, 96.0);
+                    ui.add_space(SP_S);
+                    ui.label(title(format!("{} COMPLETE", cs_name.to_uppercase()), 12.0).color(GOLD));
+                });
+                ui.add_space(SP_L);
+                parchment(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.label(RichText::new("What name should appear on your certificate?").font(FontId::new(18.0, read())).strong().color(INK_DARK));
+                    ui.add_space(SP_XS);
+                    ui.label(RichText::new("Use the name you want people to see, for example your real full name. You can only set it once: after you confirm, it can never be changed.").font(FontId::new(15.0, read())).color(INK_DARK));
+                    ui.add_space(SP_S);
+                    let r = ui.add(egui::TextEdit::singleline(&mut self.cert_input).char_limit(Save::CERT_NAME_MAX).desired_width(f32::INFINITY).hint_text("Your full name").font(FontId::new(20.0, egui::FontFamily::Proportional)));
+                    if self.modal == Modal::None && !r.has_focus() && self.cert_input.is_empty() { r.request_focus(); }
+                    ui.add_space(SP_XS);
+                    ui.label(RichText::new(format!("{} / {} characters", typed.chars().count(), Save::CERT_NAME_MAX)).font(FontId::new(12.0, read())).color(Color32::from_rgb(0x7a, 0x5a, 0x30)));
+                });
+                if !typed.is_empty() {
+                    section(ui, "HOW IT WILL LOOK");
+                    ui.vertical_centered(|ui| ui.label(title(typed.clone(), 18.0).color(GOLD)));
+                }
             });
         });
     }

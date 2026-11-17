@@ -44,7 +44,7 @@ impl App {
                         ui.add_space(SP_S);
                     }
                     if let Some(cc) = c.cert {
-                        if pbtn(ui, "VIEW YOUR CERTIFICATE", GOLD, 0.0).clicked() { done = true; self.screen = Screen::Certificate(cc); }
+                        if pbtn(ui, "CLAIM YOUR CERTIFICATE", GOLD, 0.0).clicked() { done = true; self.screen = Screen::Certificate(cc); }
                         ui.add_space(SP_S);
                     }
                     if pbtn(ui, "BACK TO MAP", GREEN, 0.0).clicked() || (enter && c.next.is_none()) { done = true; }

@@ -47,7 +47,7 @@ fn set_day_floor(s: &Save) {
 #[derive(Clone, Copy, PartialEq)]
 enum Tab { Learn, Train, Ranks, Create, Hero }
 #[derive(Clone, Copy, PartialEq)]
-enum Modal { None, Notif, Shop, Courses, NoHearts, Reset, Avatar, DeleteSpell(usize), WeekResult, Import }
+enum Modal { None, Notif, Shop, Courses, NoHearts, Reset, Avatar, DeleteSpell(usize), WeekResult, Import, CertName(usize) }
 
 #[derive(Clone)]
 enum Kind { Lesson(usize, usize, usize), Coach, Duel(usize), Daily, Review(usize) }
@@ -82,6 +82,8 @@ struct App {
     audio: Option<audio::Audio>,
     /// A progress file waiting for the player to confirm the import.
     pending_import: Option<Box<Save>>,
+    /// The name being typed for a certificate.
+    cert_input: String,
 }
 
 impl App {
@@ -107,7 +109,7 @@ impl App {
         let cur = (s.course as usize).min(courses.len() - 1);
         let onboard = if s.onboarded { None } else { Some(onboarding::Onboard::default()) };
         let mut a = App { s, tab: Tab::Learn, screen: Screen::Main, modal: Modal::None, courses, cur, open_mod: None, opp: 0, sub_train: 0, sub_create: 0,
-            input: String::new(), cat: 0, query: String::new(), view_key: 999, view_t0: 0.0, toasts: VecDeque::new(), demo, shot, frames: 0, save_warned: false, onboard, audio: None, pending_import: None };
+            input: String::new(), cat: 0, query: String::new(), view_key: 999, view_t0: 0.0, toasts: VecDeque::new(), demo, shot, frames: 0, save_warned: false, onboard, audio: None, pending_import: None, cert_input: String::new() };
         if a.shot.is_none() && !cfg!(test) { a.audio = audio::Audio::new(); }
         if tampered {
             a.log("the save file was changed outside Code Forge; gems were reset");
@@ -128,7 +130,7 @@ impl App {
         s.qdone.retain(|k, _| ids.contains(k));
         for c in courses {
             let all = (0..c.modules.len()).all(|m| (0..c.modules[m].lessons.len()).all(|l| s.done.contains(&c.lesson_id(m, l))));
-            if !all { s.ach.remove(&c.badge_id()); }
+            if !all { s.ach.remove(&c.badge_id()); s.cert_names.remove(c.slug); }
         }
         s.course = s.course.min(courses.len() as u32 - 1);
         s.codes.truncate(200);
@@ -745,6 +747,30 @@ impl App {
                 if pbtn(ui, "PRACTISE A DUEL (NO HEARTS)", PANEL_HI, 0.0).clicked() { self.tab = Tab::Train; self.sub_train = 1; self.screen = Screen::Main; close = true; }
                 if pbtn(ui, "LATER", PANEL_HI, 0.0).clicked() { close = true; }
             }),
+            Modal::CertName(c) => dialog(ctx, "certname", |ui| {
+                let cs_name = self.courses[c].name;
+                let name = Save::clean_cert_name(&self.cert_input);
+                ui.label(title("IS THIS NAME CORRECT?", 11.0).color(GOLD)); ui.add_space(SP_S);
+                ui.vertical_centered(|ui| ui.label(title(name.clone(), 16.0).color(INK)));
+                ui.add_space(SP_S);
+                ui.label(body(format!("This name will be printed on your {} certificate. Once you confirm, it is locked and can never be changed. Check the spelling!", cs_name), 14.0));
+                ui.add_space(SP_S);
+                if pbtn(ui, "YES, PRINT IT", GOLD, 0.0).clicked() {
+                    let slug = self.courses[c].slug;
+                    match self.s.lock_cert_name(slug, &name) {
+                        Ok(n) => {
+                            self.log(format!("signed the {} certificate as {}", cs_name, n));
+                            self.persist();
+                            audio::play(audio::Sfx::Complete);
+                            self.cert_input.clear();
+                        }
+                        Err(e) => self.toast(e),
+                    }
+                    close = true;
+                }
+                ui.add_space(SP_S);
+                if pbtn(ui, "LET ME FIX IT", PANEL_HI, 0.0).clicked() { close = true; }
+            }),
             Modal::WeekResult => dialog(ctx, "week", |ui| {
                 let (pl, from, to) = (self.s.res_place as usize, self.s.res_from as usize, self.s.res_to as usize);
                 ui.vertical_centered(|ui| {
@@ -926,7 +952,8 @@ fn main() -> eframe::Result {
                 "preview-js" => app.screen = Screen::Preview(2),
                 "notes" => app.screen = Screen::Notes(2, 1, 4),
                 "week" => { app.s.res_place = 2; app.s.res_from = 2; app.s.res_to = 3; app.s.res_xp = 180; app.s.res_gems = 6; app.s.res_seen = false; }
-                "cert" => { app.s.ach.insert(app.courses[0].badge_id(), today()); app.screen = Screen::Certificate(0); }
+                "cert" => { app.s.ach.insert(app.courses[0].badge_id(), today()); app.s.cert_names.insert("html".into(), "Ada Lovelace".into()); app.screen = Screen::Certificate(0); }
+                "certname" => { app.s.ach.insert(app.courses[0].badge_id(), today()); app.screen = Screen::Certificate(0); }
                 "shop" => app.modal = Modal::Shop,
                 "notif" => app.modal = Modal::Notif,
                 "avatar" => app.modal = Modal::Avatar,

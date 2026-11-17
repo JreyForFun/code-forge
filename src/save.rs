@@ -83,6 +83,8 @@ pub struct Save {
     pub seen_day: u64,
     /// Set when the file failed its checksum (edited outside the app). Not saved.
     pub tampered: bool,
+    /// The name printed on each course certificate (course slug -> name). Set once, never changed.
+    pub cert_names: BTreeMap<String, String>,
 }
 
 impl Default for Save {
@@ -98,8 +100,26 @@ impl Save {
             free_day: 0, goal: 7, league: 0, last_result: String::new(), scan: true, floor: true, notif_read: false,
             codes: vec![], ach: BTreeMap::new(), log: vec![], duel_wins: 0, flawless: 0, duel_losses: 0, reviews: 0, daily_day: 0, daily_streak: 0, solved: BTreeSet::new(), zoom: 100, music: 60, sfx: 80,
             week_days: [0; 7], ghost: [0; 7], hist: vec![], res_place: 0, res_from: 0, res_to: 0, res_xp: 0, res_gems: 0, res_seen: true,
-            rep_day: 0, rep_xp: 0, duel_day: 0, duel_today: 0, seen_day: 0, tampered: false,
+            rep_day: 0, rep_xp: 0, duel_day: 0, duel_today: 0, seen_day: 0, tampered: false, cert_names: BTreeMap::new(),
         }
+    }
+
+    /// Longest name a certificate can carry.
+    pub const CERT_NAME_MAX: usize = 40;
+
+    /// A certificate name: no control characters, single spaces, at most 40 characters.
+    pub fn clean_cert_name(raw: &str) -> String {
+        let n: String = raw.chars().filter(|c| !c.is_control() && *c != '|').collect();
+        n.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(Self::CERT_NAME_MAX).collect()
+    }
+
+    /// Lock the name on a course certificate. It can only be set once.
+    pub fn lock_cert_name(&mut self, slug: &str, raw: &str) -> Result<String, &'static str> {
+        if self.cert_names.contains_key(slug) { return Err("This certificate already has a name, and it can't be changed."); }
+        let n = Self::clean_cert_name(raw);
+        if n.chars().filter(|c| c.is_alphabetic()).count() < 2 { return Err("Type the name you want on the certificate (at least 2 letters)."); }
+        self.cert_names.insert(slug.into(), n.clone());
+        Ok(n)
     }
 
     /// Display name with the 18-char limit and no control characters.
@@ -170,6 +190,7 @@ impl Save {
                 "duel_day" => s.duel_day = n.unwrap_or(0),
                 "duel_today" => s.duel_today = u(0),
                 "seen_day" => s.seen_day = n.unwrap_or(0),
+                "cert_name" => { if let Some((slug, name)) = v.split_once('|') && !s.cert_names.contains_key(slug) { let n = Save::clean_cert_name(name); if !n.is_empty() { s.cert_names.insert(slug.into(), n); } } }
                 "check" => {}
                 "sfx" => s.sfx = u(80).min(100),
                 "zoom" => { let z = u(100); s.zoom = if [100, 115, 130].contains(&z) { z } else { 100 }; }
@@ -247,6 +268,7 @@ impl Save {
         w("week_days", join(&self.week_days));
         w("ghost", join(&self.ghost));
         w("hist", join(&self.hist));
+        for (slug, name) in &self.cert_names { w("cert_name", format!("{}|{}", slug, one(name))); }
         for (k, v) in [("res_place", self.res_place), ("res_from", self.res_from), ("res_to", self.res_to), ("res_xp", self.res_xp), ("res_gems", self.res_gems), ("rep_xp", self.rep_xp), ("duel_today", self.duel_today)] { w(k, v.to_string()); }
         w("res_seen", (self.res_seen as u8).to_string());
         for (k, v) in [("rep_day", self.rep_day), ("duel_day", self.duel_day), ("seen_day", self.seen_day)] { w(k, v.to_string()); }
@@ -374,6 +396,22 @@ mod tests {
         assert_eq!(back.name, "Ada"); assert_eq!(back.xp, 420); assert_eq!(back.ghost, s.ghost);
         assert!(Save::import_text(&s.export_text().replace("xp=420", "xp=999999")).is_err());
         assert!(Save::import_text("hello").is_err());
+    }
+
+    #[test]
+    fn certificate_names_lock_once() {
+        let mut s = Save::new();
+        assert!(s.lock_cert_name("html", " x ").is_err(), "too short");
+        assert_eq!(s.lock_cert_name("html", "  Ada   Lovelace\n").unwrap(), "Ada Lovelace");
+        assert!(s.lock_cert_name("html", "Someone Else").is_err(), "can't be changed");
+        assert_eq!(s.cert_names["html"], "Ada Lovelace");
+        // survives saving, and a second line in the file can't override it
+        let text = s.serialize();
+        assert_eq!(Save::parse(&text).cert_names["html"], "Ada Lovelace");
+        let forged = text.replace("cert_name=html|Ada Lovelace", "cert_name=html|Ada Lovelace\ncert_name=html|Mallory");
+        let f = Save::parse(&forged);
+        assert_eq!(f.cert_names["html"], "Ada Lovelace");
+        assert!(f.tampered, "and the edit is noticed");
     }
 
     #[test]
