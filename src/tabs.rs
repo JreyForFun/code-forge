@@ -31,7 +31,7 @@ impl App {
             let cleared = (0..total).filter(|l| self.is_done(c, mi, *l)).count();
             p.text(Pos2::new(r.min.x + 66.0, r.center().y - 8.0), Align2::LEFT_CENTER, self.courses[c].modules[mi].name, FontId::new(9.0, press()), if unlocked { INK } else { DIM });
             p.text(Pos2::new(r.min.x + 66.0, r.center().y + 12.0), Align2::LEFT_CENTER, format!("{} / {} lessons", cleared, total), FontId::new(12.0, egui::FontFamily::Proportional), DIM);
-            let ax = r.max.x - 24.0;
+            let ax = r.max.x - 36.0; // stays inside the stone frame
             for i in 0..4 {
                 let w = 16.0 - 4.0 * i as f32;
                 let y = if open { r.center().y + 4.0 - 2.0 * i as f32 } else { r.center().y - 4.0 + 2.0 * i as f32 };
@@ -119,66 +119,149 @@ impl App {
     }
 
     fn practice(&mut self, ui: &mut egui::Ui) {
-        panel(ui, PANEL, EDGE, |ui| {
+        enum Act { Daily, Review(usize), Coach(usize), Duel }
+        let mut act: Option<Act> = None;
+        let t = today();
+        let wide = ui.available_width() > 520.0;
+
+        // ---- Daily Quest: one big wooden banner
+        let done_today = self.s.daily_day == t;
+        panel(ui, Color32::from_rgb(0x2a, 0x20, 0x16), GOLD, |ui| {
             ui.set_width(ui.available_width());
-            ui.horizontal(|ui| { icon(ui, "scroll_lightning", 32.0); ui.vertical(|ui| { ui.label(title("Quick Challenges", 11.0)); ui.label(body("Short puzzles: +8 XP, +2 gems. Wrong answers cost hearts.", 13.0).color(DIM)); }); });
-            ui.add_space(SP_S);
-            egui::ScrollArea::horizontal().id_salt("coach").show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    for c in coaches() {
-                        ui.vertical(|ui| {
-                            ui.set_width(110.0);
-                            let (r, resp) = ui.allocate_exact_size(Vec2::splat(104.0), Sense::click());
-                            bevel(ui.painter(), r, if resp.hovered() { shade(c.color, 1.15) } else { c.color }, true);
-                            draw_icon(ui.painter(), r.shrink(18.0), c.art, Color32::WHITE);
-                            ui.label(body(c.title, 13.0));
-                            let lc = match c.level { "Easy" => GREEN, "Hard" => RED, _ => BLUE };
-                            let (lr, _) = ui.allocate_exact_size(Vec2::new(70.0, 18.0), Sense::hover());
-                            ui.painter().rect_filled(lr, 0.0, lc);
-                            ui.painter().text(lr.center(), Align2::CENTER_CENTER, c.level, FontId::new(8.0, press()), Color32::WHITE);
-                            if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.start_run(c.title, Kind::Coach, vec![], c.qs.clone()); }
-                        });
-                        ui.add_space(SP_S);
-                    }
+            ui.horizontal(|ui| {
+                let (r, _) = ui.allocate_exact_size(Vec2::splat(88.0), Sense::hover());
+                let bob = (ui.ctx().input(|i| i.time) as f32 * 2.0).sin() * 3.0;
+                draw_icon(ui.painter(), r.translate(Vec2::new(0.0, if done_today { 0.0 } else { bob })), if done_today { "open_gold_red_chest" } else { "red_gold_chest" }, Color32::WHITE);
+                ui.add_space(SP_S);
+                ui.vertical(|ui| {
+                    ui.label(title("DAILY QUEST", 13.0).color(GOLD));
+                    ui.add_space(SP_XS);
+                    ui.label(body("5 questions mixed from the lessons you've cleared. A new set every day.", 14.0));
+                    ui.add_space(SP_XS);
+                    ui.horizontal_wrapped(|ui| {
+                        tag(ui, if done_today { "Done today" } else { "+15 XP  +5 gems" }, if done_today { GREEN } else { ORANGE });
+                        tag(ui, "No hearts lost", BLUE);
+                        if self.s.daily_streak > 0 { tag(ui, &format!("{} day run", self.s.daily_streak), PURPLE); }
+                    });
                 });
             });
-        });
-        panel(ui, PANEL, EDGE, |ui| {
-            ui.set_width(ui.available_width());
-            ui.horizontal(|ui| { icon(ui, "axe", 32.0); ui.vertical(|ui| { ui.label(title("Duel Arena", 11.0)); ui.label(body("3 quick questions against a computer opponent. Duels never cost hearts.", 13.0).color(DIM)); }); });
             ui.add_space(SP_S);
-            let ow = ((ui.available_width() - 24.0) / 3.0).max(60.0);
-            let opps = opponents();
-            ui.horizontal(|ui| {
-                for (i, o) in opps.iter().enumerate() {
-                    let sel = self.opp == i;
-                    ui.vertical(|ui| {
-                        ui.set_width(ow);
-                        let (r, resp) = ui.allocate_exact_size(Vec2::new(ow, 64.0), Sense::click());
-                        bevel(ui.painter(), r, if sel { o.color } else if resp.hovered() { PANEL_HI } else { PANEL }, false);
-                        draw_icon(ui.painter(), r.shrink(10.0), o.art, Color32::WHITE);
-                        if sel { ui.painter().rect_stroke(r.expand(3.0), 0.0, Stroke::new(2.0, GOLD), egui::StrokeKind::Outside); }
-                        ui.label(body(o.name, 12.0).color(if sel { GOLD } else { DIM }));
-                        ui.label(body(format!("Skill {}", "*".repeat(o.skill as usize)), 11.0).color(DIM));
-                        if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { self.opp = i; }
+            if pbtn(ui, if done_today { "PLAY AGAIN  (+5 XP)" } else { "START DAILY QUEST" }, if done_today { PANEL_HI } else { GOLD }, 0.0).clicked() { act = Some(Act::Daily); }
+        });
+
+        // ---- Review: one card per course
+        section(ui, "REVIEW A COURSE");
+        ui.label(body("8 questions from lessons you've already cleared. Reviewing is the fastest way to remember for good.", 13.0).color(DIM));
+        ui.add_space(SP_S);
+        let n = self.courses.len();
+        let cols = if wide { 3 } else { 2 };
+        for row in 0..n.div_ceil(cols) {
+            ui.columns(cols, |cs| {
+                for (k, col) in cs.iter_mut().enumerate() {
+                    let c = row * cols + k;
+                    if c >= n { continue; }
+                    let cleared = (0..self.courses[c].modules.len()).map(|m| (0..self.courses[c].modules[m].lessons.len()).filter(|l| self.is_done(c, m, *l)).count()).sum::<usize>();
+                    let tier = self.badge_tier(c);
+                    let resp = panel_resp(col, PANEL, if cleared > 0 { EDGE } else { PANEL_HI }, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.vertical_centered(|ui| {
+                            badge(ui, &self.courses[c], tier, 48.0);
+                            ui.label(title(self.courses[c].name, 9.0));
+                            ui.label(body(if cleared > 0 { format!("{} lessons cleared", cleared) } else { "Clear a lesson first".into() }, 12.0).color(if cleared > 0 { GREEN } else { DIM }));
+                        });
                     });
+                    if cleared > 0 && resp.on_hover_text("+6 XP, +1 gem, no hearts lost").clicked() { act = Some(Act::Review(c)); }
                 }
             });
+        }
+
+        // ---- Quick challenges grid
+        let list = coaches();
+        let solved = list.iter().filter(|c| self.s.solved.contains(c.title)).count();
+        section(ui, &format!("QUICK CHALLENGES  {} / {} SOLVED", solved, list.len()));
+        let cols = if wide { 3 } else { 2 };
+        for row in 0..list.len().div_ceil(cols) {
+            ui.columns(cols, |cs| {
+                for (k, col) in cs.iter_mut().enumerate() {
+                    let i = row * cols + k;
+                    let Some(c) = list.get(i) else { continue };
+                    let done = self.s.solved.contains(c.title);
+                    let resp = panel_resp(col, PANEL, if done { GREEN } else { EDGE }, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.horizontal(|ui| {
+                            let (r, _) = ui.allocate_exact_size(Vec2::splat(48.0), Sense::hover());
+                            bevel(ui.painter(), r, c.color, false);
+                            draw_icon(ui.painter(), r.shrink(8.0), c.art, Color32::WHITE);
+                            if done { draw_spr(ui.painter(), r.right_top() + Vec2::new(-14.0, -4.0), Spr::Check, 1.4, &[('w', GREEN)]); }
+                            ui.vertical(|ui| {
+                                let lc = match c.level { "Easy" => GREEN, "Hard" => RED, _ => BLUE };
+                                tag(ui, c.level, lc);
+                                ui.label(body(c.lang, 11.0).color(DIM));
+                            });
+                        });
+                        ui.add_space(SP_XS);
+                        ui.label(title(c.title, 9.0));
+                        ui.add(egui::Label::new(body(c.desc, 12.0).color(DIM)).wrap());
+                        ui.label(body(format!("{} questions  -  {}", c.qs.len(), if done { "+4 XP" } else { "+8 XP +2 gems" }), 11.0).color(GOLD));
+                    });
+                    if resp.clicked() { act = Some(Act::Coach(i)); }
+                }
+            });
+        }
+
+        // ---- Duel arena
+        let opps = opponents();
+        section(ui, &format!("DUEL ARENA  {} WINS  -  {} LOSSES", self.s.duel_wins, self.s.duel_losses));
+        panel(ui, PANEL, EDGE, |ui| {
+            ui.set_width(ui.available_width());
+            ui.label(body(format!("{} quick questions against a computer champion. Beat their score to win +20 XP and +5 gems. Duels never cost hearts.", DUEL_LEN), 13.0).color(DIM));
             ui.add_space(SP_S);
-            let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 96.0), Sense::hover());
-            let p = ui.painter();
-            p.rect_filled(r, 0.0, Color32::from_rgb(0x3a, 0x6c, 0xd0));
-            p.add(egui::Shape::convex_polygon(vec![Pos2::new(r.center().x + 20.0, r.min.y), r.right_top(), r.right_bottom(), Pos2::new(r.center().x - 30.0, r.max.y)], opps[self.opp].color, Stroke::NONE));
-            draw_avatar(p, Rect::from_min_size(Pos2::new(r.min.x + 20.0, r.min.y + 14.0), Vec2::splat(68.0)), self.s.avatar);
-            p.text(r.center(), Align2::CENTER_CENTER, "VS", FontId::new(20.0, press()), Color32::WHITE);
-            draw_icon(p, Rect::from_min_size(Pos2::new(r.max.x - 88.0, r.min.y + 14.0), Vec2::splat(68.0)), opps[self.opp].art, Color32::WHITE);
-            ui.add_space(SP_S);
-            if pbtn(ui, "START DUEL", RED, 0.0).clicked() {
-                let o = self.opp;
-                self.start_run(&format!("Duel vs {}", opps[o].name), Kind::Duel(o), vec![], duel_questions(today() * 3 + o as u64 + self.s.duel_wins as u64));
+            let cols = if wide { 4 } else { 2 };
+            for row in 0..opps.len().div_ceil(cols) {
+                ui.columns(cols, |cs| {
+                    for (k, col) in cs.iter_mut().enumerate() {
+                        let i = row * cols + k;
+                        let Some(o) = opps.get(i) else { continue };
+                        let sel = self.opp == i;
+                        let w = col.available_width();
+                        let (r, resp) = col.allocate_exact_size(Vec2::new(w, 132.0), Sense::click());
+                        let p = col.painter();
+                        p.add(frame_shapes(r, if sel { shade(o.color, 0.45) } else if resp.hovered() { PANEL_HI } else { Color32::from_rgb(0x14, 0x12, 0x20) }, if sel { GOLD } else { EDGE }));
+                        draw_icon(p, Rect::from_center_size(Pos2::new(r.center().x, r.min.y + 40.0), Vec2::splat(52.0)), o.art, Color32::WHITE);
+                        p.text(Pos2::new(r.center().x, r.min.y + 80.0), Align2::CENTER_CENTER, o.name, FontId::new(7.0, press()), if sel { GOLD } else { INK });
+                        p.text(Pos2::new(r.center().x, r.min.y + 95.0), Align2::CENTER_CENTER, o.title, FontId::new(11.0, egui::FontFamily::Proportional), DIM);
+                        for s in 0..DUEL_LEN as u32 {
+                            let pr = Rect::from_min_size(Pos2::new(r.center().x - DUEL_LEN as f32 * 7.0 + s as f32 * 14.0, r.max.y - 24.0), Vec2::new(10.0, 6.0));
+                            p.rect_filled(pr, 0.0, if s < o.skill { o.color } else { PANEL_HI });
+                        }
+                        if resp.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(format!("Scores {} of {}", o.skill, DUEL_LEN)).clicked() { self.opp = i; }
+                    }
+                });
+                ui.add_space(SP_S);
             }
+            // versus banner
+            let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 120.0), Sense::hover());
+            let p = ui.painter();
+            let o = &opps[self.opp];
+            p.add(frame_shapes(r, Color32::from_rgb(0x22, 0x3a, 0x6e), EDGE));
+            let inner = r.shrink(10.0);
+            p.add(egui::Shape::convex_polygon(vec![Pos2::new(inner.center().x + 24.0, inner.min.y), inner.right_top(), inner.right_bottom(), Pos2::new(inner.center().x - 24.0, inner.max.y)], shade(o.color, 0.7), Stroke::NONE));
+            draw_icon(p, Rect::from_min_size(Pos2::new(inner.min.x + 14.0, inner.center().y - 38.0), Vec2::splat(76.0)), avatar(self.s.avatar).art, Color32::WHITE);
+            draw_icon(p, Rect::from_min_size(Pos2::new(inner.max.x - 90.0, inner.center().y - 38.0), Vec2::splat(76.0)), o.art, Color32::WHITE);
+            p.text(inner.center() + Vec2::splat(2.0), Align2::CENTER_CENTER, "VS", FontId::new(26.0, press()), EDGE);
+            p.text(inner.center(), Align2::CENTER_CENTER, "VS", FontId::new(26.0, press()), GOLD);
+            ui.add_space(SP_S);
+            if pbtn(ui, &format!("DUEL {}", o.name.to_uppercase()), RED, 0.0).clicked() { act = Some(Act::Duel); }
         });
         ui.add_space(SP_M);
+
+        match act {
+            Some(Act::Daily) => { let qs = self.practice_set(&self.started_courses(), 5, t.wrapping_mul(2654435761)); self.start_run("Daily Quest", Kind::Daily, vec![], qs); }
+            Some(Act::Review(c)) => { let qs = self.practice_set(&[c], 8, now()); self.start_run(&format!("{} Review", self.courses[c].name), Kind::Review(c), vec![], qs); }
+            Some(Act::Coach(i)) => { let c = &coaches()[i]; self.start_run(c.title, Kind::Coach, vec![], c.qs.clone()); }
+            Some(Act::Duel) => { let o = self.opp; self.start_run(&format!("Duel vs {}", opps[o].name), Kind::Duel(o), vec![], duel_questions(t * 3 + o as u64 + self.s.duel_wins as u64)); }
+            None => {}
+        }
     }
 
     fn log_tab(&mut self, ui: &mut egui::Ui) {
@@ -271,7 +354,7 @@ impl App {
                     bevel(ui.painter(), r, if i < 3 { medal[i] } else { PANEL_HI }, false);
                     ui.painter().text(r.center(), Align2::CENTER_CENTER, format!("{}", i + 1), FontId::new(10.0, press()), if i < 3 { EDGE } else { INK });
                     let (ar, _) = ui.allocate_exact_size(Vec2::splat(32.0), Sense::hover());
-                    match art { Some(a) => draw_icon(ui.painter(), ar, a, Color32::WHITE), None => draw_avatar(ui.painter(), ar, self.s.avatar) }
+                    draw_icon(ui.painter(), ar, art.unwrap_or(avatar(self.s.avatar).art), Color32::WHITE);
                     ui.vertical(|ui| {
                         ui.label(body(n.clone(), 15.0));
                         ui.label(body(if me { "you" } else { "computer rival" }, 11.0).color(if me { GOLD } else { DIM }));
@@ -426,6 +509,26 @@ impl App {
                     });
                 }
             });
+        });
+        // certificates: one per finished course (separate from the progress badges above)
+        panel(ui, PANEL, EDGE, |ui| {
+            ui.set_width(ui.available_width());
+            let n = (0..self.courses.len()).filter(|c| self.badge_earned(*c).is_some()).count();
+            card_title(ui, &format!("CERTIFICATES  {} / {}", n, self.courses.len()));
+            for c in 0..self.courses.len() {
+                let earned = self.badge_earned(c);
+                ui.horizontal(|ui| {
+                    icon(ui, if earned.is_some() { "scroll_fire" } else { "letter" }, 30.0);
+                    ui.vertical(|ui| {
+                        ui.label(title(self.courses[c].name, 9.0).color(if earned.is_some() { GOLD } else { DIM }));
+                        ui.label(body(match earned { Some(d) => format!("Awarded {}", ymd(d)), None => format!("{}% of the course done", (self.progress(c) * 100.0).round()) }, 12.0).color(DIM));
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if mini_btn(ui, if earned.is_some() { "VIEW" } else { "PREVIEW" }, if earned.is_some() { GOLD } else { PANEL_HI }).clicked() { self.screen = Screen::Certificate(c); }
+                    });
+                });
+                ui.add_space(SP_XS);
+            }
         });
         panel(ui, PANEL, EDGE, |ui| {
             ui.set_width(ui.available_width());

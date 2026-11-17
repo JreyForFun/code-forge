@@ -114,6 +114,7 @@ impl App {
             if pbtn(ui, "OPEN COURSE MAP", PANEL_HI, 0.0).clicked() { self.screen = Screen::Main; self.select_course(c); }
         });
         let mut notes: Option<(usize, usize)> = None;
+        let mut cert = false;
         egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
             if self.s.floor { floor(ui.painter(), ui.clip_rect(), self.s.scan); }
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
@@ -183,6 +184,7 @@ impl App {
                             ui.label(title(cs.badge.name, 11.0).color(if earned.is_some() { GOLD } else { INK }));
                             ui.add_space(SP_XS);
                             ui.label(body(cs.badge.desc, 13.0).color(DIM));
+                            if mini_btn(ui, if earned.is_some() { "VIEW CERTIFICATE" } else { "PREVIEW CERTIFICATE" }, if earned.is_some() { GOLD } else { PANEL_HI }).clicked() { cert = true; }
                             ui.label(body(match earned { Some(d) => format!("Earned {}", day_label(d)), None => format!("{} now. Bronze after chapter 1, silver at half, gold when all {} lessons are clear ({} to go).", TIER_NAMES[self.badge_tier(c) as usize], total, total - done) }, 12.0).color(if earned.is_some() { GREEN } else { DIM }));
                         });
                     });
@@ -225,6 +227,7 @@ impl App {
             });
         });
         if let Some((m, l)) = notes { self.screen = Screen::Notes(c, m, l); }
+        if cert { self.screen = Screen::Certificate(c); }
     }
 
     /// Re-read a cleared lesson: its explanation and key points, with a way to practise again.
@@ -251,6 +254,117 @@ impl App {
                 for (text, _) in &ls.slides {
                     panel(ui, PANEL, EDGE, |ui| { ui.set_width(ui.available_width()); ui.label(RichText::new(*text).monospace().size(14.0).color(PARCH)); });
                 }
+            });
+        });
+    }
+}
+
+/// Calendar date (YYYY-MM-DD) for a day number counted from 1970-01-01.
+pub fn ymd(day: u64) -> String {
+    let z = day as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!("{:04}-{:02}-{:02}", y, m, d)
+}
+
+/// A short, stable certificate number from the hero name, course and date.
+pub fn cert_no(name: &str, slug: &str, day: u64) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in name.bytes().chain(slug.bytes()).chain(day.to_le_bytes()) { h ^= b as u64; h = h.wrapping_mul(0x0100_0000_01b3); }
+    format!("PL-{}-{:04X}-{:04X}", slug.to_uppercase().chars().take(4).collect::<String>(), (h >> 16) & 0xffff, h & 0xffff)
+}
+
+impl App {
+    /// The course certificate: proof that every lesson of a course was cleared. (The badge shows
+    /// progress and grows bronze -> silver -> gold; the certificate is the finished document.)
+    pub fn certificate_screen(&mut self, ctx: &mut egui::Ui, c: usize) {
+        header(ctx, self, "Certificate", true, false);
+        let earned = self.badge_earned(c);
+        let cs_name = self.courses[c].name;
+        egui::Panel::bottom("cert_bot").frame(egui::Frame::new().fill(BG2).inner_margin(egui::Margin::same(SCREEN_PAD))).show(ctx, |ui| {
+            ledge(ui, false);
+            ui.horizontal(|ui| {
+                if pbtn(ui, "BACK", PANEL_HI, 110.0).clicked() { self.screen = Screen::Main; self.tab = Tab::Hero; }
+                let w = ui.available_width();
+                if earned.is_some() {
+                    if pbtn(ui, "SAVE AS IMAGE", GOLD, w).clicked() {
+                        let base = std::env::var("USERPROFILE").map(|h| std::path::Path::new(&h).join("Pictures")).ok().filter(|p| p.is_dir()).unwrap_or_else(crate::save::Save::dir);
+                        let path = base.join(format!("PixelLearn-{}-Certificate.png", cs_name.replace(' ', "")));
+                        let shown = path.display().to_string();
+                        ui.ctx().send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::ScreenshotCallback::new(move |img| {
+                            let (w, h) = (img.width() as u32, img.height() as u32);
+                            let raw: Vec<u8> = img.pixels.iter().flat_map(|c| c.to_array()).collect();
+                            if let Some(b) = image::RgbaImage::from_raw(w, h, raw) { let _ = b.save(&path); }
+                        })));
+                        self.toast(format!("Saved to {}", shown));
+                    }
+                } else if pbtn(ui, "CONTINUE THE COURSE", GOLD, w).clicked() { self.screen = Screen::Preview(c); }
+            });
+        });
+        egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
+            if self.s.floor { floor(ui.painter(), ui.clip_rect(), self.s.scan); }
+            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                let cs = &self.courses[c];
+                let ink = INK_DARK;
+                let w = ui.available_width().min(560.0);
+                ui.vertical_centered(|ui| {
+                    ui.set_max_width(w);
+                    panel(ui, Color32::from_rgb(0xf3, 0xe6, 0xbf), GOLD, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(SP_S);
+                            ribbon(ui, "CERTIFICATE");
+                            ui.label(title("OF COMPLETION", 10.0).color(ink));
+                            ui.add_space(SP_XS);
+                            ui.label(body("Pixel Learn Guild Academy", 13.0).color(Color32::from_rgb(0x7a, 0x5a, 0x30)));
+                            ui.add_space(SP_L);
+                            ui.label(RichText::new("This certifies that").font(FontId::new(16.0, read())).italics().color(ink));
+                            ui.add_space(SP_XS);
+                            ui.label(title(self.s.name.clone(), 18.0).color(Color32::from_rgb(0x7a, 0x2e, 0x12)));
+                            let (lr, _) = ui.allocate_exact_size(Vec2::new(ui.available_width() * 0.7, 3.0), Sense::hover());
+                            ui.painter().rect_filled(lr, 0.0, Color32::from_rgb(0xb0, 0x8a, 0x50));
+                            ui.add_space(SP_S);
+                            ui.label(RichText::new("has completed every lesson and project of").font(FontId::new(16.0, read())).italics().color(ink));
+                            ui.add_space(SP_XS);
+                            ui.label(title(cs.name.to_uppercase(), 20.0).color(shade(cs.color, 0.75)));
+                            ui.add_space(SP_S);
+                            ui.label(body(format!("{} lessons  -  {} chapters  -  {} projects  -  about {} hours", cs.lesson_count(), cs.modules.len(), cs.project_count(), cs.hours), 13.0).color(ink));
+                            ui.add_space(SP_S);
+                            ui.add(egui::Label::new(RichText::new(format!("Skills: {}", cs.teaches.join("  /  "))).font(FontId::new(14.0, read())).color(ink)).wrap());
+                            ui.add_space(SP_M);
+                            ui.horizontal(|ui| {
+                                let side = (ui.available_width() - 2.0 * 80.0 - SP_L) / 2.0;
+                                ui.add_space(side.max(0.0));
+                                badge(ui, cs, if earned.is_some() { 3 } else { 0 }, 80.0);
+                                ui.add_space(SP_L);
+                                let (r, _) = ui.allocate_exact_size(Vec2::splat(80.0), Sense::hover());
+                                draw_icon(ui.painter(), r, "gold_medal", if earned.is_some() { Color32::WHITE } else { Color32::from_rgb(0x30, 0x2c, 0x40) });
+                            });
+                            ui.add_space(SP_S);
+                            match earned {
+                                Some(d) => {
+                                    ui.label(body(format!("Awarded {}", ymd(d)), 13.0).color(ink));
+                                    ui.label(RichText::new(format!("No. {}", cert_no(&self.s.name, cs.slug, d))).monospace().size(12.0).color(Color32::from_rgb(0x7a, 0x5a, 0x30)));
+                                    ui.add_space(SP_XS);
+                                    ui.label(body(format!("{} badge: gold", cs.badge.name), 12.0).color(Color32::from_rgb(0x7a, 0x5a, 0x30)));
+                                }
+                                None => {
+                                    let left = cs.lesson_count() - (self.progress(c) * cs.lesson_count() as f32).round() as usize;
+                                    tag(ui, "Preview - not earned yet", RED);
+                                    ui.label(body(format!("Clear the last {} lesson{} to earn this certificate.", left, if left == 1 { "" } else { "s" }), 13.0).color(ink));
+                                }
+                            }
+                            ui.add_space(SP_S);
+                        });
+                    });
+                    ui.add(egui::Label::new(body("Your badge grows with your progress (bronze, silver, gold). The certificate is awarded once, when the whole course is done.", 12.0).color(DIM)).wrap());
+                });
             });
         });
     }

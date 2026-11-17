@@ -36,7 +36,11 @@ enum Tab { Learn, Train, Ranks, Create, Hero }
 enum Modal { None, Notif, Shop, Courses, NoHearts, Reset, Avatar, DeleteSpell(usize) }
 
 #[derive(Clone)]
-enum Kind { Lesson(usize, usize, usize), Coach, Duel(usize) }
+enum Kind { Lesson(usize, usize, usize), Coach, Duel(usize), Daily, Review(usize) }
+impl Kind {
+    /// Duels, the Daily Quest and reviews are practice: wrong answers never cost hearts.
+    fn safe(&self) -> bool { matches!(self, Kind::Duel(_) | Kind::Daily | Kind::Review(_)) }
+}
 
 struct RunState {
     title: String, kind: Kind, lang: &'static str, slides: Vec<(&'static str, &'static str)>, qs: Vec<Q>, stage: usize, queue: Vec<usize>,
@@ -50,10 +54,10 @@ impl RunState {
     /// Learn pages: picture slides, then the full explanation, then the summary.
     fn pages(&self) -> usize { self.slides.len() + usize::from(!self.explain.is_empty()) + usize::from(!self.summary.is_empty()) }
 }
-struct Complete { title: String, xp: u32, gems: u32, perfect: bool, score: u32, best: u32, duel: Option<(u32, u32, String, bool)>, new_streak: bool, next: Option<(usize, usize, usize)>, project: bool, summary: Vec<&'static str> }
+struct Complete { title: String, xp: u32, gems: u32, perfect: bool, score: u32, best: u32, duel: Option<(u32, u32, String, bool)>, new_streak: bool, next: Option<(usize, usize, usize)>, project: bool, summary: Vec<&'static str>, cert: Option<usize> }
 struct Editor { idx: Option<usize>, title: String, lang: String, code: String, out: Vec<(interp::Kind, String)> }
 
-enum Screen { Main, Settings, Run(Box<RunState>), Complete(Complete), Editor(Editor), Preview(usize), Notes(usize, usize, usize) }
+enum Screen { Main, Settings, Run(Box<RunState>), Complete(Complete), Editor(Editor), Preview(usize), Notes(usize, usize, usize), Certificate(usize) }
 
 struct App {
     s: Save, tab: Tab, screen: Screen, modal: Modal, courses: Vec<Course>, cur: usize, open_mod: Option<usize>,
@@ -166,7 +170,7 @@ impl App {
 
     fn start_run(&mut self, title: &str, kind: Kind, slides: Vec<(&'static str, &'static str)>, qs: Vec<Q>) {
         self.tick();
-        if self.s.hearts == 0 && !matches!(kind, Kind::Duel(_)) { self.modal = Modal::NoHearts; return; }
+        if self.s.hearts == 0 && !kind.safe() { self.modal = Modal::NoHearts; return; }
         let n = qs.len();
         let (mut stage, mut queue, mut right) = (0usize, (0..n).collect::<Vec<usize>>(), 0u32);
         if let Kind::Lesson(c, mi, l) = &kind {
@@ -186,10 +190,36 @@ impl App {
         self.screen = Screen::Run(Box::new(rs));
     }
 
+    /// Questions for practice: from lessons you cleared in `courses` (or the first lessons when none are
+    /// cleared yet), shuffled with `seed`. Typing steps are skipped so practice stays quick.
+    fn practice_set(&self, courses: &[usize], n: usize, seed: u64) -> Vec<Q> {
+        let mut pool = vec![];
+        let mut fallback = vec![];
+        for &c in courses {
+            for (mi, m) in self.courses[c].modules.iter().enumerate() {
+                for (li, l) in m.lessons.iter().enumerate() {
+                    let qs = l.qs.iter().filter(|q| !matches!(q, Q::Type { .. })).cloned();
+                    if self.is_done(c, mi, li) { pool.extend(qs); } else if mi == 0 && li < 2 { fallback.extend(qs); }
+                }
+            }
+        }
+        if pool.len() < n { pool.extend(fallback); }
+        let mut x = seed | 1;
+        for i in (1..pool.len()).rev() { x ^= x << 13; x ^= x >> 7; x ^= x << 17; pool.swap(i, (x % (i as u64 + 1)) as usize); }
+        pool.truncate(n);
+        pool
+    }
+
+    /// Courses with at least one cleared lesson (the current course when none).
+    fn started_courses(&self) -> Vec<usize> {
+        let v: Vec<usize> = (0..self.courses.len()).filter(|c| self.progress(*c) > 0.0).collect();
+        if v.is_empty() { vec![self.cur] } else { v }
+    }
+
     fn finish(&mut self, rs: &RunState) {
         self.week_check();
         let (mut xp, gems);
-        let (mut duel, mut next) = (None, None);
+        let (mut duel, mut next, mut cert) = (None, None, None);
         let perfect = rs.mistakes == 0;
         match rs.kind {
             Kind::Lesson(c, m, l) => {
@@ -201,17 +231,35 @@ impl App {
                     self.s.done.insert(self.lkey(c, m, l));
                     self.log(format!("cleared '{}' ({})", rs.title, self.courses[c].name));
                     if perfect { self.s.flawless += 1; }
-                    if self.progress(c) >= 1.0 { self.log(format!("finished the {} course!", self.courses[c].name)); }
+                    if self.progress(c) >= 1.0 { self.log(format!("finished the {} course!", self.courses[c].name)); cert = Some(c); }
                 }
                 self.open_mod = self.current_module(c).or(Some(m));
                 next = self.next_lesson(c).map(|(m, l)| (c, m, l));
             }
-            Kind::Coach => { (xp, gems) = (8, 2); self.log(format!("solved the '{}' challenge", rs.title)); }
+            Kind::Coach => {
+                let first = self.s.solved.insert(rs.title.clone());
+                (xp, gems) = if first { (8, 2) } else { (4, 0) };
+                self.log(format!("solved the '{}' challenge", rs.title));
+            }
+            Kind::Daily => {
+                let t = today();
+                if self.s.daily_day != t {
+                    self.s.daily_streak = if self.s.daily_day + 1 == t { self.s.daily_streak + 1 } else { 1 };
+                    self.s.daily_day = t;
+                    (xp, gems) = (15, 5);
+                    self.log(format!("cleared the Daily Quest ({} days in a row)", self.s.daily_streak));
+                } else { (xp, gems) = (5, 0); }
+            }
+            Kind::Review(c) => {
+                self.s.reviews += 1;
+                (xp, gems) = (6, 1);
+                self.log(format!("reviewed {}", self.courses[c].name));
+            }
             Kind::Duel(o) => {
                 let me = rs.right;
                 let bot = opponents()[o].skill.min(rs.total as u32);
                 let won = me > bot || (me == bot && me as usize == rs.total);
-                if won { (xp, gems) = (20, 5); self.s.duel_wins += 1; } else { (xp, gems) = (5, 0); }
+                if won { (xp, gems) = (20, 5); self.s.duel_wins += 1; } else { (xp, gems) = (5, 0); self.s.duel_losses += 1; }
                 duel = Some((me, bot, opponents()[o].name.to_string(), won));
                 self.log(format!("{} a duel against {}", if won { "won" } else { "lost" }, opponents()[o].name));
             }
@@ -226,7 +274,7 @@ impl App {
         game::add_xp(&mut self.s, xp, gems);
         self.award();
         self.persist();
-        self.screen = Screen::Complete(Complete { title: rs.title.clone(), xp, gems, perfect, score, best, duel, new_streak, next, project: rs.project, summary: rs.summary.clone() });
+        self.screen = Screen::Complete(Complete { title: rs.title.clone(), xp, gems, perfect, score, best, duel, new_streak, next, project: rs.project, summary: rs.summary.clone(), cert });
     }
 }
 
@@ -317,20 +365,21 @@ fn subtabs(ui: &mut egui::Ui, labels: &[&str], cur: &mut usize) {
 fn nav(ctx: &mut egui::Ui, app: &mut App) {
     egui::Panel::bottom("nav").frame(egui::Frame::new().fill(Color32::from_rgb(0x1d, 0x16, 0x32)).inner_margin(egui::Margin { left: 4, right: 4, top: 6, bottom: 6 })).show(ctx, |ui| {
         ledge(ui, false);
-        let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 56.0), Sense::hover());
+        let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 64.0), Sense::hover());
         let items = [(Tab::Learn, "LEARN", "book"), (Tab::Train, "TRAIN", "sword"), (Tab::Ranks, "RANKS", "banner_royal"), (Tab::Create, "CREATE", "staff"), (Tab::Hero, "HERO", "helmet")];
         let w = r.width() / 5.0;
         for (i, (t, name, art)) in items.iter().enumerate() {
-            let tr = Rect::from_min_size(Pos2::new(r.min.x + w * i as f32, r.min.y), Vec2::new(w, 56.0));
+            let tr = Rect::from_min_size(Pos2::new(r.min.x + w * i as f32, r.min.y), Vec2::new(w, 64.0));
             let resp = ui.interact(tr, ui.scope_id().with(("nav", i)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
             let on = app.tab == *t;
             if on {
-                ui.painter().add(frame_shapes(tr.shrink2(Vec2::new(2.0, 0.0)), Color32::from_rgb(0x2a, 0x20, 0x18), GOLD));
+                ui.painter().add(frame_shapes(tr.shrink2(Vec2::new(3.0, 2.0)), Color32::from_rgb(0x2a, 0x20, 0x18), GOLD));
             } else if resp.hovered() {
                 ui.painter().rect_filled(tr.shrink2(Vec2::new(4.0, 2.0)), 2.0, Color32::from_white_alpha(14));
             }
-            draw_icon(ui.painter(), Rect::from_center_size(Pos2::new(tr.center().x, tr.min.y + 20.0), Vec2::splat(30.0)), art, if on || resp.hovered() { Color32::WHITE } else { Color32::from_gray(150) });
-            ui.painter().text(Pos2::new(tr.center().x, tr.max.y - 9.0), Align2::CENTER_CENTER, *name, FontId::new(8.0, press()), if on { GOLD } else { DIM });
+            // icon and label sit inside the frame's 10px border
+            draw_icon(ui.painter(), Rect::from_center_size(Pos2::new(tr.center().x, tr.min.y + 24.0), Vec2::splat(26.0)), art, if on || resp.hovered() { Color32::WHITE } else { Color32::from_gray(150) });
+            ui.painter().text(Pos2::new(tr.center().x, tr.max.y - 18.0), Align2::CENTER_CENTER, *name, FontId::new(7.0, press()), if on { GOLD } else { DIM });
             if resp.clicked() { app.tab = *t; }
         }
     });
@@ -450,6 +499,9 @@ impl App {
     /// One frame of the whole app. Separate from eframe so tests can drive it headlessly.
     fn frame_ui(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
+        // text size setting (applies from the next frame)
+        let z = self.s.zoom.clamp(100, 130) as f32 / 100.0;
+        if (ctx.zoom_factor() - z).abs() > 0.01 { ctx.set_zoom_factor(z); }
         self.tick();
         if self.s.hearts < MAX_HEARTS { ctx.request_repaint_after(std::time::Duration::from_secs(1)); }
         if self.onboard.is_some() {
@@ -474,7 +526,9 @@ impl App {
                 egui::CentralPanel::default().frame(egui::Frame::new().fill(BG).inner_margin(egui::Margin { left: SCREEN_PAD, right: SCREEN_PAD, top: SCREEN_PAD, bottom: 0 })).show(ui, |ui| {
                     if self.s.floor { floor(ui.painter(), ui.clip_rect(), self.s.scan); }
                     ui.set_opacity(alpha);
-                    egui::ScrollArea::vertical().id_salt(("main", tab as u32)).auto_shrink([false, false]).show(ui, |ui| match tab {
+                    let mut sa = egui::ScrollArea::vertical().id_salt(("main", tab as u32)).auto_shrink([false, false]);
+                    if let Some(y) = SHOT_SCROLL.get() && self.frames < 100 { sa = sa.vertical_scroll_offset(*y); }
+                    sa.show(ui, |ui| match tab {
                         Tab::Learn => self.learn(ui),
                         Tab::Train => self.train(ui),
                         Tab::Ranks => self.ranks(ui),
@@ -489,6 +543,7 @@ impl App {
             Screen::Editor(ed) => { if let Some(ed) = self.editor_screen(ui, ed) { self.screen = Screen::Editor(ed); } }
             Screen::Preview(c) => { self.screen = Screen::Preview(c); self.preview_screen(ui, c); }
             Screen::Notes(c, m, l) => { self.screen = Screen::Notes(c, m, l); self.notes_screen(ui, c, m, l); }
+            Screen::Certificate(c) => { self.screen = Screen::Certificate(c); self.certificate_screen(ui, c); }
         }
         self.modals(&ctx);
         self.draw_toast(&ctx);
@@ -634,6 +689,9 @@ impl App {
 }
 
 /// "today", "yesterday" or "N days ago".
+/// Screenshot QA: scroll the main tab down by this many points.
+static SHOT_SCROLL: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+
 fn day_label(d: u64) -> String {
     match today().saturating_sub(d) { 0 => "today".into(), 1 => "yesterday".into(), n => format!("{} days ago", n) }
 }
@@ -677,6 +735,7 @@ fn main() -> eframe::Result {
         default_hook(info);
     }));
     let shot = arg("--screenshot");
+    if let Some(y) = arg("--scroll").and_then(|v| v.parse::<f32>().ok()) { let _ = SHOT_SCROLL.set(y); }
     let tab = arg("--tab");
     let screen = arg("--screen");
     let lesson = arg("--lesson");
@@ -690,31 +749,20 @@ fn main() -> eframe::Result {
     eframe::run_native("Pixel Learn", eframe::NativeOptions { viewport: vp, ..Default::default() }, Box::new(move |cc| {
         install_fonts(&cc.egui_ctx);
         Box::leak(Box::new(load_textures(&cc.egui_ctx)));
-        cc.egui_ctx.set_visuals(egui::Visuals::dark());
-        cc.egui_ctx.global_style_mut(|s| {
-            s.visuals.panel_fill = BG;
-            s.visuals.window_fill = PANEL;
-            s.visuals.override_text_color = Some(INK);
-            s.visuals.extreme_bg_color = Color32::from_rgb(0x0f, 0x0b, 0x1a);
-            s.visuals.selection.bg_fill = Color32::from_rgb(0x3a, 0x5a, 0xb8);
-            s.visuals.widgets.inactive.bg_stroke = Stroke::new(2.0, EDGE);
-            for w in [&mut s.visuals.widgets.noninteractive, &mut s.visuals.widgets.inactive, &mut s.visuals.widgets.hovered, &mut s.visuals.widgets.active, &mut s.visuals.widgets.open] { w.corner_radius = 0.0.into(); }
-            s.visuals.widgets.inactive.weak_bg_fill = PANEL_HI;
-            s.spacing.item_spacing = Vec2::new(8.0, 6.0);
-            s.visuals.window_corner_radius = 0.0.into();
-        });
+        setup_style(&cc.egui_ctx);
         let mut app = App::new(shot);
         if force_onboarding { app.onboard = Some(onboarding::Onboard::default()); }
-        if let Some(t) = tab { app.tab = match t.as_str() { "train" | "community" => Tab::Train, "ranks" | "leader" => Tab::Ranks, "create" => Tab::Create, "hero" | "profile" => Tab::Hero, _ => Tab::Learn }; }
+        if let Some(t) = tab { if t == "practice" { app.sub_train = 1; } app.tab = match t.as_str() { "train" | "practice" | "community" => Tab::Train, "ranks" | "leader" => Tab::Ranks, "create" => Tab::Create, "hero" | "profile" => Tab::Hero, _ => Tab::Learn }; }
         if let Some(sc) = screen {
             match sc.as_str() {
                 "settings" => app.screen = Screen::Settings,
                 "editor" => app.screen = Screen::Editor(Editor { idx: None, title: "Royal Banner".into(), lang: "css".into(), code: EXAMPLES[5].code.into(), out: interp::run("css", EXAMPLES[5].code) }),
                 "sql" => app.screen = Screen::Editor(Editor { idx: None, title: "Strongest Heroes".into(), lang: "sql".into(), code: EXAMPLES[6].code.into(), out: interp::run("sql", EXAMPLES[6].code) }),
-                "complete" => app.screen = Screen::Complete(Complete { title: "Project: Wanted Poster".into(), xp: 25, gems: 5, perfect: true, score: 100, best: 100, duel: None, new_streak: true, next: Some((0, 1, 0)), project: true, summary: app.courses[0].modules[0].lessons[7].summary.clone() }),
+                "complete" => app.screen = Screen::Complete(Complete { title: "Project: Wanted Poster".into(), xp: 25, gems: 5, perfect: true, score: 100, best: 100, duel: None, new_streak: true, next: Some((0, 1, 0)), project: true, summary: app.courses[0].modules[0].lessons[7].summary.clone(), cert: Some(0) }),
                 "preview" => app.screen = Screen::Preview(1),
                 "preview-js" => app.screen = Screen::Preview(2),
                 "notes" => app.screen = Screen::Notes(2, 1, 4),
+                "cert" => { app.s.ach.insert(app.courses[0].badge_id(), today()); app.screen = Screen::Certificate(0); }
                 "shop" => app.modal = Modal::Shop,
                 "notif" => app.modal = Modal::Notif,
                 "avatar" => app.modal = Modal::Avatar,
@@ -786,6 +834,7 @@ mod tests {
     fn ui_ctx() -> egui::Context {
         let ctx = egui::Context::default();
         install_fonts(&ctx);
+        setup_style(&ctx);
         Box::leak(Box::new(load_textures(&ctx)));
         ctx
     }
@@ -860,6 +909,48 @@ mod tests {
         let Screen::Complete(c) = &app.screen else { panic!() };
         assert!(!c.perfect);
         assert!(c.score < 100);
+    }
+
+    #[test]
+    fn practice_modes_reward_once_and_spare_hearts() {
+        let ctx = ui_ctx();
+        let mut app = demo_app();
+        app.tab = Tab::Train; app.sub_train = 1;
+        frame(&ctx, &mut app, vec![]);
+        // daily quest: wrong answers cost no hearts, first clear pays +15 XP, replay pays less
+        let hearts = app.s.hearts;
+        let qs = app.practice_set(&app.started_courses(), 5, 1);
+        assert_eq!(qs.len(), 5);
+        app.start_run("Daily Quest", Kind::Daily, vec![], qs.clone());
+        play(&ctx, &mut app, true);
+        assert_eq!(app.s.hearts, hearts, "practice must not cost hearts");
+        assert_eq!(app.s.daily_day, today());
+        let Screen::Complete(c) = &app.screen else { panic!() };
+        assert_eq!(c.xp, 15);
+        app.start_run("Daily Quest", Kind::Daily, vec![], qs);
+        play(&ctx, &mut app, false);
+        let Screen::Complete(c) = &app.screen else { panic!() };
+        assert_eq!(c.xp, 5, "replays give less");
+        // review of a course with cleared lessons
+        let qs = app.practice_set(&[0], 8, 7);
+        assert!(!qs.is_empty() && qs.iter().all(|q| !matches!(q, Q::Type { .. })));
+        app.start_run("HTML Review", Kind::Review(0), vec![], qs);
+        play(&ctx, &mut app, false);
+        assert_eq!(app.s.reviews, 1);
+        // a quick challenge is remembered as solved
+        let c0 = &coaches()[0];
+        app.start_run(c0.title, Kind::Coach, vec![], c0.qs.clone());
+        play(&ctx, &mut app, false);
+        assert!(app.s.solved.contains(c0.title));
+        // the certificate renders both before and after it is earned
+        for earned in [false, true] {
+            if earned { app.s.ach.insert(app.courses[1].badge_id(), today()); }
+            app.screen = Screen::Certificate(1);
+            frame(&ctx, &mut app, vec![]);
+            assert!(matches!(app.screen, Screen::Certificate(1)));
+        }
+        assert_eq!(crate::preview::ymd(0), "1970-01-01");
+        assert_eq!(crate::preview::ymd(20409), "2025-11-17");
     }
 
     #[test]

@@ -14,7 +14,7 @@ impl App {
         let n_slides = rs.pages();
         let n_pics = rs.slides.len();
         let in_slides = rs.stage < n_slides;
-        let duel = matches!(rs.kind, Kind::Duel(_));
+        let duel = rs.kind.safe(); // practice runs never cost hearts
         let cur_q = rs.queue.first().copied();
         let shown_q = if rs.fb.is_some() { rs.last } else { cur_q };
         let phase = if in_slides {

@@ -19,7 +19,8 @@ Write-Host "3/3 Creating zip..."
 $stage = Join-Path $root "dist\PixelLearn-$version"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force $stage | Out-Null
-Copy-Item target\release\pixel_learn.exe (Join-Path $stage "PixelLearn.exe")
+$target = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { "target" }
+Copy-Item (Join-Path $target "release\pixel_learn.exe")(Join-Path $stage "PixelLearn.exe")
 Copy-Item README.md, CREDITS.md $stage
 $zip = Join-Path $root "dist\PixelLearn-$version-windows.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }

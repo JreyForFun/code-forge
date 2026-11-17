@@ -6,7 +6,7 @@ computer.
 
 ## Quick start (players)
 
-1. Unzip `PixelLearn-1.2.0-windows.zip` anywhere.
+1. Unzip `PixelLearn-1.3.0-windows.zip` anywhere.
 2. Double-click **PixelLearn.exe**.
 3. Choose a name, a hero and your first course, then start learning.
 
@@ -33,7 +33,12 @@ Nothing to install, no account, no internet needed.
   UPDATE, DELETE and CREATE TABLE.
 - **Spell Forge**: write, run and save your own programs in any of the five languages, or start
   from bundled examples.
-- **Practice**: quick challenges and duels against computer opponents (duels never cost hearts).
+- **Practice**: a **Daily Quest** (5 mixed questions, +15 XP once a day), **course reviews** from lessons
+  you've cleared, 10 **quick challenges** across all five languages, and a **Duel Arena** with four
+  computer champions. Daily quests, reviews and duels never cost hearts.
+- **Certificates**: finish a course to earn its certificate (name, course, skills, date, number), which
+  you can save as an image. Separate from the badge, which grows bronze → silver → gold as you go.
+- **Text size**: Normal, Large or Huge in Settings.
 - **Progress**: XP and levels, gems, a daily streak with streak savers, 7 weekly leagues against
   computer rivals, 12 achievements and an adventure log.
 - **Keyboard friendly**: Enter = next/check/continue, 1–5 = pick an answer, Esc = leave a lesson,
@@ -65,7 +70,7 @@ cargo run --release   # optimized build, no console window
 powershell -ExecutionPolicy Bypass -File scripts/package.ps1   # dist/PixelLearn-<ver>-windows.zip
 ```
 
-QA helpers: `--screenshot out.png [--tab learn|train|ranks|create|hero] [--screen settings|editor|sql|complete|shop|notif|avatar|nohearts|preview|notes] [--lesson C.M.L --stage N] [--onboarding] [--size 360x600]`.
+QA helpers: `--screenshot out.png [--tab learn|train|ranks|create|hero] [--tab practice] [--scroll N] [--screen settings|editor|sql|complete|shop|notif|avatar|nohearts|preview|notes|cert] [--lesson C.M.L --stage N] [--onboarding] [--size 360x600]`.
 Screenshot mode uses an in-memory demo profile and never touches your save.
 
 Project plan and specs live in `specs/` (Spec Kit). Project principles are in

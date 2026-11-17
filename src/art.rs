@@ -63,12 +63,45 @@ pub fn body(s: impl Into<String>, size: f32) -> RichText {
 pub fn install_fonts(ctx: &egui::Context) {
     let mut f = egui::FontDefinitions::default();
     f.font_data.insert("silk".into(), std::sync::Arc::new(egui::FontData::from_static(include_bytes!("../assets/Silkscreen.ttf"))));
+    // Pixelify Sans has real lowercase letters, so code like console.log() reads correctly
+    f.font_data.insert("pixel".into(), std::sync::Arc::new(egui::FontData::from_static(include_bytes!("../assets/PixelifySans.ttf"))));
     f.font_data.insert("press".into(), std::sync::Arc::new(egui::FontData::from_static(include_bytes!("../assets/PressStart2P.ttf"))));
-    f.families.get_mut(&FontFamily::Proportional).unwrap().insert(0, "silk".into());
+    let prop = f.families.get_mut(&FontFamily::Proportional).unwrap();
+    prop.insert(0, "silk".into());
+    prop.insert(0, "pixel".into());
     f.families.insert(press(), vec!["press".into()]);
     // a calm, readable face for long explanations
     f.families.insert(read(), vec!["Ubuntu-Light".into(), "Hack".into(), "silk".into()]);
     ctx.set_fonts(f);
+}
+
+/// Shared look for the whole app (also used by headless tests and screenshots).
+pub fn setup_style(ctx: &egui::Context) {
+    ctx.set_visuals(egui::Visuals::dark());
+    ctx.global_style_mut(|s| {
+        s.visuals.panel_fill = BG;
+        s.visuals.window_fill = PANEL;
+        s.visuals.override_text_color = Some(INK);
+        s.visuals.extreme_bg_color = Color32::from_rgb(0x0f, 0x0b, 0x1a);
+        s.visuals.selection.bg_fill = Color32::from_rgb(0x3a, 0x5a, 0xb8);
+        s.visuals.widgets.inactive.bg_stroke = Stroke::new(2.0, EDGE);
+        for w in [&mut s.visuals.widgets.noninteractive, &mut s.visuals.widgets.inactive, &mut s.visuals.widgets.hovered, &mut s.visuals.widgets.active, &mut s.visuals.widgets.open] { w.corner_radius = 0.0.into(); }
+        s.visuals.widgets.inactive.weak_bg_fill = PANEL_HI;
+        s.spacing.item_spacing = Vec2::new(8.0, 6.0);
+        s.visuals.window_corner_radius = 0.0.into();
+        // invisible scrollbars: wheel, drag and touch scrolling still work
+        let sc = &mut s.spacing.scroll;
+        sc.floating = true;
+        sc.floating_allocated_width = 0.0;
+        sc.bar_width = 4.0;
+        sc.floating_width = 4.0;
+        sc.dormant_background_opacity = 0.0;
+        sc.active_background_opacity = 0.0;
+        sc.interact_background_opacity = 0.0;
+        sc.dormant_handle_opacity = 0.0;
+        sc.active_handle_opacity = 0.0;
+        sc.interact_handle_opacity = 0.0;
+    });
 }
 
 // ---------- code-drawn sprites ----------
@@ -214,9 +247,10 @@ pub fn parchment<R>(ui: &mut egui::Ui, f: impl FnOnce(&mut egui::Ui) -> R) -> R 
 
 /// A red ribbon banner with a title on it.
 pub fn ribbon(ui: &mut egui::Ui, text: &str) {
+    // the ribbon's ends and its inner trim take ~14px per side; leave clear space inside them
     let galley = ui.painter().layout_no_wrap(text.to_string(), FontId::new(12.0, press()), Color32::WHITE);
-    let w = (galley.size().x + 80.0).min(ui.available_width());
-    let (r, _) = ui.allocate_exact_size(Vec2::new(w, 32.0), Sense::hover());
+    let w = (galley.size().x + 2.0 * (7.0 * SKIN_SCALE + 26.0)).min(ui.available_width());
+    let (r, _) = ui.allocate_exact_size(Vec2::new(w, 44.0), Sense::hover());
     ui.painter().add(nine_shape(r, "ribbon", 7.0, Color32::WHITE));
     ui.painter().text(r.center() + Vec2::new(1.0, 0.0), egui::Align2::CENTER_CENTER, text, FontId::new(12.0, press()), Color32::from_black_alpha(160));
     ui.painter().text(r.center() - Vec2::new(0.0, 1.0), egui::Align2::CENTER_CENTER, text, FontId::new(12.0, press()), Color32::WHITE);

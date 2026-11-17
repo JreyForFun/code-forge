@@ -57,44 +57,91 @@ pub const AVATARS: &[Avatar] = &[
 pub fn avatar(i: u32) -> &'static Avatar { &AVATARS[(i as usize).min(AVATARS.len() - 1)] }
 
 // ----- practice challenges -----
-pub struct Coach { pub title: &'static str, pub level: &'static str, pub color: Color32, pub art: &'static str, pub qs: Vec<Q> }
+pub fn fq(prompt: &'static str, code: &'static str, opts: Vec<&'static str>, right: usize, why: &'static str) -> Q { Q::Fill { prompt, code, opts, right, why } }
+
+// ----- quick challenges (Practice tab) -----
+pub struct Coach { pub title: &'static str, pub level: &'static str, pub lang: &'static str, pub desc: &'static str, pub color: Color32, pub art: &'static str, pub qs: Vec<Q> }
 pub fn coaches() -> Vec<Coach> {
     vec![
-        Coach { title: "FizzBuzz", level: "Easy", color: ORANGE, art: "scroll_fire", qs: vec![
+        Coach { title: "FizzBuzz", level: "Easy", lang: "Python", desc: "The classic counting puzzle with % and elif.", color: ORANGE, art: "scroll_fire", qs: vec![
             mc("Which number prints 'Fizz'?", vec!["5", "3", "7", "10"], 1, "Multiples of 3 print Fizz."),
             mc("15 prints...", vec!["Fizz", "Buzz", "FizzBuzz", "15"], 2, "15 is a multiple of both 3 and 5."),
             mc("Which operator gives the remainder of a division?", vec!["/", "%", "//", "*"], 1, "% is the remainder (modulo) operator."),
+            fq("Test for a multiple of 5.", "if n % 5 ___ 0:\n    print(\"Buzz\")", vec!["==", "=", "!="], 0, "No remainder means a multiple."),
+            mc("Why check n % 15 first?", vec!["Otherwise 15 prints Fizz", "It is faster", "15 is prime"], 0, "The first matching branch wins."),
         ]},
-        Coach { title: "Camel to Snake", level: "Medium", color: TEAL, art: "scroll_lightning", qs: vec![
+        Coach { title: "Tag Detective", level: "Easy", lang: "HTML", desc: "Spot the broken tags before the page falls apart.", color: Color32::from_rgb(0xe8, 0x5a, 0x1e), art: "shield", qs: vec![
+            mc("Which line is broken?", vec!["<p>Hi</p>", "<h2>Quest<h2>", "<li>Rope</li>"], 1, "The closing tag needs a slash: </h2>."),
+            mc("Which element has no closing tag?", vec!["<img>", "<p>", "<a>"], 0, "<img> is an empty element."),
+            fq("Close the link.", "<a href=\"map.html\">Map___", vec!["</a>", "<a/>", "</link>"], 0, "Anchors close with </a>."),
+            mc("Which nesting is correct?", vec!["<b><i>Run</b></i>", "<b><i>Run</i></b>", "<i><b>Run</i>"], 1, "Close the inner element first."),
+        ]},
+        Coach { title: "Camel to Snake", level: "Medium", lang: "Any", desc: "Name things the way each language likes.", color: TEAL, art: "scroll_lightning", qs: vec![
             mc("Convert 'myHeroName' to snake_case:", vec!["my_hero_name", "myheroname", "My_Hero_Name", "my-hero-name"], 0, "Lowercase words joined by _."),
             mc("Which is camelCase?", vec!["hero_name", "HeroName", "heroName", "hero-name"], 2, "camelCase starts lowercase; each new word starts with a capital."),
+            mc("Python variables usually use...", vec!["snake_case", "camelCase", "kebab-case"], 0, "Python style is snake_case."),
+            mc("CSS class names usually use...", vec!["kebab-case", "snake_case", "PascalCase"], 0, "quest-card is typical CSS."),
+            mc("Python class names use...", vec!["PascalCase", "snake_case", "UPPERCASE"], 0, "class BankAccount:"),
         ]},
-        Coach { title: "It's a Sign", level: "Hard", color: Color32::from_rgb(0x60, 0x7d, 0x8b), art: "hourglass", qs: vec![
+        Coach { title: "Selector Sniper", level: "Medium", lang: "CSS", desc: "Hit exactly the elements you mean.", color: Color32::from_rgb(0x26, 0x6d, 0xd3), art: "bow", qs: vec![
+            mc("Which selects class=\"rare\"?", vec![".rare", "#rare", "rare"], 0, "Classes start with a dot."),
+            mc("What does nav a select?", vec!["Links inside nav", "nav and a", "A nav inside a link"], 0, "A space means inside."),
+            mc("Which is most specific?", vec!["p", ".note", "#intro"], 2, "id beats class beats type."),
+            fq("Style links on hover.", "a___ { color: gold; }", vec![":hover", ".hover", "#hover"], 0, "Pseudo-classes use a colon."),
+        ]},
+        Coach { title: "Loop Labyrinth", level: "Medium", lang: "JavaScript", desc: "Count the turns before you get lost.", color: GOLD, art: "map", qs: vec![
+            mc("for (let i = 0; i < 4; i++) runs how many times?", vec!["3", "4", "5"], 1, "0, 1, 2, 3."),
+            mc("What does break do?", vec!["Leaves the loop", "Skips one round", "Restarts the loop"], 0, "break exits immediately."),
+            mc("A while loop never ends when...", vec!["its condition never becomes false", "it uses console.log", "it has braces"], 0, "Something must change."),
+            fq("Count down.", "for (let i = 3; i > 0; ___) { }", vec!["i--", "i++", "i = 0"], 0, "i-- moves towards 0."),
+        ]},
+        Coach { title: "Truth Tables", level: "Medium", lang: "Any", desc: "and, or, not: who survives the gate?", color: PURPLE, art: "keyhole", qs: vec![
+            mc("True and False is...", vec!["True", "False"], 1, "and needs both."),
+            mc("False or True is...", vec!["True", "False"], 0, "or needs one."),
+            mc("not (5 > 3) is...", vec!["True", "False"], 1, "5 > 3 is True; not flips it."),
+            mc("Which checks 13 to 19?", vec!["age >= 13 and age <= 19", "age >= 13 or age <= 19", "13 < age > 19"], 0, "Both limits must hold."),
+        ]},
+        Coach { title: "Query Quest", level: "Medium", lang: "SQL", desc: "Ask the vault the right question.", color: Color32::from_rgb(0x1f, 0x9d, 0x8a), art: "book", qs: vec![
+            mc("Which keyword filters rows?", vec!["WHERE", "ORDER BY", "LIMIT"], 0, "WHERE keeps matching rows."),
+            mc("Names starting with D:", vec!["LIKE 'D%'", "LIKE '%D'", "= 'D'"], 0, "% after the letter."),
+            mc("Totals per class need...", vec!["GROUP BY class", "ORDER BY class", "DISTINCT class"], 0, "GROUP BY makes one row per group."),
+            mc("Find missing values with...", vec!["IS NULL", "= NULL", "== NULL"], 0, "Comparisons with NULL are never true."),
+            fq("Strongest first.", "SELECT name FROM heroes ORDER BY hp ___;", vec!["DESC", "ASC", "UP"], 0, "DESC is largest first."),
+        ]},
+        Coach { title: "It's a Sign", level: "Hard", lang: "Python", desc: "Tricky maths with negatives and rounding.", color: Color32::from_rgb(0x60, 0x7d, 0x8b), art: "hourglass", qs: vec![
             mc("What does -5 % 3 give in Python?", vec!["-2", "1", "2", "-1"], 1, "Python keeps the divisor's sign, so -5 % 3 is 1."),
             mc("What is abs(-7)?", vec!["-7", "7", "0", "error"], 1, "abs removes the sign."),
+            mc("7 // 2 is...", vec!["3.5", "3", "4"], 1, "// drops the decimals."),
+            mc("round(2.675, 1) shows about...", vec!["2.7", "2.6", "3"], 0, "Rounded to one decimal."),
         ]},
-        Coach { title: "Card Check", level: "Medium", color: GOLD, art: "coins", qs: vec![
+        Coach { title: "Card Check", level: "Hard", lang: "Any", desc: "The Luhn rule that guards card numbers.", color: Color32::from_rgb(0xc8, 0x9b, 0x2a), art: "coins", qs: vec![
             mc("The Luhn check starts doubling from which digit?", vec!["The first", "Second from the right", "The last", "Random"], 1, "Every second digit from the right is doubled."),
             mc("If a doubled digit is over 9, you...", vec!["drop it", "subtract 9", "add 9", "keep it"], 1, "Subtract 9 (the same as adding its two digits)."),
+            mc("A number passes when the total...", vec!["ends in 0", "is even", "is over 50"], 0, "Total % 10 == 0."),
         ]},
-        Coach { title: "Pig Latin", level: "Medium", color: Color32::from_rgb(0xe9, 0x1e, 0x63), art: "spellbook", qs: vec![
+        Coach { title: "Pig Latin", level: "Hard", lang: "Python", desc: "Slice and glue words into a secret code.", color: Color32::from_rgb(0xe9, 0x1e, 0x63), art: "spellbook", qs: vec![
             mc("'pig' in Pig Latin is...", vec!["igpay", "pigay", "gipay", "pig"], 0, "Move 'p' to the end and add 'ay'."),
             mc("In Python, which gives the first letter of word?", vec!["word[0]", "word[1]", "word.first", "first(word)"], 0, "Indexes start at 0."),
+            mc("word[1:] gives...", vec!["everything after the first letter", "the second letter only", "the last letter"], 0, "A slice from index 1 to the end."),
+            fq("Build the Pig Latin word.", "new = word[1:] + word[0] + ___", vec!["\"ay\"", "ay", "'a' 'y'"], 0, "Add the text \"ay\"."),
         ]},
     ]
 }
 
 // ----- duel opponents (computer characters) -----
-pub struct Opponent { pub name: &'static str, pub skill: u32, pub color: Color32, pub art: &'static str }
+pub struct Opponent { pub name: &'static str, pub title: &'static str, pub skill: u32, pub color: Color32, pub art: &'static str }
 pub fn opponents() -> Vec<Opponent> {
     vec![
-        Opponent { name: "Slime Scout", skill: 1, color: GREEN, art: "potion_magic" },
-        Opponent { name: "Goblin Coder", skill: 2, color: ORANGE, art: "axe" },
-        Opponent { name: "Dark Compiler", skill: 3, color: PURPLE, art: "mystic_figure" },
+        Opponent { name: "Slime Scout", title: "Wobbly beginner", skill: 2, color: GREEN, art: "potion_magic" },
+        Opponent { name: "Goblin Coder", title: "Sneaky and quick", skill: 3, color: ORANGE, art: "axe" },
+        Opponent { name: "Dark Compiler", title: "Rarely wrong", skill: 4, color: PURPLE, art: "mystic_figure" },
+        Opponent { name: "Bug Dragon", title: "Only perfection wins", skill: 5, color: RED, art: "flame" },
     ]
 }
 
-const DUEL_POOL: usize = 12;
+/// Questions per duel.
+pub const DUEL_LEN: usize = 5;
+const DUEL_POOL: usize = 30;
 fn duel_pool() -> [Q; DUEL_POOL] {
     [
         mc("What prints text in Python?", vec!["print()", "echo()", "say()"], 0, "print() writes to the screen."),
@@ -109,14 +156,32 @@ fn duel_pool() -> [Q; DUEL_POOL] {
         mc("SQL: which sorts results?", vec!["ORDER BY", "SORT", "GROUP BY"], 0, "ORDER BY sorts rows."),
         mc("Python: range(3) gives...", vec!["1, 2, 3", "0, 1, 2", "0, 1, 2, 3"], 1, "range stops before the end number."),
         mc("CSS: a class selector starts with...", vec!["#", ".", "@"], 1, ".name selects class=\"name\"."),
+        mc("Python: which starts a function?", vec!["def", "function", "fn"], 0, "def name():"),
+        mc("JS: [10, 20, 30][1] is...", vec!["10", "20", "30"], 1, "Indexes start at 0."),
+        mc("CSS: which centres a flex row's items horizontally?", vec!["justify-content: center", "align-items: center", "text-align: left"], 0, "justify-content works on the main axis."),
+        mc("HTML: where does <title> go?", vec!["<head>", "<body>", "<footer>"], 0, "Page information lives in the head."),
+        mc("SQL: COUNT(*) gives...", vec!["the number of rows", "the sum", "the first row"], 0, "COUNT(*) counts rows."),
+        mc("Python: [1, 2, 3][-1] is...", vec!["1", "3", "error"], 1, "-1 is the last item."),
+        mc("JS: typeof \"7\" is...", vec!["number", "string", "boolean"], 1, "Anything in quotes is a string."),
+        mc("CSS: margin is space...", vec!["outside the border", "inside the border", "between letters"], 0, "Padding is inside; margin is outside."),
+        mc("HTML: which input hides what you type?", vec!["type=\"password\"", "type=\"hidden\"", "type=\"secret\""], 0, "Password fields show dots."),
+        mc("Python: \"Hi\" * 3 is...", vec!["HiHiHi", "Hi3", "error"], 0, "* repeats a string."),
+        mc("SQL: which keeps every row of the left table?", vec!["LEFT JOIN", "INNER JOIN", "WHERE"], 0, "LEFT JOIN keeps unmatched left rows."),
+        mc("JS: which adds to the end of an array?", vec!["push", "pop", "shift"], 0, "push adds to the end."),
+        mc("Python: which loops over each item?", vec!["for item in bag:", "for (item of bag)", "loop bag"], 0, "for ... in ...:"),
+        mc("CSS: position: absolute is placed relative to...", vec!["the nearest positioned ancestor", "the next sibling", "the mouse"], 0, "Give the parent position: relative."),
+        mc("HTML: alt text is for...", vec!["describing images", "making links", "bold text"], 0, "Screen readers read alt."),
+        mc("Python: 10 // 4 is...", vec!["2.5", "2", "3"], 1, "// drops the decimals."),
+        mc("JS: what does return do?", vec!["Sends a value back and ends the function", "Prints a value", "Restarts the loop"], 0, "return ends the function with a value."),
+        mc("SQL: which renames a column in the result?", vec!["AS", "RENAME", "TO"], 0, "column AS new_name."),
     ]
 }
 
-/// Three questions for a duel, varying by a seed (e.g. the day and opponent).
+/// The questions for a duel, varying by a seed (e.g. the day and opponent).
 pub fn duel_questions(seed: u64) -> Vec<Q> {
     let pool = duel_pool();
     let start = (seed.wrapping_mul(7) % DUEL_POOL as u64) as usize;
-    (0..3).map(|k| pool[(start + k * 5) % DUEL_POOL].clone()).collect()
+    (0..DUEL_LEN).map(|k| pool[(start + k * 7) % DUEL_POOL].clone()).collect()
 }
 
 // ----- weekly league rivals (computer characters) -----
@@ -190,9 +255,12 @@ mod tests {
     fn duel_questions_are_valid_and_vary() {
         let a: Vec<String> = duel_questions(1).iter().map(|q| if let Q::Mc { q, .. } = q { q.to_string() } else { String::new() }).collect();
         let b: Vec<String> = duel_questions(2).iter().map(|q| if let Q::Mc { q, .. } = q { q.to_string() } else { String::new() }).collect();
-        assert_eq!(a.len(), 3);
+        assert_eq!(a.len(), DUEL_LEN);
+        let set: std::collections::HashSet<_> = a.iter().collect();
+        assert_eq!(set.len(), DUEL_LEN, "duel questions repeat");
         assert_ne!(a, b);
         for q in duel_pool() { if let Q::Mc { opts, right, .. } = q { assert!(right < opts.len()); } }
+        for c in coaches() { assert!(c.qs.len() >= 3, "{} needs 3+ questions", c.title); for q in &c.qs { match q { Q::Mc { opts, right, .. } | Q::Fill { opts, right, .. } => assert!(*right < opts.len(), "{}", c.title), _ => {} } } }
     }
 
     #[test]

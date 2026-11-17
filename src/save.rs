@@ -1,6 +1,6 @@
 //! Learner save data: format v2 (see specs/001-shippable-release/contracts/save-format.md).
 //! Parsing and serializing are pure string functions so they can be tested; file IO is atomic.
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 pub const SAVE_VERSION: u32 = 2;
@@ -43,6 +43,17 @@ pub struct Save {
     pub log: Vec<(u64, String)>,
     pub duel_wins: u32,
     pub flawless: u32,
+    pub duel_losses: u32,
+    /// Course reviews finished in Practice.
+    pub reviews: u32,
+    /// Day the Daily Quest was last cleared.
+    pub daily_day: u64,
+    /// Days in a row the Daily Quest was cleared.
+    pub daily_streak: u32,
+    /// Quick challenges solved at least once (by title).
+    pub solved: BTreeSet<String>,
+    /// Interface size in percent (100, 115 or 130).
+    pub zoom: u32,
 }
 
 impl Default for Save {
@@ -56,7 +67,7 @@ impl Save {
             xp: 0, gems: 20, hearts: MAX_HEARTS, heart_t: 0, streak: 0, streak_max: 0, last_day: 0, savers: 0,
             week_id: 0, week_mask: 0, week_xp: 0, done: HashSet::new(), best: HashMap::new(), qdone: HashMap::new(),
             free_day: 0, goal: 7, league: 0, last_result: String::new(), scan: true, floor: true, notif_read: false,
-            codes: vec![], ach: BTreeMap::new(), log: vec![], duel_wins: 0, flawless: 0,
+            codes: vec![], ach: BTreeMap::new(), log: vec![], duel_wins: 0, flawless: 0, duel_losses: 0, reviews: 0, daily_day: 0, daily_streak: 0, solved: BTreeSet::new(), zoom: 100,
         }
     }
 
@@ -111,6 +122,12 @@ impl Save {
                 "notif" => s.notif_read = b,
                 "duel_wins" => s.duel_wins = u(0),
                 "flawless" => s.flawless = u(0),
+                "duel_losses" => s.duel_losses = u(0),
+                "reviews" => s.reviews = u(0),
+                "zoom" => { let z = u(100); s.zoom = if [100, 115, 130].contains(&z) { z } else { 100 }; }
+                "daily_day" => s.daily_day = n.unwrap_or(0),
+                "daily_streak" => s.daily_streak = u(0),
+                "solved" => { if !v.is_empty() { s.solved.insert(v.into()); } }
                 "done" => { if !v.is_empty() { s.done.insert(v.into()); } }
                 "qdone" => {
                     if let Some((key, list)) = v.split_once('|') {
@@ -150,10 +167,12 @@ impl Save {
         w("avatar", self.avatar.to_string());
         w("course", self.course.to_string());
         for (k, v) in [("xp", self.xp), ("gems", self.gems), ("hearts", self.hearts), ("streak", self.streak), ("streak_max", self.streak_max),
-            ("savers", self.savers), ("week_xp", self.week_xp), ("goal", self.goal), ("league", self.league), ("duel_wins", self.duel_wins), ("flawless", self.flawless)] {
+            ("savers", self.savers), ("week_xp", self.week_xp), ("goal", self.goal), ("league", self.league), ("duel_wins", self.duel_wins), ("flawless", self.flawless),
+            ("duel_losses", self.duel_losses), ("reviews", self.reviews), ("daily_streak", self.daily_streak), ("zoom", self.zoom)] {
             w(k, v.to_string());
         }
-        for (k, v) in [("heart_t", self.heart_t), ("last_day", self.last_day), ("week_id", self.week_id), ("free_day", self.free_day)] { w(k, v.to_string()); }
+        for (k, v) in [("heart_t", self.heart_t), ("last_day", self.last_day), ("week_id", self.week_id), ("free_day", self.free_day), ("daily_day", self.daily_day)] { w(k, v.to_string()); }
+        for t in &self.solved { w("solved", one(t)); }
         w("week_mask", self.week_mask.to_string());
         w("last_result", one(&self.last_result));
         w("scan", (self.scan as u8).to_string());

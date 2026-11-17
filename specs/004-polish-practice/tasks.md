@@ -1,0 +1,11 @@
+# Tasks: 004 Polish, bigger Practice, certificates
+- [x] T001 Ribbon, ranks avatar, chevron, nav bar layout fixes
+- [x] T002 Invisible scrollbars via shared `setup_style`
+- [x] T003 Pixelify Sans body font (static, GSUB removed); verified lowercase code text
+- [x] T004 Save fields: daily_day, daily_streak, reviews, duel_losses, solved, zoom
+- [x] T005 Kind::Daily / Kind::Review; `practice_set` sampling; hearts-free practice
+- [x] T006 10 quick challenges, 4 opponents, 30-question duel pool, 5-question duels
+- [x] T007 Practice screen rebuild (daily banner, review grid, challenge grid, arena)
+- [x] T008 Certificate screen + entry points (completion, Hero tab, preview) + PNG export
+- [x] T009 Text size setting
+- [x] T010 Tests: practice rewards/hearts, certificate render, dates; 66 passing; clippy clean

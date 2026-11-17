@@ -43,6 +43,10 @@ impl App {
                         }
                         ui.add_space(SP_S);
                     }
+                    if let Some(cc) = c.cert {
+                        if pbtn(ui, "VIEW YOUR CERTIFICATE", GOLD, 0.0).clicked() { done = true; self.screen = Screen::Certificate(cc); }
+                        ui.add_space(SP_S);
+                    }
                     if pbtn(ui, "BACK TO MAP", GREEN, 0.0).clicked() || (enter && c.next.is_none()) { done = true; }
                     ui.add_space(SP_S);
                     if pbtn(ui, "GUILD RANKS", BLUE, 0.0).clicked() { done = true; self.tab = Tab::Ranks; }
@@ -83,6 +87,15 @@ impl App {
                     card_title(ui, "DISPLAY");
                     if toggle(ui, "Scanlines", "CRT-style pixel filter", &mut self.s.scan) { self.persist(); }
                     if toggle(ui, "Dungeon floor", "Brick texture behind the screen", &mut self.s.floor) { self.persist(); }
+                    ui.add_space(SP_S);
+                    ui.label(body("Text size", 15.0));
+                    ui.label(body("Make everything bigger and easier to read", 12.0).color(DIM));
+                    ui.add_space(SP_XS);
+                    ui.horizontal(|ui| {
+                        for (z, name) in [(100, "NORMAL"), (115, "LARGE"), (130, "HUGE")] {
+                            if mini_btn(ui, name, if self.s.zoom == z { GOLD } else { PANEL_HI }).clicked() && self.s.zoom != z { self.s.zoom = z; self.persist(); }
+                        }
+                    });
                 });
                 panel(ui, PANEL, EDGE, |ui| {
                     ui.set_width(ui.available_width());
