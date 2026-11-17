@@ -164,6 +164,11 @@ impl App {
                         let r = ui.add(egui::TextEdit::singleline(&mut ob.name).hint_text("Hero").char_limit(save::NAME_MAX).desired_width(f32::INFINITY).font(FontId::new(18.0, egui::FontFamily::Proportional)));
                         if !r.has_focus() && ob.name.is_empty() { r.request_focus(); }
                         ui.label(body("You can change this later in Settings.", 12.0).color(DIM));
+                        ui.add_space(SP_L);
+                        ui.label(body("Played on another device? Bring your hero here.", 13.0).color(DIM));
+                        ui.add_space(SP_XS);
+                        if mini_btn(ui, "IMPORT PROGRESS", BLUE).clicked() && !self.demo
+                            && let Some(p) = rfd::FileDialog::new().set_title("Open Code Forge progress").add_filter("Code Forge progress", &["codeforge"]).pick_file() { self.load_import(&p); }
                     }
                     1 => {
                         ui.label(title("CHOOSE YOUR HERO", 12.0).color(GOLD));

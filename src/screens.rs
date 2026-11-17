@@ -116,7 +116,7 @@ impl App {
                 panel(ui, PANEL, EDGE, |ui| {
                     ui.set_width(ui.available_width());
                     card_title(ui, "HOW IT WORKS");
-                    let league_rule = format!("Earn {} XP in a week to move up a league. Rivals are computer characters.", LEAGUE_UP_XP);
+                    let league_rule = "Each week you race five computer rivals tuned to your pace, plus your own last week. Top 3 move up a league, the bottom 2 move down.".to_string();
                     for (ic, t) in [("heart", "Wrong answers cost a heart. Hearts refill 1 every 5 minutes (max 5)."), ("scroll_lightning", "100 XP per level. First clears give 10 XP (+5 if flawless) and 5 gems."),
                         ("flame", "Clear one lesson a day to grow your streak. A streak saver covers one missed day."), ("banner_royal", league_rule.as_str())] {
                         ui.horizontal_wrapped(|ui| { icon(ui, ic, 26.0); ui.label(body(t, 13.0)); });
@@ -129,6 +129,15 @@ impl App {
                     card_title(ui, "DATA");
                     ui.label(body("Progress is saved on this computer only. Nothing is sent anywhere.", 13.0));
                     ui.label(RichText::new(Save::path().display().to_string()).monospace().size(11.0).color(DIM));
+                    ui.add_space(SP_S);
+                    ui.label(body("Changing device? Export your progress to a file, then import it on the new device. You can also drop a .codeforge file onto the window.", 13.0).color(DIM));
+                    ui.add_space(SP_S);
+                    ui.horizontal(|ui| {
+                        let w = (ui.available_width() - SP_S) / 2.0;
+                        if pbtn(ui, "EXPORT", BLUE, w).on_hover_text("Save your progress to a file").clicked() && !self.demo { self.export_progress(); }
+                        if pbtn(ui, "IMPORT", BLUE, w).on_hover_text("Load progress from a file").clicked() && !self.demo
+                            && let Some(p) = rfd::FileDialog::new().set_title("Open Code Forge progress").add_filter("Code Forge progress", &["codeforge"]).pick_file() { self.load_import(&p); }
+                    });
                     ui.add_space(SP_S);
                     if pbtn(ui, "RESET PROGRESS", RED, 0.0).clicked() { self.modal = Modal::Reset; }
                 });
@@ -176,14 +185,20 @@ impl App {
                 ui.add_space(SP_S);
                 panel(ui, Color32::from_rgb(0x0f, 0x0b, 0x1a), GREEN, |ui| {
                     ui.add(egui::TextEdit::multiline(&mut ed.code).code_editor().desired_rows(11).desired_width(f32::INFINITY).text_color(PARCH).char_limit(20_000));
+                    if ed.code.contains("input(") || ed.code.contains("prompt(") {
+                        ui.add_space(SP_XS);
+                        ui.label(body("Program input: what the user types, one answer per line", 12.0).color(DIM));
+                        ui.add(egui::TextEdit::multiline(&mut ed.stdin).code_editor().desired_rows(2).desired_width(f32::INFINITY).hint_text("Pix\n12").text_color(PARCH).char_limit(2_000));
+                    }
                 });
                 ui.horizontal(|ui| {
-                    if pbtn(ui, "RUN", GREEN, 100.0).on_hover_text("Ctrl+Enter or F5").clicked() || run_key { ed.out = interp::run(&ed.lang, &ed.code); }
+                    if pbtn(ui, "RUN", GREEN, 100.0).on_hover_text("Ctrl+Enter or F5").clicked() || run_key { ed.out = interp::run_with_input(&ed.lang, &ed.code, &ed.stdin); }
                     if pbtn(ui, "SAVE", BLUE, 100.0).clicked() {
                         let t = if ed.title.trim().is_empty() { "Untitled".to_string() } else { ed.title.trim().to_string() };
                         ed.title = t.clone();
                         let e = (t, ed.lang.clone(), ed.code.clone());
-                        match ed.idx { Some(i) if i < self.s.codes.len() => self.s.codes[i] = e, _ => { self.s.codes.push(e); ed.idx = Some(self.s.codes.len() - 1); self.log(format!("forged a new spell: '{}'", ed.title)); } }
+                        match ed.idx { Some(i) if i < self.s.codes.len() => self.s.codes[i] = e, _ if self.s.codes.len() >= 200 => { self.toast("Your spell book is full (200 spells). Delete one first."); }
+                            _ => { self.s.codes.push(e); ed.idx = Some(self.s.codes.len() - 1); self.log(format!("wrote a new spell: '{}'", ed.title)); } }
                         self.award();
                         self.persist(); self.toast("Saved to My Spells");
                     }

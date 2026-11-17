@@ -20,7 +20,7 @@ use preview::*;
 use lesson::summary_card;
 use data::*;
 use eframe::egui::{self, Align2, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, Vec2};
-use game::{HINT_COST, LEAGUES, LEAGUE_UP_XP, REFILL_COST, SAVER_COST, XP_PER_LEVEL};
+use game::{HINT_COST, LEAGUES, REFILL_COST, SAVER_COST, XP_PER_LEVEL};
 use save::{Save, MAX_HEARTS};
 use std::collections::VecDeque;
 
@@ -28,13 +28,26 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const HDR: Color32 = Color32::from_rgb(0x0b, 0x12, 0x28);
 
 fn now() -> u64 { std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0) }
-fn today() -> u64 { game::day_of(now()) }
+/// The furthest day already seen in this save: turning the clock back can't replay a day.
+static DAY_FLOOR: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// Seconds since 1970 in the player's own time zone, so days change at local midnight.
+fn local_secs() -> u64 {
+    let off = chrono::Local::now().offset().local_minus_utc() as i64;
+    (now() as i64 + off).max(0) as u64
+}
+fn today() -> u64 { game::day_of(local_secs()).max(DAY_FLOOR.load(std::sync::atomic::Ordering::Relaxed)) }
+/// How far through today we are (0..1).
+fn day_frac() -> f32 { if game::day_of(local_secs()) < today() { 1.0 } else { (local_secs() % 86_400) as f32 / 86_400.0 } }
+fn set_day_floor(s: &Save) {
+    let d = s.seen_day.max(s.last_day).max(s.daily_day).max(s.rep_day).max(s.duel_day);
+    DAY_FLOOR.fetch_max(d, std::sync::atomic::Ordering::Relaxed);
+}
 
 // ---------------- state ----------------
 #[derive(Clone, Copy, PartialEq)]
 enum Tab { Learn, Train, Ranks, Create, Hero }
 #[derive(Clone, Copy, PartialEq)]
-enum Modal { None, Notif, Shop, Courses, NoHearts, Reset, Avatar, DeleteSpell(usize) }
+enum Modal { None, Notif, Shop, Courses, NoHearts, Reset, Avatar, DeleteSpell(usize), WeekResult, Import }
 
 #[derive(Clone)]
 enum Kind { Lesson(usize, usize, usize), Coach, Duel(usize), Daily, Review(usize) }
@@ -56,7 +69,7 @@ impl RunState {
     fn pages(&self) -> usize { self.slides.len() + usize::from(!self.explain.is_empty()) + usize::from(!self.summary.is_empty()) }
 }
 struct Complete { title: String, xp: u32, gems: u32, perfect: bool, score: u32, best: u32, duel: Option<(u32, u32, String, bool)>, new_streak: bool, next: Option<(usize, usize, usize)>, project: bool, summary: Vec<&'static str>, cert: Option<usize> }
-struct Editor { idx: Option<usize>, title: String, lang: String, code: String, out: Vec<(interp::Kind, String)> }
+struct Editor { idx: Option<usize>, title: String, lang: String, code: String, out: Vec<(interp::Kind, String)>, /** answers for input() / prompt(), one per line */ stdin: String }
 
 enum Screen { Main, Settings, Run(Box<RunState>), Complete(Complete), Editor(Editor), Preview(usize), Notes(usize, usize, usize), Certificate(usize) }
 
@@ -67,6 +80,8 @@ struct App {
     onboard: Option<onboarding::Onboard>,
     /// Sound output (None in tests, screenshots, or without a sound device).
     audio: Option<audio::Audio>,
+    /// A progress file waiting for the player to confirm the import.
+    pending_import: Option<Box<Save>>,
 }
 
 impl App {
@@ -78,7 +93,7 @@ impl App {
         if demo {
             // In-memory demo profile for screenshots. Never written to disk.
             s.onboarded = true; s.name = "Ada".into(); s.avatar = 1; s.xp = 399; s.gems = 65; s.streak = 3; s.streak_max = 4; s.last_day = today();
-            s.week_id = game::week_of(today()); s.week_xp = 120; s.week_mask = 0b0000101; s.league = 2; s.hearts = 4;
+            s.week_id = game::week_of(today()); s.week_xp = 120; s.hist = vec![150]; s.ghost = [30, 25, 0, 40, 20, 15, 20]; s.week_mask = 0b0000101; s.league = 2; s.hearts = 4;
             for k in ["html/your-first-tags", "html/headings", "html/paragraphs-and-breaks", "html/bold-italic-and-more"] { s.done.insert(k.into()); }
             s.ach.insert("first_lesson".into(), today() - 3); s.ach.insert("streak3".into(), today() - 1); s.ach.insert("xp100".into(), today() - 2);
             s.codes.push(("Torch Counter".into(), "python".into(), "for i in range(3):\n  print(\"Torch\", i + 1)\n".into()));
@@ -86,19 +101,43 @@ impl App {
             s.add_log(today(), "reached a 3 day streak");
         }
         let courses = courses();
+        if !demo { set_day_floor(&s); }
+        let tampered = s.tampered;
+        App::validate(&mut s, &courses);
         let cur = (s.course as usize).min(courses.len() - 1);
         let onboard = if s.onboarded { None } else { Some(onboarding::Onboard::default()) };
         let mut a = App { s, tab: Tab::Learn, screen: Screen::Main, modal: Modal::None, courses, cur, open_mod: None, opp: 0, sub_train: 0, sub_create: 0,
-            input: String::new(), cat: 0, query: String::new(), view_key: 999, view_t0: 0.0, toasts: VecDeque::new(), demo, shot, frames: 0, save_warned: false, onboard, audio: None };
+            input: String::new(), cat: 0, query: String::new(), view_key: 999, view_t0: 0.0, toasts: VecDeque::new(), demo, shot, frames: 0, save_warned: false, onboard, audio: None, pending_import: None };
         if a.shot.is_none() && !cfg!(test) { a.audio = audio::Audio::new(); }
+        if tampered {
+            a.log("the save file was changed outside Code Forge; gems were reset");
+            a.toast("Your save was edited outside Code Forge, so your gems were reset.");
+            a.persist();
+        }
         a.week_check();
         a.open_mod = a.current_module(a.cur);
         a
     }
 
+    /// Drop anything in a save the game could not have produced: unknown lessons, badges and
+    /// certificates for unfinished courses, progress for lessons that no longer exist.
+    fn validate(s: &mut Save, courses: &[Course]) {
+        let ids: std::collections::HashSet<String> = courses.iter().flat_map(|c| (0..c.modules.len()).flat_map(move |m| (0..c.modules[m].lessons.len()).map(move |l| c.lesson_id(m, l)))).collect();
+        s.done.retain(|k| ids.contains(k));
+        s.best.retain(|k, _| ids.contains(k));
+        s.qdone.retain(|k, _| ids.contains(k));
+        for c in courses {
+            let all = (0..c.modules.len()).all(|m| (0..c.modules[m].lessons.len()).all(|l| s.done.contains(&c.lesson_id(m, l))));
+            if !all { s.ach.remove(&c.badge_id()); }
+        }
+        s.course = s.course.min(courses.len() as u32 - 1);
+        s.codes.truncate(200);
+    }
+
     /// Save to disk (atomic). Warns once if the save folder can't be written.
     fn persist(&mut self) {
         if self.demo { return; }
+        self.s.seen_day = self.s.seen_day.max(today());
         if let Err(e) = self.s.store()
             && !self.save_warned { self.save_warned = true; self.toast(format!("Can't save progress: {}", e)); }
     }
@@ -120,6 +159,44 @@ impl App {
             self.persist();
         }
     }
+    /// Write the progress file the player chose.
+    fn export_progress(&mut self) {
+        let name: String = self.s.name.chars().filter(|c| c.is_alphanumeric()).collect();
+        let file = format!("CodeForge-{}-{}.codeforge", if name.is_empty() { "Hero".into() } else { name }, preview::ymd(today()));
+        let Some(path) = rfd::FileDialog::new().set_title("Save your Code Forge progress").set_file_name(&file).add_filter("Code Forge progress", &["codeforge"]).save_file() else { return };
+        match std::fs::write(&path, self.s.export_text()) {
+            Ok(()) => { self.toast(format!("Progress saved to {}", path.display())); audio::play(audio::Sfx::Coin); }
+            Err(e) => self.toast(format!("Couldn't save the file: {}", e)),
+        }
+    }
+
+    /// Read a progress file and ask before replacing the current hero.
+    fn load_import(&mut self, path: &std::path::Path) {
+        match std::fs::read_to_string(path).map_err(|_| "Couldn't read that file.").and_then(|t| Save::import_text(&t)) {
+            Ok(s) => { self.pending_import = Some(Box::new(s)); self.modal = Modal::Import; }
+            Err(e) => self.toast(e),
+        }
+    }
+
+    fn apply_import(&mut self) {
+        let Some(mut s) = self.pending_import.take() else { return };
+        // keep a copy of what is being replaced, just in case
+        if !self.demo { let _ = self.s.store_to(&Save::dir().join("save.before-import.txt")); }
+        content::migrate(&mut s);
+        App::validate(&mut s, &self.courses);
+        if s.heart_t == 0 { s.heart_t = now(); }
+        set_day_floor(&s);
+        self.s = *s;
+        self.onboard = None;
+        self.cur = (self.s.course as usize).min(self.courses.len() - 1);
+        self.open_mod = self.current_module(self.cur);
+        self.screen = Screen::Main;
+        self.week_check();
+        self.persist();
+        self.toast(format!("Welcome back, {}! Your progress is here.", self.s.name));
+        audio::play(audio::Sfx::LevelUp);
+    }
+
     fn courses_cleared(&self) -> usize { (0..self.courses.len()).filter(|c| self.progress(*c) >= 1.0).count() }
     /// Grant newly earned achievements, with a toast and log entry for each.
     fn award(&mut self) {
@@ -196,6 +273,7 @@ impl App {
 
     fn start_run(&mut self, title: &str, kind: Kind, slides: Vec<(&'static str, &'static str)>, qs: Vec<Q>) {
         self.tick();
+        if qs.is_empty() { self.toast("Nothing to practise here yet. Clear a lesson first!"); return; }
         if self.s.hearts == 0 && !kind.safe() { self.modal = Modal::NoHearts; return; }
         audio::play(match kind { Kind::Duel(_) => audio::Sfx::DuelStart, Kind::Daily => audio::Sfx::Chest, _ => audio::Sfx::Confirm });
         let n = qs.len();
@@ -205,7 +283,7 @@ impl App {
             // An unfinished lesson resumes at the first question not yet answered correctly.
             if !self.s.done.contains(&k)
                 && let Some(d) = self.s.qdone.get(&k)
-                    && !d.is_empty() { queue.retain(|i| !d.contains(i)); right = d.len() as u32; stage = usize::MAX; }
+                    && !d.is_empty() { let d: Vec<usize> = d.iter().copied().filter(|i| *i < n).collect(); queue.retain(|i| !d.contains(i)); right = d.len() as u32; if !d.is_empty() { stage = usize::MAX; } }
         }
         let lang = match &kind { Kind::Lesson(c, _, _) => self.courses[*c].lang, _ => "" };
         let (project, explain, summary) = match kind {
@@ -248,11 +326,14 @@ impl App {
         let (mut xp, gems);
         let (mut duel, mut next, mut cert) = (None, None, None);
         let perfect = rs.mistakes == 0;
+        let score = if rs.kind.safe() { (rs.right * 100).checked_div(rs.total as u32).unwrap_or(0) } else { game::score(rs.total as u32, rs.mistakes) };
+        let day = today();
         match rs.kind {
             Kind::Lesson(c, m, l) => {
                 let first = !self.is_done(c, m, l);
                 self.s.qdone.remove(&self.lkey(c, m, l));
                 (xp, gems) = game::lesson_reward(first, perfect);
+                if !first { xp = game::repeat_xp(&mut self.s, day, xp); }
                 if first && self.courses[c].modules[m].lessons[l].project { xp += game::PROJECT_BONUS; }
                 if first {
                     self.s.done.insert(self.lkey(c, m, l));
@@ -265,7 +346,7 @@ impl App {
             }
             Kind::Coach => {
                 let first = self.s.solved.insert(rs.title.clone());
-                (xp, gems) = if first { (8, 2) } else { (4, 0) };
+                (xp, gems) = if first { (8, 2) } else { (game::repeat_xp(&mut self.s, day, 4), 0) };
                 self.log(format!("solved the '{}' challenge", rs.title));
             }
             Kind::Daily => {
@@ -275,23 +356,26 @@ impl App {
                     self.s.daily_day = t;
                     (xp, gems) = (15, 5);
                     self.log(format!("cleared the Daily Quest ({} days in a row)", self.s.daily_streak));
-                } else { (xp, gems) = (5, 0); }
+                } else { (xp, gems) = (game::repeat_xp(&mut self.s, day, 5), 0); }
             }
             Kind::Review(c) => {
                 self.s.reviews += 1;
-                (xp, gems) = (6, 1);
+                // a review pays XP only for real effort, from the daily repeat budget
+                (xp, gems) = (game::repeat_xp(&mut self.s, day, if score >= 50 { 6 } else { 2 }), 0);
                 self.log(format!("reviewed {}", self.courses[c].name));
             }
             Kind::Duel(o) => {
                 let me = rs.right;
                 let bot = opponents()[o].skill.min(rs.total as u32);
                 let won = me > bot || (me == bot && me as usize == rs.total);
-                if won { (xp, gems) = (20, 5); self.s.duel_wins += 1; } else { (xp, gems) = (5, 0); self.s.duel_losses += 1; }
+                if won {
+                    self.s.duel_wins += 1;
+                    (xp, gems) = if game::duel_reward_left(&mut self.s, day) { (20, 5) } else { (game::repeat_xp(&mut self.s, day, 4), 0) };
+                } else { (xp, gems) = (game::repeat_xp(&mut self.s, day, 3), 0); self.s.duel_losses += 1; }
                 duel = Some((me, bot, opponents()[o].name.to_string(), won));
                 self.log(format!("{} a duel against {}", if won { "won" } else { "lost" }, opponents()[o].name));
             }
         }
-        let score = game::score(rs.total as u32, rs.mistakes);
         let mut best = score;
         if let Kind::Lesson(c, mi, l) = rs.kind {
             let e = self.s.best.entry(self.lkey(c, mi, l)).or_insert((0, 0));
@@ -299,7 +383,7 @@ impl App {
         }
         let new_streak = game::bump_streak(&mut self.s, today());
         let lvl = self.level();
-        game::add_xp(&mut self.s, xp, gems);
+        game::add_xp(&mut self.s, xp, gems, day);
         audio::play(match &duel { Some((_, _, _, true)) => audio::Sfx::Victory, Some(_) => audio::Sfx::Defeat, None if self.level() > lvl => audio::Sfx::LevelUp, None => audio::Sfx::Complete });
         self.award();
         self.persist();
@@ -529,14 +613,22 @@ impl App {
     /// One frame of the whole app. Separate from eframe so tests can drive it headlessly.
     fn frame_ui(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
-        // text size setting (applies from the next frame)
         if self.update_audio() { ctx.request_repaint(); }
+        if self.onboard.is_none() && self.modal == Modal::None && matches!(self.screen, Screen::Main) && !self.s.res_seen && self.s.res_place > 0 {
+            self.modal = Modal::WeekResult;
+            audio::play(if self.s.res_to > self.s.res_from { audio::Sfx::Victory } else if self.s.res_to < self.s.res_from { audio::Sfx::Defeat } else { audio::Sfx::Complete });
+        }
+        let dropped: Vec<std::path::PathBuf> = ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).filter(|p| !p.as_os_str().is_empty()).collect());
+        if let Some(p) = dropped.first() { self.load_import(p); }
+        // text size setting (applies from the next frame)
         let z = self.s.zoom.clamp(100, 130) as f32 / 100.0;
         if (ctx.zoom_factor() - z).abs() > 0.01 { ctx.set_zoom_factor(z); }
         self.tick();
         if self.s.hearts < MAX_HEARTS { ctx.request_repaint_after(std::time::Duration::from_secs(1)); }
+        if self.onboard.is_none() { self.week_check(); }
         if self.onboard.is_some() {
             self.onboarding_screen(ui);
+            self.modals(&ctx);
             self.draw_toast(&ctx);
             self.screenshot(&ctx);
             return;
@@ -550,7 +642,7 @@ impl App {
         let screen = std::mem::replace(&mut self.screen, Screen::Main);
         match screen {
             Screen::Main => {
-                let (t, dd) = match self.tab { Tab::Learn => (self.courses[self.cur].name.to_string(), true), Tab::Train => ("Training".into(), false), Tab::Ranks => ("Guild Ranks".into(), false), Tab::Create => ("Spell Forge".into(), false), Tab::Hero => (self.s.name.clone(), false) };
+                let (t, dd) = match self.tab { Tab::Learn => (self.courses[self.cur].name.to_string(), true), Tab::Train => ("Training".into(), false), Tab::Ranks => ("Guild Ranks".into(), false), Tab::Create => ("Spell Lab".into(), false), Tab::Hero => (self.s.name.clone(), false) };
                 header(ui, self, &t, false, dd);
                 nav(ui, self);
                 let tab = self.tab;
@@ -652,6 +744,37 @@ impl App {
                 ui.add_space(SP_S);
                 if pbtn(ui, "PRACTISE A DUEL (NO HEARTS)", PANEL_HI, 0.0).clicked() { self.tab = Tab::Train; self.sub_train = 1; self.screen = Screen::Main; close = true; }
                 if pbtn(ui, "LATER", PANEL_HI, 0.0).clicked() { close = true; }
+            }),
+            Modal::WeekResult => dialog(ctx, "week", |ui| {
+                let (pl, from, to) = (self.s.res_place as usize, self.s.res_from as usize, self.s.res_to as usize);
+                ui.vertical_centered(|ui| {
+                    ribbon(ui, "WEEK RESULTS");
+                    let (r, _) = ui.allocate_exact_size(Vec2::splat(96.0), Sense::hover());
+                    draw_icon(ui.painter(), r, match pl { 1 => "gold_trophy", 2 => "silver_trophy", 3 => "bronze_trophy", _ => "banner" }, Color32::WHITE);
+                    ui.label(title(format!("YOU FINISHED #{}", pl), 13.0).color(GOLD));
+                    ui.add_space(SP_XS);
+                    ui.label(body(format!("{} XP last week", self.s.res_xp), 14.0).color(DIM));
+                    ui.add_space(SP_S);
+                    let (msg, col) = if to > from { (format!("Promoted to the {} league!", LEAGUES[to.min(6)]), GREEN) } else if to < from { (format!("Dropped to the {} league", LEAGUES[to.min(6)]), RED) } else { (format!("You stay in the {} league", LEAGUES[to.min(6)]), INK) };
+                    ui.label(title(msg, 10.0).color(col));
+                    if self.s.res_gems > 0 { ui.add_space(SP_S); ui.horizontal(|ui| { icon(ui, "open_gold_red_chest", 40.0); ui.label(body(format!("Podium chest: +{} gems", self.s.res_gems), 15.0).color(PURPLE)); }); }
+                    ui.add_space(SP_S);
+                    ui.label(body("A new week has begun with new rivals. Top 3 move up, the bottom 2 move down.", 13.0).color(DIM));
+                });
+                ui.add_space(SP_S);
+                if pbtn(ui, "TO THE NEW WEEK", GOLD, 0.0).clicked() { self.s.res_seen = true; self.persist(); close = true; }
+            }),
+            Modal::Import => dialog(ctx, "import", |ui| {
+                let Some(s) = self.pending_import.as_ref() else { close = true; return };
+                ui.label(title("IMPORT PROGRESS?", 11.0).color(GOLD)); ui.add_space(SP_S);
+                let lessons = s.done.len();
+                ui.label(body(format!("Hero: {}\nLevel {}  -  {} XP\n{} lessons cleared  -  {} gems", s.name, game::level(s.xp), s.xp, lessons, s.gems), 15.0));
+                ui.add_space(SP_S);
+                ui.label(body(format!("This replaces the progress of {} on this device. A copy of the current progress is kept in the save folder.", self.s.name), 13.0).color(DIM));
+                ui.add_space(SP_S);
+                if pbtn(ui, "YES, IMPORT", GOLD, 0.0).clicked() { self.apply_import(); close = true; }
+                ui.add_space(SP_S);
+                if pbtn(ui, "CANCEL", PANEL_HI, 0.0).clicked() { self.pending_import = None; close = true; }
             }),
             Modal::Reset => dialog(ctx, "reset", |ui| {
                 ui.label(title("RESET PROGRESS?", 11.0).color(RED)); ui.add_space(SP_S);
@@ -792,15 +915,17 @@ fn main() -> eframe::Result {
         let mut app = App::new(shot);
         if force_onboarding { app.onboard = Some(onboarding::Onboard::default()); }
         if let Some(t) = tab { if t == "practice" { app.sub_train = 1; } app.tab = match t.as_str() { "train" | "practice" | "community" => Tab::Train, "ranks" | "leader" => Tab::Ranks, "create" => Tab::Create, "hero" | "profile" => Tab::Hero, _ => Tab::Learn }; }
-        if let Some(sc) = screen {
+        let qa = app.demo;
+        if let Some(sc) = screen.filter(|_| qa) {
             match sc.as_str() {
                 "settings" => app.screen = Screen::Settings,
-                "editor" => app.screen = Screen::Editor(Editor { idx: None, title: "Royal Banner".into(), lang: "css".into(), code: EXAMPLES[5].code.into(), out: interp::run("css", EXAMPLES[5].code) }),
-                "sql" => app.screen = Screen::Editor(Editor { idx: None, title: "Strongest Heroes".into(), lang: "sql".into(), code: EXAMPLES[6].code.into(), out: interp::run("sql", EXAMPLES[6].code) }),
+                "editor" => app.screen = Screen::Editor(Editor { idx: None, title: "Royal Banner".into(), lang: "css".into(), code: EXAMPLES[5].code.into(), out: interp::run("css", EXAMPLES[5].code), stdin: String::new() }),
+                "sql" => app.screen = Screen::Editor(Editor { idx: None, title: "Strongest Heroes".into(), lang: "sql".into(), code: EXAMPLES[6].code.into(), out: interp::run("sql", EXAMPLES[6].code), stdin: String::new() }),
                 "complete" => app.screen = Screen::Complete(Complete { title: "Project: Wanted Poster".into(), xp: 25, gems: 5, perfect: true, score: 100, best: 100, duel: None, new_streak: true, next: Some((0, 1, 0)), project: true, summary: app.courses[0].modules[0].lessons[7].summary.clone(), cert: Some(0) }),
                 "preview" => app.screen = Screen::Preview(1),
                 "preview-js" => app.screen = Screen::Preview(2),
                 "notes" => app.screen = Screen::Notes(2, 1, 4),
+                "week" => { app.s.res_place = 2; app.s.res_from = 2; app.s.res_to = 3; app.s.res_xp = 180; app.s.res_gems = 6; app.s.res_seen = false; }
                 "cert" => { app.s.ach.insert(app.courses[0].badge_id(), today()); app.screen = Screen::Certificate(0); }
                 "shop" => app.modal = Modal::Shop,
                 "notif" => app.modal = Modal::Notif,
@@ -810,7 +935,7 @@ fn main() -> eframe::Result {
             }
         }
         // QA helper: --lesson C.M.L [--stage N] [--skip N] opens a lesson directly.
-        if let Some(spec) = lesson {
+        if let Some(spec) = lesson.filter(|_| qa) {
             let p: Vec<usize> = spec.split('.').filter_map(|x| x.parse().ok()).collect();
             if p.len() == 3 && p[0] < app.courses.len() && p[1] < app.courses[p[0]].modules.len() && p[2] < app.courses[p[0]].modules[p[1]].lessons.len() {
                 app.open_lesson(p[0], p[1], p[2]);
@@ -990,6 +1115,32 @@ mod tests {
         }
         assert_eq!(crate::preview::ymd(0), "1970-01-01");
         assert_eq!(crate::preview::ymd(20409), "2025-11-17");
+    }
+
+    #[test]
+    fn saves_are_validated_and_progress_imports() {
+        let mut app = demo_app();
+        // a hand-made save claiming a certificate and a lesson that doesn't exist
+        let mut s = Save::new();
+        s.onboarded = true; s.name = "Rook".into(); s.xp = 777;
+        s.done.insert("html/your-first-tags".into()); s.done.insert("html/not-a-lesson".into());
+        s.ach.insert(app.courses[0].badge_id(), 1);
+        App::validate(&mut s, &app.courses);
+        assert!(!s.done.contains("html/not-a-lesson"));
+        assert!(!s.ach.contains_key(&app.courses[0].badge_id()), "no certificate without finishing the course");
+        // export from one device, import on another
+        let file = s.export_text();
+        let incoming = Save::import_text(&file).expect("valid export");
+        app.pending_import = Some(Box::new(incoming));
+        app.apply_import();
+        assert_eq!(app.s.name, "Rook");
+        assert_eq!(app.s.xp, 777);
+        assert!(app.s.done.contains("html/your-first-tags"));
+        // practice with nothing to practise never pays out
+        let xp = app.s.xp;
+        app.start_run("Empty", Kind::Daily, vec![], vec![]);
+        assert!(!matches!(app.screen, Screen::Run(_)));
+        assert_eq!(app.s.xp, xp);
     }
 
     #[test]

@@ -1,7 +1,29 @@
 use super::*;
 
-fn norm_code(s: &str) -> String {
-    s.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_lowercase().trim_end_matches(';').to_string()
+/// Normalise code for comparing a typed answer: spacing outside text doesn't matter (but a space between
+/// two words does), either quote style is fine, a semicolon at the end of a line is optional. Text
+/// inside quotes must match exactly, and capitals matter except in HTML, CSS and SQL.
+pub fn norm_code(s: &str, lang: &str) -> String {
+    let fold = matches!(lang, "html" | "css" | "sql");
+    let c: Vec<char> = s.chars().collect();
+    let mut out = String::new();
+    let mut quote: Option<char> = None;
+    let mut space = false;
+    let word = |ch: char| ch.is_alphanumeric() || ch == '_' || ch == '$';
+    for i in 0..c.len() {
+        let ch = c[i];
+        if let Some(q) = quote {
+            if ch == q { quote = None; out.push('"'); } else { out.push(ch); }
+            continue;
+        }
+        if ch.is_whitespace() { space = true; continue; }
+        if ch == ';' && c[i + 1..].iter().take_while(|x| **x != '\n').all(|x| x.is_whitespace()) { space = true; continue; }
+        if space && out.chars().last().is_some_and(word) && word(ch) { out.push(' '); }
+        space = false;
+        if ch == '"' || ch == '\'' || ch == '`' { quote = Some(ch); out.push('"'); continue; }
+        if fold { out.extend(ch.to_lowercase()); } else { out.push(ch); }
+    }
+    out
 }
 
 impl App {
@@ -73,7 +95,7 @@ impl App {
                 let can = match &rs.qs[qi] { Q::Type { .. } => !rs.text.trim().is_empty(), _ => rs.sel.is_some() };
                 ui.horizontal(|ui| {
                     let hint_w = 120.0;
-                    if rs.hint_q != Some(qi)
+                    if rs.hint_q != Some(qi) && !matches!(rs.kind, Kind::Duel(_))
                         && pbtn(ui, &format!("HINT {}G", HINT_COST), PANEL_HI, hint_w).clicked() {
                             if self.s.gems >= HINT_COST { self.s.gems -= HINT_COST; rs.hint_q = Some(qi); self.persist(); } else { self.toast("Not enough gems"); }
                         }
@@ -81,7 +103,7 @@ impl App {
                     if (pbtn(ui, "CHECK", if can { GOLD } else { PANEL_HI }, w).clicked() || go) && can {
                         let (ok, why) = match &rs.qs[qi] {
                             Q::Mc { right, why, .. } | Q::Fill { right, why, .. } => (rs.sel == Some(*right), why.to_string()),
-                            Q::Type { answer, why, .. } => (norm_code(&rs.text) == norm_code(answer), if norm_code(&rs.text) == norm_code(answer) { why.to_string() } else { format!("{}  Answer: {}", why, answer) }),
+                            Q::Type { answer, why, .. } => { let ok = norm_code(&rs.text, rs.lang) == norm_code(answer, rs.lang); (ok, if ok { why.to_string() } else { format!("{}  Answer: {}", why, answer) }) }
                         };
                         rs.last = Some(qi);
                         rs.queue.remove(0);
@@ -243,6 +265,22 @@ impl App {
 }
 
 /// Small page markers under the learn pages.
+#[cfg(test)]
+mod tests {
+    use super::norm_code;
+    #[test]
+    fn answers_are_compared_fairly() {
+        assert_eq!(norm_code("print( 'hi' )", "python"), norm_code("print(\"hi\")", "python"));
+        assert_ne!(norm_code("Print(\"hi\")", "python"), norm_code("print(\"hi\")", "python"), "capitals matter in Python");
+        assert_ne!(norm_code("print(\"hiworld\")", "python"), norm_code("print(\"hi world\")", "python"), "text in quotes must match");
+        assert_ne!(norm_code("returnx", "python"), norm_code("return x", "python"), "a space between words matters");
+        assert_eq!(norm_code("let x = 1;", "javascript"), norm_code("let x=1", "javascript"));
+        assert_eq!(norm_code("select * from heroes;", "sql"), norm_code("SELECT * FROM heroes", "sql"));
+        assert_eq!(norm_code("<H1>Hi</H1>", "html"), norm_code("<h1>hi</h1>", "html"));
+        assert_eq!(norm_code("for i in range(3):\n    print(i)", "python"), norm_code("for i in range(3):\n print(i)", "python"));
+    }
+}
+
 fn page_dots(ui: &mut egui::Ui, at: usize, n: usize) {
     let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 12.0), Sense::hover());
     for i in 0..n {

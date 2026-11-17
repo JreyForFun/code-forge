@@ -16,6 +16,7 @@
   <link rel="preload" href="assets/fonts/PressStart2P.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="assets/fonts/PixelifySans.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="dungeon.css">
   <script>
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('js-motion');
   </script>
@@ -34,13 +35,22 @@
         <a href="#courses">Courses</a>
         <a href="#rules">Rules</a>
       </nav>
+      <button class="torch-toggle" type="button" aria-pressed="true" data-torch-toggle>
+        <svg viewBox="0 0 8 10" width="16" height="20" aria-hidden="true" shape-rendering="crispEdges"><path fill="#f08a24" d="M3 0h2v1h1v2h1v4H6v1H2V7H1V3h1V1h1z"/><path fill="#facc15" d="M3 3h2v1h1v3H2V4h1z"/><rect x="3" y="8" width="2" height="2" fill="#8b5a2b"/></svg>
+        <span class="torch-toggle__label">Torches</span>
+      </button>
       <a class="btn btn--gold btn--sm" href="#download">Download</a>
     </div>
   </header>
 
   <main id="main">
     <!-- 1. HERO -->
-    <section class="hero" id="top" aria-labelledby="hero-title">
+    <section class="hero room" id="top" aria-labelledby="hero-title">
+      <div class="room__dark" aria-hidden="true" data-carried-light></div>
+      <div class="wrap room__torches" aria-hidden="true">
+        <span class="torch"></span>
+        <span class="torch torch--b"></span>
+      </div>
       <div class="wrap hero__grid">
         <div class="hero__copy">
           <button class="forge" type="button" aria-label="Strike the hammer" data-forge>
@@ -55,7 +65,7 @@
             <span class="forge__sparks" aria-hidden="true"></span>
           </button>
 
-          <h1 id="hero-title" data-enter>Learn to code in a <span class="nowrap">pixel-art dungeon.</span></h1>
+          <h1 id="hero-title" data-enter>Learn to code in a <span class="keep">pixel-art</span> dungeon.</h1>
           <p class="lead" data-enter>Pick a quest, read a short scroll, fill in the missing code, then type it yourself and watch it run. 181 lessons in HTML, CSS, JavaScript, Python and SQL.</p>
           <div class="actions" data-enter>
             <a class="btn btn--gold" href="#download">Download for Windows</a>
@@ -75,7 +85,7 @@
     </section>
 
     <!-- 2. HOW A QUEST WORKS -->
-    <section class="quest band" id="quest" aria-labelledby="quest-title">
+    <section class="quest room room--deep" id="quest" aria-labelledby="quest-title">
       <div class="wrap quest__grid">
         <div class="quest__intro">
           <h2 id="quest-title">Every lesson runs the same four steps.</h2>
@@ -151,13 +161,14 @@
     </section>
 
     <!-- 3. COURSES -->
-    <section class="courses" id="courses" aria-labelledby="courses-title">
+    <section class="courses room room--vault" id="courses" aria-labelledby="courses-title">
       <div class="wrap">
         <div class="courses__head">
           <h2 id="courses-title">Five courses. Each one ends in a gold badge.</h2>
           <p class="lead">Every chapter closes with a checkpoint project worth 10 bonus XP. Badges grow with you: bronze after the first chapter, silver at halfway, gold when the course is done.</p>
         </div>
 
+        <div class="tablet">
         <table class="ledger">
           <caption class="sr-only">Code Forge courses with chapters, lessons, estimated hours and badge</caption>
           <tbody>
@@ -203,6 +214,7 @@
             </tr>
           </tbody>
         </table>
+        </div>
 
         <h3 class="between__title">Between quests</h3>
         <dl class="between">
@@ -215,14 +227,24 @@
     </section>
 
     <!-- 4. DOWNLOAD -->
-    <section class="download" id="download" aria-labelledby="download-title">
+    <section class="download room" id="download" aria-labelledby="download-title">
       <div class="wrap download__grid">
         <div class="download__copy">
-          <h2 id="download-title">Unzip it, <span class="nowrap">double-click,</span> start your first quest.</h2>
+          <div class="niche" aria-hidden="true">
+            <span class="torch torch--inline torch--c"></span>
+            <div class="chest" data-chest>
+              <span class="chest__glow"></span>
+              <img class="chest__img chest__img--shut" src="assets/ui/chest_closed.png" width="16" height="16" alt="">
+              <img class="chest__img chest__img--open" src="assets/ui/chest_open.png" width="16" height="16" alt="">
+              <span class="chest__sparks"></span>
+            </div>
+            <span class="torch torch--inline torch--d"></span>
+          </div>
+          <h2 id="download-title">Unzip it, <span class="keep">double-click,</span> start your first quest.</h2>
           <p class="lead">Code Forge is one small program for Windows. No installer, no account, no internet. Your progress is saved on your own computer, and the previous save is always kept as a backup.</p>
           <div class="actions">
             <!-- Update this link when the build is hosted (currently the local dist build). -->
-            <a class="btn btn--gold btn--lg" href="../dist/CodeForge-1.5.0-windows.zip" download>Download Code Forge 1.5.0</a>
+            <a class="btn btn--gold btn--lg" href="../dist/CodeForge-1.5.0-windows.zip" download data-chest-trigger>Download Code Forge 1.5.0</a>
           </div>
           <p class="download__meta">For Windows &middot; 4&nbsp;MB zip</p>
         </div>
@@ -246,7 +268,7 @@
         <img src="assets/logo/logo_mark.png" width="28" height="28" alt="">
         <span class="wordmark wordmark--sm"><span class="wordmark__a">CODE</span> <span class="wordmark__b">FORGE</span></span>
       </a>
-      <p class="footer__credits">Screens from Code Forge 1.5.0. Fonts: Press Start 2P, Pixelify Sans and Silkscreen (SIL OFL). Wall texture by Kenney (CC0). Badges from the Achievement Icon Pack by GTORAVERSE.</p>
+      <p class="footer__credits">Screens from Code Forge 1.5.0. Fonts: Press Start 2P, Pixelify Sans and Silkscreen (SIL OFL). Dungeon walls, frames and chest by Kenney (CC0). Badges from the Achievement Icon Pack by GTORAVERSE.</p>
     </div>
   </footer>
 

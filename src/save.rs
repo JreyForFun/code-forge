@@ -3,7 +3,9 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-pub const SAVE_VERSION: u32 = 2;
+pub const SAVE_VERSION: u32 = 4;
+/// Header line of an exported progress file.
+pub const EXPORT_TAG: &str = "codeforge-export=1";
 pub const MAX_HEARTS: u32 = 5;
 pub const MAX_SAVERS: u32 = 3;
 pub const MAX_LOG: usize = 100;
@@ -57,6 +59,30 @@ pub struct Save {
     /// Music and sound-effect volume in percent.
     pub music: u32,
     pub sfx: u32,
+    /// XP earned on each weekday of the current week (Mon..Sun), for the ghost of next week.
+    pub week_days: [u32; 7],
+    /// Last week's XP per weekday: the "You (last week)" ghost on the board.
+    pub ghost: [u32; 7],
+    /// Total XP of recent weeks (newest last, up to 4), used to tune the rivals.
+    pub hist: Vec<u32>,
+    /// Last week's result for the Monday ceremony: place (1-based, 0 = none), league before/after,
+    /// XP, gem reward, and whether it has been shown.
+    pub res_place: u32,
+    pub res_from: u32,
+    pub res_to: u32,
+    pub res_xp: u32,
+    pub res_gems: u32,
+    pub res_seen: bool,
+    /// Daily budget for XP from repeats (replays, reviews, extra quests, duels).
+    pub rep_day: u64,
+    pub rep_xp: u32,
+    /// Duel wins rewarded today.
+    pub duel_day: u64,
+    pub duel_today: u32,
+    /// The furthest day the app has seen; the calendar never goes back past it.
+    pub seen_day: u64,
+    /// Set when the file failed its checksum (edited outside the app). Not saved.
+    pub tampered: bool,
 }
 
 impl Default for Save {
@@ -71,6 +97,8 @@ impl Save {
             week_id: 0, week_mask: 0, week_xp: 0, done: HashSet::new(), best: HashMap::new(), qdone: HashMap::new(),
             free_day: 0, goal: 7, league: 0, last_result: String::new(), scan: true, floor: true, notif_read: false,
             codes: vec![], ach: BTreeMap::new(), log: vec![], duel_wins: 0, flawless: 0, duel_losses: 0, reviews: 0, daily_day: 0, daily_streak: 0, solved: BTreeSet::new(), zoom: 100, music: 60, sfx: 80,
+            week_days: [0; 7], ghost: [0; 7], hist: vec![], res_place: 0, res_from: 0, res_to: 0, res_xp: 0, res_gems: 0, res_seen: true,
+            rep_day: 0, rep_xp: 0, duel_day: 0, duel_today: 0, seen_day: 0, tampered: false,
         }
     }
 
@@ -128,6 +156,21 @@ impl Save {
                 "duel_losses" => s.duel_losses = u(0),
                 "reviews" => s.reviews = u(0),
                 "music" => s.music = u(60).min(100),
+                "week_days" => s.week_days = days7(v),
+                "ghost" => s.ghost = days7(v),
+                "hist" => s.hist = v.split(',').filter_map(|x| x.trim().parse().ok()).take(4).collect(),
+                "res_place" => s.res_place = u(0).min(99),
+                "res_from" => s.res_from = u(0).min(6),
+                "res_to" => s.res_to = u(0).min(6),
+                "res_xp" => s.res_xp = u(0),
+                "res_gems" => s.res_gems = u(0).min(50),
+                "res_seen" => s.res_seen = b,
+                "rep_day" => s.rep_day = n.unwrap_or(0),
+                "rep_xp" => s.rep_xp = u(0),
+                "duel_day" => s.duel_day = n.unwrap_or(0),
+                "duel_today" => s.duel_today = u(0),
+                "seen_day" => s.seen_day = n.unwrap_or(0),
+                "check" => {}
                 "sfx" => s.sfx = u(80).min(100),
                 "zoom" => { let z = u(100); s.zoom = if [100, 115, 130].contains(&z) { z } else { 100 }; }
                 "daily_day" => s.daily_day = n.unwrap_or(0),
@@ -154,6 +197,11 @@ impl Save {
             }
         }
         s.streak_max = s.streak_max.max(s.streak);
+        // integrity: files written by this version carry a checksum of everything above it
+        let body: String = text.lines().filter(|l| !l.starts_with("check=")).map(|l| format!("{}\n", l)).collect();
+        let check = text.lines().find_map(|l| l.strip_prefix("check="));
+        s.tampered = match check { Some(c) => c.trim() != checksum(&body), None => version >= 4 };
+        s.sanitize();
         s.version = SAVE_VERSION;
         if version < 2 && !saw_onboarded {
             // Legacy prototype save: anyone who already played skips the welcome flow.
@@ -195,7 +243,48 @@ impl Save {
         for (t, l, c) in &self.codes { w("code", format!("{}\u{1f}{}\u{1f}{}", one(t), one(l), c.replace('\r', "").replace('\n', "\u{1e}"))); }
         for (id, d) in &self.ach { w("ach", format!("{}|{}", id, d)); }
         for (d, t) in &self.log { w("log", format!("{}|{}", d, one(t))); }
+        let join = |a: &[u32]| a.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(",");
+        w("week_days", join(&self.week_days));
+        w("ghost", join(&self.ghost));
+        w("hist", join(&self.hist));
+        for (k, v) in [("res_place", self.res_place), ("res_from", self.res_from), ("res_to", self.res_to), ("res_xp", self.res_xp), ("res_gems", self.res_gems), ("rep_xp", self.rep_xp), ("duel_today", self.duel_today)] { w(k, v.to_string()); }
+        w("res_seen", (self.res_seen as u8).to_string());
+        for (k, v) in [("rep_day", self.rep_day), ("duel_day", self.duel_day), ("seen_day", self.seen_day)] { w(k, v.to_string()); }
+        let c = checksum(&o);
+        o.push_str("check="); o.push_str(&c); o.push('\n');
         o
+    }
+
+    /// Keep every value inside what the game can produce, whatever the file says.
+    pub fn sanitize(&mut self) {
+        self.hearts = self.hearts.min(MAX_HEARTS);
+        self.savers = self.savers.min(MAX_SAVERS);
+        self.league = self.league.min(6);
+        self.xp = self.xp.min(10_000_000);
+        self.gems = self.gems.min(100_000);
+        self.week_xp = self.week_xp.min(self.xp);
+        self.streak_max = self.streak_max.max(self.streak);
+        if self.tampered {
+            // edited by hand: currency is not trusted
+            self.gems = self.gems.min(20);
+        }
+    }
+
+    /// A progress file to move to another device (the save itself, tagged).
+    pub fn export_text(&self) -> String {
+        let mut c = self.clone();
+        c.tampered = false;
+        format!("{}\n{}", EXPORT_TAG, c.serialize())
+    }
+
+    /// Read an exported progress file. Refuses files that are not Code Forge exports or were changed.
+    pub fn import_text(text: &str) -> Result<Save, &'static str> {
+        let text = text.trim_start_matches('\u{feff}');
+        let Some(body) = text.strip_prefix(EXPORT_TAG) else { return Err("This is not a Code Forge progress file.") };
+        let s = Save::parse(body.trim_start_matches(['\r', '\n']));
+        if s.tampered { return Err("This file was changed or damaged, so it can't be imported."); }
+        if !s.onboarded { return Err("This progress file has no hero in it yet."); }
+        Ok(s)
     }
 
     pub fn dir() -> PathBuf {
@@ -236,6 +325,19 @@ impl Save {
     }
 }
 
+fn days7(v: &str) -> [u32; 7] {
+    let mut a = [0u32; 7];
+    for (i, x) in v.split(',').take(7).enumerate() { a[i] = x.trim().parse().unwrap_or(0); }
+    a
+}
+
+/// Checksum of a save's text. It stops casual hand-editing; it is not encryption.
+pub fn checksum(body: &str) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ 0x5eed_c0de_f0e5_e000;
+    for b in "code-forge/anvil".bytes().chain(body.replace('\r', "").bytes()) { h ^= b as u64; h = h.wrapping_mul(0x0100_0000_01b3); h ^= h >> 29; }
+    format!("{:016x}", h)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,6 +355,25 @@ mod tests {
         s.add_log(20000, "cleared 'Tags'");
         s.duel_wins = 2; s.flawless = 5;
         s
+    }
+
+    #[test]
+    fn checksum_catches_hand_edits_and_export_round_trips() {
+        let mut s = sample();
+        s.week_days = [1, 2, 3, 4, 5, 6, 7]; s.ghost = [9, 0, 0, 0, 0, 0, 10]; s.hist = vec![40, 120];
+        let text = s.serialize();
+        assert!(!Save::parse(&text).tampered);
+        let edited = text.replace("gems=7", "gems=99999");
+        let t = Save::parse(&edited);
+        assert!(t.tampered, "editing the file must be noticed");
+        assert!(t.gems <= 20, "edited currency is not trusted");
+        let no_check: String = text.lines().filter(|l| !l.starts_with("check=")).map(|l| format!("{}\n", l)).collect();
+        assert!(Save::parse(&no_check).tampered, "removing the checksum line is noticed too");
+        // export and import
+        let back = Save::import_text(&s.export_text()).unwrap();
+        assert_eq!(back.name, "Ada"); assert_eq!(back.xp, 420); assert_eq!(back.ghost, s.ghost);
+        assert!(Save::import_text(&s.export_text().replace("xp=420", "xp=999999")).is_err());
+        assert!(Save::import_text("hello").is_err());
     }
 
     #[test]

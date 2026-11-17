@@ -2,6 +2,18 @@ use super::*;
 
 fn locked_grey() -> Color32 { Color32::from_rgb(0x47, 0x55, 0x69) }
 
+/// A labelled divider on the league board (promotion / demotion line).
+fn zone_line(ui: &mut egui::Ui, label: &str, color: Color32) {
+    let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 16.0), Sense::hover());
+    let y = r.center().y;
+    ui.painter().rect_filled(Rect::from_min_max(Pos2::new(r.min.x, y - 1.0), Pos2::new(r.max.x, y + 1.0)), 0.0, color.gamma_multiply(0.7));
+    let g = ui.painter().layout_no_wrap(label.to_string(), FontId::new(7.0, press()), color);
+    let tr = Rect::from_center_size(r.center(), g.size() + Vec2::new(12.0, 4.0));
+    ui.painter().rect_filled(tr, 0.0, BG);
+    ui.painter().galley(tr.min + Vec2::new(6.0, 2.0), g, color);
+    ui.add_space(SP_XS);
+}
+
 impl App {
     // ------------------------------------------------------------ LEARN
     pub fn learn(&mut self, ui: &mut egui::Ui) {
@@ -326,7 +338,7 @@ impl App {
         ui.add_space(SP_S);
         ui.vertical_centered(|ui| ui.label(title(format!("{} League", LEAGUES[league]), 12.0).color(cols[league])));
         ui.add_space(SP_XS);
-        ui.vertical_centered(|ui| ui.label(body("You compete with computer rivals. The week resets every Monday.", 12.0).color(DIM)));
+        ui.vertical_centered(|ui| ui.label(body("Race five computer rivals and your own last week. A new week starts every Monday.", 12.0).color(DIM)));
         ui.add_space(SP_M);
         if self.s.week_xp == 0 {
             ui.add_space(SP_XL);
@@ -341,32 +353,45 @@ impl App {
             return;
         }
         let wd = game::weekday(today());
-        let mut rows: Vec<(String, u32, Option<&'static str>)> = RIVALS.iter().map(|r| (r.name.to_string(), rival_xp(r, self.s.league, wd), Some(r.art))).collect();
-        rows.push((self.s.name.clone(), self.s.week_xp, None));
-        rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.is_some().cmp(&b.2.is_some())));
+        let frac = day_frac();
+        let rows = game::board(&self.s, wd, frac);
+        let place = game::place(&rows);
+        let n = rows.len();
+        let left_h = (((7 - wd) as f32 - frac) * 24.0).max(0.0) as u32;
+        ui.vertical_centered(|ui| ui.label(body(format!("Week ends in {}d {}h  -  top {} move up, bottom {} move down", left_h / 24, left_h % 24, game::PROMOTE_TOP, game::DEMOTE_BOTTOM), 12.0).color(DIM)));
+        ui.add_space(SP_S);
         let medal = [GOLD, Color32::from_rgb(0xc8, 0xcc, 0xd8), Color32::from_rgb(0xc0, 0x80, 0x40)];
-        for (i, (n, x, art)) in rows.iter().enumerate() {
-            let me = art.is_none();
-            panel(ui, if me { Color32::from_rgb(0x4a, 0x3a, 0x1a) } else { PANEL }, if me { GOLD } else { EDGE }, |ui| {
+        for (i, row) in rows.iter().enumerate() {
+            if i == n - game::DEMOTE_BOTTOM && league > 0 { zone_line(ui, "DEMOTION ZONE", RED); }
+            let me = row.who == game::Who::You;
+            let ghost = row.who == game::Who::Ghost;
+            panel(ui, if me { Color32::from_rgb(0x4a, 0x3a, 0x1a) } else if ghost { Color32::from_rgb(0x16, 0x14, 0x22) } else { PANEL }, if me { GOLD } else { EDGE }, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     let (r, _) = ui.allocate_exact_size(Vec2::splat(30.0), Sense::hover());
                     bevel(ui.painter(), r, if i < 3 { medal[i] } else { PANEL_HI }, false);
                     ui.painter().text(r.center(), Align2::CENTER_CENTER, format!("{}", i + 1), FontId::new(10.0, press()), if i < 3 { EDGE } else { INK });
                     let (ar, _) = ui.allocate_exact_size(Vec2::splat(32.0), Sense::hover());
-                    draw_icon(ui.painter(), ar, art.unwrap_or(avatar(self.s.avatar).art), Color32::WHITE);
+                    let art = if row.art.is_empty() { avatar(self.s.avatar).art } else { row.art };
+                    draw_icon(ui.painter(), ar, art, if ghost { Color32::from_rgba_unmultiplied(160, 170, 200, 120) } else { Color32::WHITE });
                     ui.vertical(|ui| {
-                        ui.label(body(n.clone(), 15.0));
-                        ui.label(body(if me { "you" } else { "computer rival" }, 11.0).color(if me { GOLD } else { DIM }));
+                        ui.label(body(row.name.clone(), 15.0).color(if ghost { DIM } else { INK }));
+                        let sub = match &row.who { game::Who::You => "you".to_string(), game::Who::Ghost => "your own score last week, replayed".into(), game::Who::Rival(st) => format!("computer rival  -  {}", st.label()) };
+                        ui.label(body(sub, 11.0).color(if me { GOLD } else { DIM }));
                     });
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| { ui.label(title(format!("{} XP", x), 9.0).color(GOLD)); });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| { ui.label(title(format!("{} XP", row.xp), 9.0).color(if ghost { DIM } else { GOLD })); });
                 });
             });
+            if i + 1 == game::PROMOTE_TOP && league < 6 { zone_line(ui, "PROMOTION ZONE ABOVE", GREEN); }
         }
         ui.add_space(SP_XS);
-        let up = if self.s.league >= 6 { "You are in the top league. Stay active to keep your place.".to_string() } else { format!("Earn {} XP this week to reach {} ({} so far). Earn none and you drop a league.", LEAGUE_UP_XP, LEAGUES[(league + 1).min(6)], self.s.week_xp) };
-        ui.label(body(up, 12.0).color(DIM));
-        bar(ui, self.s.week_xp as f32 / LEAGUE_UP_XP as f32, GOLD, 10.0);
+        let third = rows.get(game::PROMOTE_TOP - 1).map(|r| r.xp).unwrap_or(0);
+        let tip = if self.s.week_xp == 0 { "Earn XP this week or you drop a league. One lesson is enough to get going.".to_string() }
+            else if place <= game::PROMOTE_TOP { if league >= 6 { "You're on the podium of the top league. Stay there!".into() } else { "You're in the promotion zone. Hold on until Sunday night!".into() } }
+            else { format!("{} more XP puts you in 3rd place.", third.saturating_sub(self.s.week_xp) + 1) };
+        ui.label(body(tip, 13.0).color(if place <= game::PROMOTE_TOP { GREEN } else { DIM }));
+        ui.add_space(SP_XS);
+        ui.label(body(format!("Podium chests: {} / {} / {} gems. Rivals are computer characters tuned to your pace, so every week is a close race.", game::PODIUM_GEMS[0], game::PODIUM_GEMS[1], game::PODIUM_GEMS[2]), 11.0).color(DIM));
         ui.add_space(SP_M);
     }
 
@@ -395,7 +420,7 @@ impl App {
                         });
                     });
                 });
-                if resp.clicked() { self.screen = Screen::Editor(Editor { idx: Some(i), title: self.s.codes[i].0.clone(), lang: lg, code, out: vec![] }); }
+                if resp.clicked() { self.screen = Screen::Editor(Editor { idx: Some(i), title: self.s.codes[i].0.clone(), lang: lg, code, out: vec![], stdin: String::new() }); }
             }
             ui.add_space(70.0);
         } else {
@@ -409,7 +434,7 @@ impl App {
                         ui.vertical(|ui| { ui.label(body(e.title, 16.0)); ui.label(body(e.desc, 12.0).color(DIM)); });
                     });
                 });
-                if resp.clicked() { self.screen = Screen::Editor(Editor { idx: None, title: e.title.into(), lang: e.lang.into(), code: e.code.into(), out: interp::run(e.lang, e.code) }); }
+                if resp.clicked() { self.screen = Screen::Editor(Editor { idx: None, title: e.title.into(), lang: e.lang.into(), code: e.code.into(), out: interp::run(e.lang, e.code), stdin: String::new() }); }
             }
             ui.add_space(70.0);
         }
@@ -419,7 +444,7 @@ impl App {
         bevel(ui.painter(), fr, if resp.hovered() { shade(GREEN, 1.15) } else { GREEN }, true);
         ui.painter().rect_filled(Rect::from_center_size(fr.center(), Vec2::new(24.0, 6.0)), 0.0, Color32::WHITE);
         ui.painter().rect_filled(Rect::from_center_size(fr.center(), Vec2::new(6.0, 24.0)), 0.0, Color32::WHITE);
-        if resp.clicked() { self.screen = Screen::Editor(Editor { idx: None, title: "Untitled".into(), lang: "python".into(), code: data::starter("python").into(), out: vec![] }); }
+        if resp.clicked() { self.screen = Screen::Editor(Editor { idx: None, title: "Untitled".into(), lang: "python".into(), code: data::starter("python").into(), out: vec![], stdin: String::new() }); }
     }
 
     // ------------------------------------------------------------ HERO

@@ -46,7 +46,7 @@ A table looks like a spreadsheet:
 - The id column gives every row a unique number.
 
 ## Your practice database
-Code Forge has four tables you can query: heroes, items, guilds and quests. The Spell Forge shows their columns when you pick SQL.
+Code Forge has four tables you can query: heroes, items, guilds and quests. The Spell Lab shows their columns when you pick SQL.
 
 ## Your first query
     SELECT * FROM heroes;

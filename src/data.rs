@@ -185,24 +185,35 @@ pub fn duel_questions(seed: u64) -> Vec<Q> {
 }
 
 // ----- weekly league rivals (computer characters) -----
-pub struct Rival { pub name: &'static str, pub pace: f32, pub art: &'static str }
+/// How a computer rival spreads its XP over the week.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Style { Steady, Weekend, EarlyBird, LateRush, Streaky }
+impl Style {
+    pub fn label(&self) -> &'static str { match self { Style::Steady => "steady", Style::Weekend => "weekend sprinter", Style::EarlyBird => "early bird", Style::LateRush => "late rush", Style::Streaky => "streaky" } }
+    /// Share of the week's XP earned on each weekday (Mon..Sun), sums to 1.
+    pub fn days(&self) -> [f32; 7] {
+        match self {
+            Style::Steady => [1.0 / 7.0; 7],
+            Style::Weekend => [0.07, 0.07, 0.08, 0.08, 0.1, 0.3, 0.3],
+            Style::EarlyBird => [0.25, 0.2, 0.16, 0.13, 0.11, 0.08, 0.07],
+            Style::LateRush => [0.06, 0.07, 0.09, 0.12, 0.16, 0.22, 0.28],
+            Style::Streaky => [0.2, 0.03, 0.22, 0.02, 0.2, 0.03, 0.3],
+        }
+    }
+}
+pub struct Rival { pub name: &'static str, pub style: Style, pub art: &'static str }
 pub const RIVALS: &[Rival] = &[
-    Rival { name: "Sir Byte", pace: 2.6, art: "helmet_knight" },
-    Rival { name: "Hex the Wise", pace: 2.0, art: "hat_wizard" },
-    Rival { name: "Loop Ranger", pace: 1.6, art: "bow" },
-    Rival { name: "Syntax Smith", pace: 1.25, art: "hammer" },
-    Rival { name: "Null Mage", pace: 0.95, art: "potion_magic" },
-    Rival { name: "Pixel Squire", pace: 0.7, art: "helmet_bronze" },
-    Rival { name: "Bug Hunter", pace: 0.45, art: "axe" },
-    Rival { name: "Echo Mystic", pace: 0.25, art: "mystic_figure" },
+    Rival { name: "Sir Byte", style: Style::Steady, art: "helmet_knight" },
+    Rival { name: "Hex the Wise", style: Style::Weekend, art: "hat_wizard" },
+    Rival { name: "Loop Ranger", style: Style::EarlyBird, art: "bow" },
+    Rival { name: "Syntax Smith", style: Style::Steady, art: "hammer" },
+    Rival { name: "Null Mage", style: Style::LateRush, art: "potion_magic" },
+    Rival { name: "Pixel Squire", style: Style::Streaky, art: "helmet_bronze" },
+    Rival { name: "Bug Hunter", style: Style::Weekend, art: "axe" },
+    Rival { name: "Echo Mystic", style: Style::EarlyBird, art: "mystic_figure" },
 ];
 
-/// A rival's XP this week, growing with the weekday so the table moves during the week.
-pub fn rival_xp(r: &Rival, league: u32, weekday: usize) -> u32 {
-    let base = 20.0 + league as f32 * 12.0;
-    let progress = (weekday as f32 + 1.0) / 7.0;
-    ((base * r.pace * progress * 1.6) as u32) / 5 * 5
-}
+
 
 // ----- bundled example programs (no fake authors or stats) -----
 pub struct Example { pub title: &'static str, pub lang: &'static str, pub desc: &'static str, pub code: &'static str }
@@ -264,8 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn rivals_scale_with_week() {
-        assert!(rival_xp(&RIVALS[0], 0, 6) > rival_xp(&RIVALS[0], 0, 0));
-        assert!(rival_xp(&RIVALS[0], 3, 3) > rival_xp(&RIVALS[0], 0, 3));
+    fn rival_styles_sum_to_one() {
+        for r in RIVALS { let s: f32 = r.style.days().iter().sum(); assert!((s - 1.0).abs() < 0.01, "{}", r.name); }
     }
 }

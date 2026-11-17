@@ -290,6 +290,8 @@ struct Run<'l> {
     lines: &'l [Line], vars: HashMap<String, V>, funcs: HashMap<String, Func>, out: Vec<(Kind, String)>,
     steps: u32, js: bool, depth: u32, ret: Option<V>, seed: u64, dom: HashMap<String, Vec<(String, V)>>,
     classes: HashMap<String, Class>,
+    /// Lines given to input() / prompt(), in order.
+    stdin: std::collections::VecDeque<String>,
     /// local name -> qualified module name ("math" -> "math", "sqrt" -> "math.sqrt")
     imports: HashMap<String, String>,
 }
@@ -701,7 +703,15 @@ impl<'l> Run<'l> {
             "list" => match arg0()? { V::S(s) => V::L(s.chars().map(|c| V::S(c.to_string())).collect()), V::L(l) => V::L(l), _ => return Err("list() needs text or a list".into()) },
             "range" => { let (s, e) = if a.len() >= 2 { (n(0)?, n(1)?) } else { (0.0, n(0)?) }; V::L((0..((e - s).max(0.0) as usize).min(MAX_LIST)).map(|k| V::N(s + k as f64)).collect()) }
             "alert" => { let t = self.show(&arg0()?); self.page(format!("[alert] {}", t))?; V::Nil }
-            "input" | "prompt" => V::S(String::new()),
+            "input" | "prompt" => {
+                let ask = a.first().map(|x| self.show(x)).unwrap_or_default();
+                let ans = self.stdin.pop_front().unwrap_or_default();
+                if !ask.is_empty() || !ans.is_empty() {
+                    if self.out.len() >= MAX_OUT { return Err("stopped: too much output".into()); }
+                    self.out.push((Kind::Out, format!("{}{}", ask, ans)));
+                }
+                V::S(ans)
+            }
             "Object.keys" => match arg0()? { V::O(o) => V::L(o.iter().filter(|(k, _)| !k.starts_with("__")).map(|(k, _)| V::S(k.clone())).collect()), _ => return Err("Object.keys() needs an object".into()) },
             "Object.values" => match arg0()? { V::O(o) => V::L(o.iter().filter(|(k, _)| !k.starts_with("__")).map(|(_, v)| v.clone()).collect()), _ => return Err("Object.values() needs an object".into()) },
             "Array.isArray" => V::B(matches!(arg0()?, V::L(_))),
@@ -1244,18 +1254,21 @@ fn balanced(s: &str) -> bool {
 
 /// Run a program. Interpreting is recursive (nested blocks and function calls), so each run gets
 /// its own thread with a roomy stack; the bounded step/depth limits keep it short-lived.
-pub fn run(lang: &str, src: &str) -> Vec<(Kind, String)> {
-    let (l, s) = (lang.to_string(), src.to_string());
+pub fn run(lang: &str, src: &str) -> Vec<(Kind, String)> { run_with_input(lang, src, "") }
+
+/// Run a program; `input` holds the answers for input() / prompt(), one per line.
+pub fn run_with_input(lang: &str, src: &str, input: &str) -> Vec<(Kind, String)> {
+    let (l, s, inp) = (lang.to_string(), src.to_string(), input.to_string());
     std::thread::Builder::new()
         .name("interp".into())
         .stack_size(64 << 20)
-        .spawn(move || run_here(&l, &s))
+        .spawn(move || run_here(&l, &s, &inp))
         .ok()
         .and_then(|h| h.join().ok())
         .unwrap_or_else(|| vec![(Kind::Err, "Something went wrong while running this code.".into())])
 }
 
-fn run_here(lang: &str, src: &str) -> Vec<(Kind, String)> {
+fn run_here(lang: &str, src: &str, input: &str) -> Vec<(Kind, String)> {
     if src.len() > MAX_SRC { return vec![(Kind::Err, format!("This program is too long to run ({} characters, limit {}).", src.len(), MAX_SRC))]; }
     match lang {
         "html" => return html(src),
@@ -1267,7 +1280,7 @@ fn run_here(lang: &str, src: &str) -> Vec<(Kind, String)> {
     let lines = normalize(src, js);
     let n = lines.len();
     let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(42) | 1;
-    let mut r = Run { lines: &lines, vars: HashMap::new(), funcs: HashMap::new(), out: vec![], steps: 0, js, depth: 0, ret: None, seed, dom: HashMap::new(), classes: HashMap::new(), imports: HashMap::new() };
+    let mut r = Run { lines: &lines, vars: HashMap::new(), funcs: HashMap::new(), out: vec![], steps: 0, js, depth: 0, ret: None, seed, dom: HashMap::new(), classes: HashMap::new(), imports: HashMap::new(), stdin: input.lines().map(|l| l.to_string()).collect() };
     match r.exec(0, n) {
         Err(e) => r.out.push((Kind::Err, e)),
         Ok(Flow::Return) => r.out.push((Kind::Err, "'return' only works inside a function".into())),
@@ -1568,6 +1581,14 @@ mod tests_v3 {
         assert_eq!(o("print(\"-\".join([\"a\", \"b\"]), \"hi there\".title(), \"banana\".count(\"a\"))"), ["a-b Hi There 3"]);
         assert_eq!(o("print(round(3.14159, 2))"), ["3.14"]);
         assert_eq!(o("bag = {\"gold\": 5}\ng = bag.pop(\"gold\")\nprint(g, bag)"), ["5 {}"]);
+    }
+
+    #[test]
+    fn input_reads_program_input() {
+        let out = super::run_with_input("python", "name = input(\"Name? \")\nage = int(input(\"Age? \"))\nprint(name, age + 1)", "Pix\n12");
+        let t: Vec<String> = out.into_iter().map(|(_, t)| t).collect();
+        assert_eq!(t, ["Name? Pix", "Age? 12", "Pix 13"]);
+        assert_eq!(o("x = input()\nprint(len(x))"), ["0"], "no input means empty text");
     }
 
     #[test]

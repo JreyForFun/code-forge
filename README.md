@@ -6,7 +6,7 @@ computer.
 
 ## Quick start (players)
 
-1. Unzip `CodeForge-1.6.0-windows.zip` anywhere.
+1. Unzip `CodeForge-1.0.0-windows.zip` anywhere.
 2. Double-click **CodeForge.exe**.
 3. Choose a name, a hero and your first course, then start learning.
 
@@ -31,7 +31,7 @@ Nothing to install, no account, no internet needed.
   page changing, HTML shows a preview including forms, CSS shows the styled result, and SQL runs
   against a sample database (heroes, items, guilds, quests) with filters, totals, joins, INSERT,
   UPDATE, DELETE and CREATE TABLE.
-- **Spell Forge**: write, run and save your own programs in any of the five languages, or start
+- **Spell Lab**: write, run and save your own programs in any of the five languages, or start
   from bundled examples.
 - **Practice**: a **Daily Quest** (5 mixed questions, +15 XP once a day), **course reviews** from lessons
   you've cleared, 10 **quick challenges** across all five languages, and a **Duel Arena** with four
@@ -48,8 +48,12 @@ Nothing to install, no account, no internet needed.
   everything as WAV files.
 - **Animated welcome**: the logo is forged in front of you: the iron head drops, the handle slides in,
   the runes `< / >` fly into place and a final hammer strike sends sparks flying.
-- **Progress**: XP and levels, gems, a daily streak with streak savers, 7 weekly leagues against
-  computer rivals, 12 achievements and an adventure log.
+- **Weekly leagues**: 7 leagues. Each week you race five computer rivals tuned to your own pace (each
+  with a style: steady, weekend sprinter, early bird, late rush, streaky) and a ghost of your own last
+  week. Finish top 3 to move up (with a podium chest), bottom 2 to move down. Monday brings a results
+  ceremony.
+- **Progress**: XP and levels, gems, a daily streak with streak savers, 12 achievements, course badges,
+  certificates and an adventure log.
 - **Keyboard friendly**: Enter = next/check/continue, 1–5 = pick an answer, Esc = leave a lesson,
   Ctrl+Enter or F5 = run code in the editor.
 
@@ -58,14 +62,24 @@ Nothing to install, no account, no internet needed.
 | | |
 |---|---|
 | Hearts | 5 max. A wrong answer costs 1. Hearts refill 1 every 5 minutes, or 10 gems for a full refill, or 1 free per day |
-| XP | First clear 10 XP (+5 if flawless) and 5 gems. Replays give 5 XP. 100 XP per level |
+| XP | First clear 10 XP (+5 if flawless) and 5 gems. 100 XP per level. Repeats (replays, extra daily quests, reviews, solved challenges, extra duels) give up to 60 XP a day in total |
+| Duels | Win: +20 XP and 5 gems, for the first 3 wins each day. Duels never cost hearts |
 | Streak | Clear one lesson a day. A streak saver (20 gems) covers one missed day |
-| Leagues | Earn 100 XP in a week to move up. Earn none and you drop one |
+| Leagues | Top 3 of 7 move up (10 / 6 / 3 gems), bottom 2 move down, no XP at all also drops you |
+| Days | A new day starts at your local midnight. Turning the clock back does not give a day back |
 
 ## Your data
 
 Progress is saved to `%APPDATA%\code_forge\save.txt` (saves from Pixel Learn 1.x in `%APPDATA%\pixel_learn` are copied over automatically). Every save is written safely: the previous
 save is kept as `save.bak`. Delete the folder to start over, or use *Settings → Reset progress*.
+
+**Changing device:** *Settings → Export* saves your progress to a `.codeforge` file. On the new device,
+choose *Import progress* on the welcome screen or in Settings (or drop the file onto the window). The
+file is checked before it is used, and the progress it replaces is kept as `save.before-import.txt`.
+
+**Fair play:** the save carries a checksum. If it is edited by hand, the game notices, resets the gems
+and drops anything it could not have produced (unknown lessons, certificates for unfinished courses).
+This keeps casual cheating out; it is an offline game, so it is not meant as real security.
 
 ## Building from source
 

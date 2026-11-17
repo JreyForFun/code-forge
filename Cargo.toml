@@ -1,6 +1,6 @@
 [package]
 name = "code_forge"
-version = "1.6.0"
+version = "1.0.0"
 edition = "2024"
 description = "Code Forge - learn to code in a pixel-art RPG"
 license = "LicenseRef-Proprietary"
@@ -14,6 +14,8 @@ path = "src/main.rs"
 eframe = { version = "0.37.0", default-features = false, features = ["accesskit", "clipboard", "default_fonts", "glow", "links", "wayland", "x11"] }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 rodio = { version = "0.19", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+rfd = "0.15"
 
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"

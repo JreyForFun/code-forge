@@ -172,4 +172,88 @@
     row.addEventListener('pointerenter', grow);
     row.addEventListener('pointerleave', shrink);
   });
+
+  /* ---------------- Dungeon: torches you can snuff ---------------- */
+  const toggle = document.querySelector('[data-torch-toggle]');
+  const store = {
+    get() { try { return localStorage.getItem('cf-torches'); } catch { return null; } },
+    set(v) { try { localStorage.setItem('cf-torches', v); } catch { /* private mode */ } },
+  };
+  let torchesLit = store.get() !== 'out';
+  function applyTorches() {
+    root.classList.toggle('torches-out', !torchesLit);
+    toggle.setAttribute('aria-pressed', String(torchesLit));
+    toggle.setAttribute('aria-label', torchesLit ? 'Torches lit: stop the flicker' : 'Torches out: light them');
+  }
+  applyTorches();
+  toggle.addEventListener('click', () => {
+    torchesLit = !torchesLit;
+    store.set(torchesLit ? 'lit' : 'out');
+    applyTorches();
+  });
+
+  /* ---------------- The light you carry through the hero ---------------- */
+  const hero = document.querySelector('.hero');
+  const dark = document.querySelector('[data-carried-light]');
+  const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (dark && finePointer && !reduce) {
+    let tx = 0, ty = 0, x = 0, y = 0, raf = 0, placed = false;
+    const home = () => {
+      const f = forge.getBoundingClientRect(), h = hero.getBoundingClientRect();
+      return [f.left - h.left + f.width / 2, f.top - h.top + f.height / 2];
+    };
+    [x, y] = home(); tx = x; ty = y;
+    const paint = () => { dark.style.setProperty('--lx', `${x.toFixed(1)}px`); dark.style.setProperty('--ly', `${y.toFixed(1)}px`); };
+    paint();
+    const tick = () => {
+      // Damped follow: the light trails the hand a little, like a carried torch.
+      x += (tx - x) * 0.14; y += (ty - y) * 0.14;
+      paint();
+      raf = Math.abs(tx - x) + Math.abs(ty - y) > 0.5 ? requestAnimationFrame(tick) : 0;
+    };
+    hero.addEventListener('pointermove', (e) => {
+      if (!torchesLit) return;
+      const h = hero.getBoundingClientRect();
+      tx = e.clientX - h.left; ty = e.clientY - h.top;
+      if (!placed) { placed = true; }
+      if (!raf) raf = requestAnimationFrame(tick);
+    });
+    hero.addEventListener('pointerleave', () => {
+      [tx, ty] = home();
+      if (!raf) raf = requestAnimationFrame(tick);
+    });
+  } else if (dark) {
+    const f = forge.getBoundingClientRect(), h = hero.getBoundingClientRect();
+    dark.style.setProperty('--lx', `${f.left - h.left + f.width / 2}px`);
+    dark.style.setProperty('--ly', `${f.top - h.top + f.height / 2}px`);
+  }
+
+  /* ---------------- The treasure chest opens as you reach for the download ---------------- */
+  const chest = document.querySelector('[data-chest]');
+  const trigger = document.querySelector('[data-chest-trigger]');
+  if (chest && trigger) {
+    const coinBox = chest.querySelector('.chest__sparks');
+    let closeTimer = 0;
+    const open = () => {
+      clearTimeout(closeTimer);
+      if (chest.classList.contains('is-open')) return;
+      chest.classList.add('is-open');
+      if (!canAnimate) return;
+      M.animate(chest, { y: [0, -6, 0], scale: [1, 1.05, 1] }, { duration: 0.32, ease: EASE });
+      for (let i = 0; i < 12; i++) {
+        const s = document.createElement('span');
+        s.className = 'spark';
+        coinBox.appendChild(s);
+        const dx = (Math.random() - 0.5) * 120;
+        const up = 50 + Math.random() * 60;
+        M.animate(s, { x: [0, dx], y: [0, -up, -up + 30], opacity: [1, 1, 0] },
+          { duration: 0.6 + Math.random() * 0.3, ease: 'easeOut' }).then(() => s.remove());
+      }
+    };
+    const close = () => { closeTimer = setTimeout(() => chest.classList.remove('is-open'), 350); };
+    trigger.addEventListener('pointerenter', open);
+    trigger.addEventListener('focus', open);
+    trigger.addEventListener('pointerleave', close);
+    trigger.addEventListener('blur', close);
+  }
 })();

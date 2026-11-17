@@ -5,7 +5,6 @@ pub const XP_PER_LEVEL: u32 = 100;
 pub const HEART_SECS: u64 = 300;
 pub const REFILL_COST: u32 = 10;
 pub const SAVER_COST: u32 = 20;
-pub const LEAGUE_UP_XP: u32 = 100;
 pub const HINT_COST: u32 = 1;
 /// Extra XP for the first clear of a checkpoint project.
 pub const PROJECT_BONUS: u32 = 10;
@@ -97,13 +96,24 @@ pub fn week_roll(s: &mut Save, day: u64) -> Option<LeagueResult> {
     if s.week_id == wk || (s.week_id > wk && s.week_id != 0) { return None; }
     let mut out = None;
     if s.week_id != 0 {
-        let r = if s.week_xp >= LEAGUE_UP_XP && s.league < 6 { s.league += 1; LeagueResult::Up }
-            else if s.week_xp == 0 && s.league > 0 { s.league -= 1; LeagueResult::Down }
+        // final standings of the week that just ended
+        let rows = board(s, 7, 0.0);
+        let pl = place(&rows);
+        let from = s.league;
+        let r = if s.week_xp > 0 && pl <= PROMOTE_TOP && s.league < 6 { s.league += 1; LeagueResult::Up }
+            else if (s.week_xp == 0 || pl > rows.len() - DEMOTE_BOTTOM) && s.league > 0 { s.league -= 1; LeagueResult::Down }
             else { LeagueResult::Stay };
+        let gems = if s.week_xp > 0 && pl <= 3 { PODIUM_GEMS[pl - 1] } else { 0 };
+        s.gems = s.gems.saturating_add(gems);
+        s.res_place = pl as u32; s.res_from = from; s.res_to = s.league; s.res_xp = s.week_xp; s.res_gems = gems; s.res_seen = false;
         s.last_result = r.code().into();
+        // the ghost replays the week that just ended, unless whole weeks were skipped
+        s.ghost = if wk == s.week_id + 1 { s.week_days } else { [0; 7] };
+        s.hist.push(if wk == s.week_id + 1 { s.week_xp } else { 0 });
+        if s.hist.len() > 4 { s.hist.remove(0); }
         out = Some(r);
     }
-    s.week_id = wk; s.week_mask = 0; s.week_xp = 0;
+    s.week_id = wk; s.week_mask = 0; s.week_xp = 0; s.week_days = [0; 7];
     out
 }
 
@@ -118,11 +128,97 @@ pub fn score(total: u32, mistakes: u32) -> u32 {
     (total * 100).checked_div(attempts).map(|s| s.min(100)).unwrap_or(100)
 }
 
-pub fn add_xp(s: &mut Save, xp: u32, gems: u32) {
+pub fn add_xp(s: &mut Save, xp: u32, gems: u32, day: u64) {
     s.xp = s.xp.saturating_add(xp);
     s.week_xp = s.week_xp.saturating_add(xp);
+    s.week_days[weekday(day)] = s.week_days[weekday(day)].saturating_add(xp);
     s.gems = s.gems.saturating_add(gems);
 }
+
+// ------------------------------------------------------------------ anti-farming
+/// Most XP per day from repeats: lesson replays, extra daily quests, reviews, solved challenges, duels
+/// past the daily reward limit. First clears are never limited.
+pub const REPEAT_XP_DAILY: u32 = 60;
+/// Duel wins per day that pay the full reward.
+pub const DUEL_REWARDS_DAILY: u32 = 3;
+
+/// Take up to `want` XP from today's repeat budget.
+pub fn repeat_xp(s: &mut Save, day: u64, want: u32) -> u32 {
+    if s.rep_day != day { s.rep_day = day; s.rep_xp = 0; }
+    let give = want.min(REPEAT_XP_DAILY.saturating_sub(s.rep_xp));
+    s.rep_xp += give;
+    give
+}
+
+/// True if a duel win today still pays the full reward (and counts it).
+pub fn duel_reward_left(s: &mut Save, day: u64) -> bool {
+    if s.duel_day != day { s.duel_day = day; s.duel_today = 0; }
+    if s.duel_today < DUEL_REWARDS_DAILY { s.duel_today += 1; true } else { false }
+}
+
+// ------------------------------------------------------------------ league board
+use crate::data::{Style, RIVALS};
+
+/// Rivals per week, and how strong each is compared with the player's usual week
+/// (one stretch, one just ahead, one just behind, two easier).
+pub const RIVAL_FACTORS: [f32; 5] = [1.45, 1.12, 0.9, 0.68, 0.42];
+/// Places that promote, and places from the bottom that demote.
+pub const PROMOTE_TOP: usize = 3;
+pub const DEMOTE_BOTTOM: usize = 2;
+/// Gems for finishing 1st, 2nd and 3rd.
+pub const PODIUM_GEMS: [u32; 3] = [10, 6, 3];
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Who { You, Ghost, Rival(Style) }
+
+#[derive(Clone, Debug)]
+pub struct Row { pub name: String, pub art: &'static str, pub xp: u32, pub who: Who }
+
+/// XP a "usual week" is worth for this player: recent weeks, but never below the league's floor.
+pub fn rival_target(s: &Save) -> f32 {
+    let avg = if s.hist.is_empty() { 0.0 } else { s.hist.iter().sum::<u32>() as f32 / s.hist.len() as f32 };
+    avg.max(40.0 + s.league as f32 * 15.0)
+}
+
+/// The five rivals of a week (indexes into RIVALS), shuffled by the week number.
+pub fn week_rivals(week: u64) -> [usize; 5] {
+    let mut idx: Vec<usize> = (0..RIVALS.len()).collect();
+    let mut x = week.wrapping_mul(0x9e37_79b9_7f4a_7c15) | 1;
+    for i in (1..idx.len()).rev() { x ^= x << 13; x ^= x >> 7; x ^= x << 17; idx.swap(i, (x % (i as u64 + 1)) as usize); }
+    [idx[0], idx[1], idx[2], idx[3], idx[4]]
+}
+
+/// Share of a weekly total done by `wd` (0 = Monday) and `frac` of that day, following `days`.
+/// Within a day, XP arrives between 8:00 and 22:00, more of it in the evening.
+fn progress(days: &[f32; 7], wd: usize, frac: f32) -> f32 {
+    let before: f32 = days[..wd.min(7)].iter().sum();
+    let t = ((frac * 24.0 - 8.0) / 14.0).clamp(0.0, 1.0);
+    let today = if wd < 7 { days[wd] * t * t * (3.0 - 2.0 * t) } else { 0.0 };
+    (before + today).min(1.0)
+}
+
+/// The league board at weekday `wd` and fraction of day `frac` (use wd = 7 for the final standings).
+pub fn board(s: &Save, wd: usize, frac: f32) -> Vec<Row> {
+    let target = rival_target(s);
+    let mut rows = vec![Row { name: s.name.clone(), art: "", xp: s.week_xp, who: Who::You }];
+    for (k, i) in week_rivals(s.week_id).iter().enumerate() {
+        let r = &RIVALS[*i];
+        let xp = (target * RIVAL_FACTORS[k] * progress(&r.style.days(), wd, frac)).round() as u32;
+        rows.push(Row { name: r.name.into(), art: r.art, xp, who: Who::Rival(r.style) });
+    }
+    if s.hist.last().is_some_and(|x| *x > 0) {
+        let total: u32 = s.ghost.iter().sum();
+        let mut g: u32 = s.ghost[..wd.min(7)].iter().sum();
+        if wd < 7 { g += (s.ghost[wd] as f32 * frac) as u32; }
+        rows.push(Row { name: "You, last week".into(), art: "", xp: g.min(total), who: Who::Ghost });
+    }
+    // ties go to the player
+    rows.sort_by(|a, b| b.xp.cmp(&a.xp).then((a.who != Who::You).cmp(&(b.who != Who::You))));
+    rows
+}
+
+/// 1-based place of the player on a board.
+pub fn place(rows: &[Row]) -> usize { rows.iter().position(|r| r.who == Who::You).map(|p| p + 1).unwrap_or(rows.len()) }
 
 // ---------------- achievements ----------------
 pub struct Ctx { pub courses_cleared: usize }
@@ -153,6 +249,53 @@ pub fn grant_achievements(s: &mut Save, ctx: &Ctx, day: u64) -> Vec<&'static Ach
         if !s.ach.contains_key(a.id) && (a.check)(s, ctx) { s.ach.insert(a.id.into(), day); new.push(a); }
     }
     new
+}
+
+#[cfg(test)]
+mod board_tests {
+    use super::*;
+
+    #[test]
+    fn rivals_adapt_and_the_board_moves_through_the_week() {
+        let mut s = Save::new();
+        s.week_id = 3000; s.name = "Ada".into();
+        let early = board(&s, 0, 0.0);
+        assert!(early.iter().filter(|r| matches!(r.who, Who::Rival(_))).all(|r| r.xp == 0), "Monday morning starts at zero");
+        let end = board(&s, 7, 0.0);
+        let top = end.iter().map(|r| r.xp).max().unwrap();
+        s.hist = vec![400, 400];
+        let strong = board(&s, 7, 0.0).iter().map(|r| r.xp).max().unwrap();
+        assert!(strong > top, "rivals grow with the player's usual week");
+        assert_eq!(end.len(), 6, "no ghost before there is a last week");
+        s.ghost = [10, 10, 10, 10, 10, 10, 10]; s.hist = vec![70];
+        assert!(board(&s, 3, 0.5).iter().any(|r| r.who == Who::Ghost && r.xp == 35));
+    }
+
+    #[test]
+    fn placement_decides_the_league_and_pays_the_podium() {
+        let mut s = Save::new();
+        s.week_id = 3000; s.league = 2; s.week_xp = 1000; s.week_days = [1000, 0, 0, 0, 0, 0, 0];
+        let gems = s.gems;
+        assert_eq!(week_roll(&mut s, 3001 * 7 - 3), Some(LeagueResult::Up));
+        assert_eq!((s.res_place, s.res_from, s.res_to), (1, 2, 3));
+        assert_eq!(s.gems, gems + PODIUM_GEMS[0]);
+        assert_eq!(s.ghost[0], 1000, "last week becomes the ghost");
+        assert_eq!(s.week_xp, 0);
+        // a week with almost nothing ends in the bottom two
+        s.week_xp = 1; s.week_days = [1, 0, 0, 0, 0, 0, 0];
+        assert_eq!(week_roll(&mut s, 3002 * 7 - 3), Some(LeagueResult::Down));
+    }
+
+    #[test]
+    fn repeats_and_duels_are_capped_per_day() {
+        let mut s = Save::new();
+        let mut total = 0;
+        for _ in 0..50 { total += repeat_xp(&mut s, 100, 5); }
+        assert_eq!(total, REPEAT_XP_DAILY);
+        assert_eq!(repeat_xp(&mut s, 101, 5), 5, "the budget refills the next day");
+        let wins = (0..10).filter(|_| duel_reward_left(&mut s, 100)).count();
+        assert_eq!(wins as u32, DUEL_REWARDS_DAILY);
+    }
 }
 
 #[cfg(test)]
@@ -292,7 +435,7 @@ mod tests {
         assert_eq!(score(0, 0), 100);
         let mut s = Save::new();
         s.xp = u32::MAX - 1;
-        add_xp(&mut s, 10, 1);
+        add_xp(&mut s, 10, 1, 20000);
         assert_eq!(s.xp, u32::MAX);
     }
 
