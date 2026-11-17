@@ -88,6 +88,22 @@ impl App {
                     if toggle(ui, "Scanlines", "CRT-style pixel filter", &mut self.s.scan) { self.persist(); }
                     if toggle(ui, "Dungeon floor", "Brick texture behind the screen", &mut self.s.floor) { self.persist(); }
                     ui.add_space(SP_S);
+                    let mut vol_changed = false;
+                    for (label, sub, v) in [("Music", "Dungeon, title and battle themes", &mut self.s.music), ("Sound effects", "Buttons, answers, duels and rewards", &mut self.s.sfx)] {
+                        ui.label(body(label, 15.0));
+                        ui.label(body(sub, 12.0).color(DIM));
+                        ui.add_space(SP_XS);
+                        let mut changed = false;
+                        ui.horizontal(|ui| {
+                            for (lv, name) in [(0, "OFF"), (30, "LOW"), (60, "MEDIUM"), (100, "HIGH")] {
+                                let on = (*v == 0 && lv == 0) || (*v > 0 && lv > 0 && (*v as i32 - lv as i32).abs() < 15) || (*v > 80 && lv == 100);
+                                if mini_btn(ui, name, if on { GOLD } else { PANEL_HI }).clicked() { *v = lv; changed = true; }
+                            }
+                        });
+                        if changed { audio::play(audio::Sfx::Coin); vol_changed = true; }
+                        ui.add_space(SP_S);
+                    }
+                    if vol_changed { self.persist(); }
                     ui.label(body("Text size", 15.0));
                     ui.label(body("Make everything bigger and easier to read", 12.0).color(DIM));
                     ui.add_space(SP_XS);

@@ -15,7 +15,7 @@ dark on light). Review sheets: `logo-variants/review.png`, `logo-variants/c_refi
 - **Application:** readable, but the chevrons sit on a diagonal and no longer read as one `</>`.
 - **Signals:** action, energy. **Rejects:** calm/corporate tech.
 
-## 03, `</>` with the slash as a hammer (CHOSEN)
+## 03, `</>` with the slash as a hammer (v1.4, replaced)
 - **Architecture:** letterform-as-symbol + pixel wordmark lockup ("CODE" gold, "FORGE" steel, Press Start 2P).
 - **Symbol:** letterform-derived. The `/` of `</>` is a forge hammer at exactly 45° (clean pixel staircases);
   the `<` `>` are glowing ember chevrons. One idea: forging code.
@@ -28,3 +28,16 @@ dark on light). Review sheets: `logo-variants/review.png`, `logo-variants/c_refi
 
 ## Files
 `assets/icon.ico`, `assets/icon.png`, `assets/art/logo_mark.png`, `design/logo-variants/lockup.png`.
+
+## 04, Rune hammer (CHOSEN, v1.5), from the owner's sketch
+- **Architecture:** symbol + pixel wordmark lockup. **Symbol:** literal war hammer at 45°, dark riveted
+  iron head with flared striking faces, leather-wrapped handle and iron pommel; the runes `</>` are carved
+  into the head and glow like embers, reading left to right as in the sketch.
+- **Why it is distinctive:** code logos are usually brackets, terminals or laptops. This is a dungeon
+  weapon first, and the code is the enchantment on it.
+- **Motion:** the sketch's exploded frame becomes the welcome animation (head drops onto the anvil,
+  handle slides in, the three runes fly in, final strike with sparks; idle glow and drifting embers).
+- **Layers:** `assets/art/logo_{head,handle,lt,sl,gt}.png` share one 48 px canvas; `logo_mark.png` is
+  the composite. Icons: `assets/icon.ico`, `assets/icon.png`. Review: `logo-variants/v2_review.png`.
+- **Tests:** reads at 256, 64, 32 px; at 16 px the silhouette is a hammer with an orange core; single
+  colour keeps the runes as cut-outs on both dark and light.

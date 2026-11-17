@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 //! Code Forge: learn to code in a pixel-art RPG. Offline, single player.
 mod art;
+mod audio;
 mod content;
 mod css;
 mod data;
@@ -64,6 +65,8 @@ struct App {
     opp: usize, sub_train: usize, sub_create: usize, input: String, cat: usize, query: String,
     view_key: u32, view_t0: f64, toasts: VecDeque<(String, f64)>, demo: bool, shot: Option<String>, frames: u32, save_warned: bool,
     onboard: Option<onboarding::Onboard>,
+    /// Sound output (None in tests, screenshots, or without a sound device).
+    audio: Option<audio::Audio>,
 }
 
 impl App {
@@ -86,7 +89,8 @@ impl App {
         let cur = (s.course as usize).min(courses.len() - 1);
         let onboard = if s.onboarded { None } else { Some(onboarding::Onboard::default()) };
         let mut a = App { s, tab: Tab::Learn, screen: Screen::Main, modal: Modal::None, courses, cur, open_mod: None, opp: 0, sub_train: 0, sub_create: 0,
-            input: String::new(), cat: 0, query: String::new(), view_key: 999, view_t0: 0.0, toasts: VecDeque::new(), demo, shot, frames: 0, save_warned: false, onboard };
+            input: String::new(), cat: 0, query: String::new(), view_key: 999, view_t0: 0.0, toasts: VecDeque::new(), demo, shot, frames: 0, save_warned: false, onboard, audio: None };
+        if a.shot.is_none() && !cfg!(test) { a.audio = audio::Audio::new(); }
         a.week_check();
         a.open_mod = a.current_module(a.cur);
         a
@@ -138,6 +142,24 @@ impl App {
     }
 
     fn level(&self) -> u32 { game::level(self.s.xp) }
+
+    /// Play this frame's sounds and keep the right music on: the title theme while onboarding,
+    /// the battle theme in duels, the dungeon theme everywhere else.
+    fn update_audio(&mut self) {
+        let sounds = audio::take();
+        let want = if self.onboard.is_some() { audio::Track::Title } else {
+            match &self.screen {
+                Screen::Run(rs) if matches!(rs.kind, Kind::Duel(_)) => audio::Track::Battle,
+                Screen::Complete(c) if c.duel.is_some() => audio::Track::Battle,
+                _ => audio::Track::Dungeon,
+            }
+        };
+        let (mv, sv) = (self.s.music as f32 / 100.0, self.s.sfx as f32 / 100.0);
+        if let Some(a) = &mut self.audio {
+            for s in sounds { a.sfx(s, sv); }
+            a.music(Some(want), mv);
+        }
+    }
     fn lkey(&self, c: usize, m: usize, l: usize) -> String { self.courses[c].lesson_id(m, l) }
     fn is_done(&self, c: usize, m: usize, l: usize) -> bool { self.s.done.contains(&self.lkey(c, m, l)) }
     fn module_done(&self, c: usize, m: usize) -> bool { (0..self.courses[c].modules[m].lessons.len()).all(|l| self.is_done(c, m, l)) }
@@ -171,6 +193,7 @@ impl App {
     fn start_run(&mut self, title: &str, kind: Kind, slides: Vec<(&'static str, &'static str)>, qs: Vec<Q>) {
         self.tick();
         if self.s.hearts == 0 && !kind.safe() { self.modal = Modal::NoHearts; return; }
+        audio::play(match kind { Kind::Duel(_) => audio::Sfx::DuelStart, Kind::Daily => audio::Sfx::Chest, _ => audio::Sfx::Confirm });
         let n = qs.len();
         let (mut stage, mut queue, mut right) = (0usize, (0..n).collect::<Vec<usize>>(), 0u32);
         if let Kind::Lesson(c, mi, l) = &kind {
@@ -271,7 +294,9 @@ impl App {
             e.0 = e.0.max(score); e.1 += 1; best = e.0;
         }
         let new_streak = game::bump_streak(&mut self.s, today());
+        let lvl = self.level();
         game::add_xp(&mut self.s, xp, gems);
+        audio::play(match &duel { Some((_, _, _, true)) => audio::Sfx::Victory, Some(_) => audio::Sfx::Defeat, None if self.level() > lvl => audio::Sfx::LevelUp, None => audio::Sfx::Complete });
         self.award();
         self.persist();
         self.screen = Screen::Complete(Complete { title: rs.title.clone(), xp, gems, perfect, score, best, duel, new_streak, next, project: rs.project, summary: rs.summary.clone(), cert });
@@ -357,7 +382,7 @@ fn subtabs(ui: &mut egui::Ui, labels: &[&str], cur: &mut usize) {
         let on = *cur == i;
         ui.painter().text(tr.center() - Vec2::new(0.0, 2.0), Align2::CENTER_CENTER, *lab, FontId::new(9.0, press()), if on { Color32::WHITE } else if resp.hovered() { INK } else { DIM });
         if on { ui.painter().rect_filled(Rect::from_min_size(Pos2::new(tr.min.x, tr.max.y - 4.0), Vec2::new(tr.width(), 4.0)), 0.0, GOLD); }
-        if resp.clicked() { *cur = i; }
+        if resp.clicked() { if *cur != i { audio::play(audio::Sfx::Page); } *cur = i; }
     }
     ui.add_space(SP_S);
 }
@@ -380,7 +405,7 @@ fn nav(ctx: &mut egui::Ui, app: &mut App) {
             // icon and label sit inside the frame's 10px border
             draw_icon(ui.painter(), Rect::from_center_size(Pos2::new(tr.center().x, tr.min.y + 24.0), Vec2::splat(26.0)), art, if on || resp.hovered() { Color32::WHITE } else { Color32::from_gray(150) });
             ui.painter().text(Pos2::new(tr.center().x, tr.max.y - 18.0), Align2::CENTER_CENTER, *name, FontId::new(7.0, press()), if on { GOLD } else { DIM });
-            if resp.clicked() { app.tab = *t; }
+            if resp.clicked() { if app.tab != *t { audio::play(audio::Sfx::Nav); } app.tab = *t; }
         }
     });
 }
@@ -470,7 +495,7 @@ fn option_btn(ui: &mut egui::Ui, text: &str, selected: bool, locked: bool, sel: 
     if selected { ui.painter().rect_stroke(r.expand(2.0), 0.0, Stroke::new(3.0, GOLD), egui::StrokeKind::Outside); }
     ui.painter().text(Pos2::new(r.min.x + 12.0, r.center().y), Align2::LEFT_CENTER, format!("{}", i + 1), FontId::new(9.0, press()), DIM);
     ui.painter().with_clip_rect(r).text(Pos2::new(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, text, FontId::new(16.0, egui::FontFamily::Proportional), INK);
-    if resp.clicked() && !locked { *sel = Some(i); }
+    if resp.clicked() && !locked { *sel = Some(i); audio::play(audio::Sfx::Select); }
     ui.add_space(SP_S);
 }
 
@@ -500,6 +525,7 @@ impl App {
     fn frame_ui(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         // text size setting (applies from the next frame)
+        self.update_audio();
         let z = self.s.zoom.clamp(100, 130) as f32 / 100.0;
         if (ctx.zoom_factor() - z).abs() > 0.01 { ctx.set_zoom_factor(z); }
         self.tick();
@@ -579,14 +605,14 @@ impl App {
                 ui.horizontal(|ui| { icon(ui, "money_bag", 36.0); ui.label(title("SHOP", 12.0).color(GOLD)); ui.add_space(SP_M); icon(ui, "crystal_purple", 28.0); ui.label(title(format!("{}", self.s.gems), 11.0)); });
                 ui.add_space(SP_M);
                 ui.horizontal_wrapped(|ui| { icon(ui, "heart", 34.0); ui.label(body(format!("Refill all hearts ({} gems)", REFILL_COST), 14.0)); });
-                if pbtn(ui, "BUY HEARTS", RED, 0.0).clicked() { match game::buy_refill(&mut self.s) { Ok(()) => { self.persist(); self.toast("Hearts refilled!"); } Err(e) => self.toast(e.msg()) } }
+                if pbtn(ui, "BUY HEARTS", RED, 0.0).clicked() { match game::buy_refill(&mut self.s) { Ok(()) => { self.persist(); self.toast("Hearts refilled!"); audio::play(audio::Sfx::Coin); } Err(e) => self.toast(e.msg()) } }
                 let claimed = self.s.free_day == today();
                 if pbtn(ui, if claimed { "FREE HEART (TOMORROW)" } else { "FREE HEART (1 PER DAY)" }, if claimed { PANEL_HI } else { GREEN }, 0.0).clicked() {
                     match game::claim_free_heart(&mut self.s, today()) { Ok(()) => { self.persist(); self.toast("+1 heart!"); } Err(e) => self.toast(e.msg()) }
                 }
                 ui.add_space(SP_M);
                 ui.horizontal_wrapped(|ui| { icon(ui, "hourglass", 34.0); ui.label(body(format!("Streak saver ({} gems, hold up to 3). Protects your streak if you miss one day.", SAVER_COST), 14.0)); });
-                if pbtn(ui, &format!("BUY SAVER ({}/3)", self.s.savers), BLUE, 0.0).clicked() { match game::buy_saver(&mut self.s) { Ok(()) => { self.persist(); self.toast("Streak saver added!"); } Err(e) => self.toast(e.msg()) } }
+                if pbtn(ui, &format!("BUY SAVER ({}/3)", self.s.savers), BLUE, 0.0).clicked() { match game::buy_saver(&mut self.s) { Ok(()) => { self.persist(); self.toast("Streak saver added!"); audio::play(audio::Sfx::Coin); } Err(e) => self.toast(e.msg()) } }
                 ui.add_space(SP_M);
                 ui.label(body("Earn gems by clearing lessons, challenges and duels.", 12.0).color(DIM));
                 if pbtn(ui, "CLOSE", PANEL_HI, 0.0).clicked() { close = true; }
@@ -614,7 +640,7 @@ impl App {
                     ui.label(body(format!("{}Hearts refill 1 every 5 minutes. Your lesson progress is saved.", wait), 14.0)); ui.add_space(SP_S);
                 });
                 if pbtn(ui, &format!("REFILL ({} GEMS)", REFILL_COST), RED, 0.0).clicked() {
-                    match game::buy_refill(&mut self.s) { Ok(()) => { self.persist(); close = true; } Err(e) => self.toast(e.msg()) }
+                    match game::buy_refill(&mut self.s) { Ok(()) => { self.persist(); close = true; audio::play(audio::Sfx::Coin); } Err(e) => self.toast(e.msg()) }
                 }
                 if self.s.free_day != today() && pbtn(ui, "FREE DAILY HEART", GREEN, 0.0).clicked()
                     && game::claim_free_heart(&mut self.s, today()).is_ok() { self.persist(); close = true; }
@@ -677,7 +703,7 @@ impl App {
         let Some(path) = self.shot.clone() else { return };
         self.frames += 1;
         ctx.request_repaint();
-        if self.frames == 120 {
+        if self.frames == *SHOT_FRAME.get().unwrap_or(&120) {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::ScreenshotCallback::new(move |img| {
                 let (w, h) = (img.width() as u32, img.height() as u32);
                 let raw: Vec<u8> = img.pixels.iter().flat_map(|c| c.to_array()).collect();
@@ -691,6 +717,8 @@ impl App {
 /// "today", "yesterday" or "N days ago".
 /// Screenshot QA: scroll the main tab down by this many points.
 static SHOT_SCROLL: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+/// Screenshot QA: which frame to capture (default 120).
+static SHOT_FRAME: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
 
 fn day_label(d: u64) -> String {
     match today().saturating_sub(d) { 0 => "today".into(), 1 => "yesterday".into(), n => format!("{} days ago", n) }
@@ -724,6 +752,11 @@ fn avatar_grid(ui: &mut egui::Ui, cur: &mut u32) -> bool {
 fn main() -> eframe::Result {
     let args: Vec<String> = std::env::args().collect();
     let arg = |k: &str| args.iter().position(|a| a == k).and_then(|i| args.get(i + 1).cloned());
+    if let Some(i) = args.iter().position(|a| a == "--export-audio") {
+        let dir = args.get(i + 1).cloned().unwrap_or_else(|| "audio".into());
+        match audio::export(std::path::Path::new(&dir)) { Ok(n) => println!("wrote {} sounds to {}", n, dir), Err(e) => eprintln!("export failed: {}", e) }
+        return Ok(());
+    }
     if args.iter().any(|a| a == "--version") { println!("Code Forge {}", VERSION); return Ok(()); }
     // Release builds have no console: record any crash next to the save so it can be reported.
     let default_hook = std::panic::take_hook();
@@ -735,6 +768,7 @@ fn main() -> eframe::Result {
         default_hook(info);
     }));
     let shot = arg("--screenshot");
+    if let Some(f) = arg("--shot-frame").and_then(|v| v.parse::<u32>().ok()) { let _ = SHOT_FRAME.set(f.max(2)); }
     if let Some(y) = arg("--scroll").and_then(|v| v.parse::<f32>().ok()) { let _ = SHOT_SCROLL.set(y); }
     let tab = arg("--tab");
     let screen = arg("--screen");

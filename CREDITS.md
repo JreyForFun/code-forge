@@ -18,8 +18,12 @@ reward icons come from the **Achievement Icon Pack** by **GTORAVERSE**
 credit. Embedded inside the executable only.
 
 ## Logo
-The Code Forge logo (the `/` of `</>` as a forge hammer) is original pixel art made for this app;
+The Code Forge logo (an iron war hammer with the runes `</>` carved into its head) is original pixel art
+made for this app from the owner's sketch;
 see `design/logo-variants.md`.
+
+## Music and sound
+All music and sound effects are original and synthesised in code at runtime (`src/audio.rs`).
 
 ## Fonts
 - **Press Start 2P** by CodeMan38, SIL Open Font License 1.1

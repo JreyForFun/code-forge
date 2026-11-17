@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
+use crate::audio::Sfx;
 use eframe::egui::{self, Color32, FontFamily, FontId, Pos2, Rect, RichText, Sense, Stroke, Vec2};
 
 // ---------- RPG dungeon palette ----------
@@ -196,6 +197,10 @@ pub fn pbtn(ui: &mut egui::Ui, label: &str, color: Color32, width: f32) -> egui:
         ui.painter().text(r.center() + Vec2::splat(1.0), egui::Align2::CENTER_CENTER, label, FontId::new(11.0, press()), Color32::from_black_alpha(170));
     }
     ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, label, FontId::new(11.0, press()), txt_col);
+    if resp.clicked() {
+        // each kind of button has its own voice
+        crate::audio::ui(if color == GOLD { Sfx::Confirm } else if color == GREEN { Sfx::Go } else if color == RED { Sfx::Heavy } else if color == PANEL_HI { Sfx::Back } else { Sfx::Click });
+    }
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -277,6 +282,7 @@ pub fn mini_btn(ui: &mut egui::Ui, label: &str, color: Color32) -> egui::Respons
     let (r, resp) = ui.allocate_exact_size(Vec2::new(w, 24.0), Sense::click());
     bevel(ui.painter(), r, if resp.hovered() { shade(color, 1.2) } else { color }, false);
     ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, label, FontId::new(7.0, press()), Color32::WHITE);
+    if resp.clicked() { crate::audio::ui(Sfx::Click); }
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -349,6 +355,7 @@ pub fn panel_resp(ui: &mut egui::Ui, fill: Color32, edge: Color32, f: impl FnOnc
     let rect = framed(ui, fill, edge, f).response.rect;
     let r = ui.interact(rect, ui.scope_id().with(("pr", rect.min.x as i32, rect.min.y as i32)), Sense::click());
     if r.hovered() { ui.painter().rect_stroke(rect.shrink(1.0), 2.0, Stroke::new(1.0, Color32::from_white_alpha(40)), egui::StrokeKind::Inside); }
+    if r.clicked() { crate::audio::ui(Sfx::Click); }
     r.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -405,6 +412,12 @@ pub const ART: &[(&str, &[u8])] = &[
     ("amulet", include_bytes!("../assets/art/chest2.png")),
     // Code Forge logo mark: the "/" of </> is a forge hammer (original pixel art, design/logo-variants)
     ("logo_mark", include_bytes!("../assets/art/logo_mark.png")),
+    // the same logo in parts, for the forging animation on the welcome screen
+    ("logo_head", include_bytes!("../assets/art/logo_head.png")),
+    ("logo_handle", include_bytes!("../assets/art/logo_handle.png")),
+    ("logo_lt", include_bytes!("../assets/art/logo_lt.png")),
+    ("logo_sl", include_bytes!("../assets/art/logo_sl.png")),
+    ("logo_gt", include_bytes!("../assets/art/logo_gt.png")),
 ];
 
 /// Dungeon skin tiles (Kenney "Tiny Dungeon" and "UI Pack: Pixel Adventure", CC0). `true` = repeat-wrapped.

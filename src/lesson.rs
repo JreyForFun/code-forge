@@ -54,9 +54,9 @@ impl App {
             if bot_fill == BG2 { ledge(ui, false); }
             if in_slides {
                 ui.horizontal(|ui| {
-                    if rs.stage > 0 && pbtn(ui, "BACK", PANEL_HI, 100.0).clicked() { slide_step = -1; }
+                    if rs.stage > 0 && pbtn(ui, "BACK", PANEL_HI, 100.0).clicked() { slide_step = -1; audio::play(audio::Sfx::Page); }
                     let w = ui.available_width();
-                    if pbtn(ui, if rs.stage + 1 == n_slides { "START PRACTICE" } else { "NEXT" }, GOLD, w).clicked() || go { slide_step = 1; }
+                    if pbtn(ui, if rs.stage + 1 == n_slides { "START PRACTICE" } else { "NEXT" }, GOLD, w).clicked() || go { slide_step = 1; audio::play(if rs.stage + 1 == n_slides { audio::Sfx::Confirm } else { audio::Sfx::Page }); }
                 });
             } else if let Some((ok, why)) = rs.fb.clone() {
                 ui.label(title(if ok { "CORRECT" } else { "NOT QUITE" }, 12.0).color(if ok { GREEN } else { RED }));
@@ -93,6 +93,7 @@ impl App {
                             }
                         }
                         else { rs.mistakes += 1; if !duel { rs.queue.push(qi); game::lose_heart(&mut self.s, now()); self.persist(); } }
+                        audio::play(match (ok, duel && matches!(rs.kind, Kind::Duel(_))) { (true, true) => audio::Sfx::Hit, (false, true) => audio::Sfx::Miss, (true, false) => audio::Sfx::Correct, (false, false) => audio::Sfx::Wrong });
                         rs.fb = Some((ok, why));
                     }
                 });
@@ -190,7 +191,7 @@ impl App {
                                     else { bevel(ui.painter(), r, if resp.hovered() || resp.dragged() { PANEL_HI } else { PANEL }, true); }
                                     ui.painter().text(r.center(), Align2::CENTER_CENTER, *o, FontId::monospace(15.0), if used { PANEL_HI } else { INK });
                                     if locked { continue; }
-                                    if resp.clicked() { rs.sel = Some(i); }
+                                    if resp.clicked() { rs.sel = Some(i); audio::play(audio::Sfx::Select); }
                                     if resp.dragged()
                                         && let Some(pos) = ui.ctx().input(|inp| inp.pointer.interact_pos()) {
                                             let lp = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("dragchip")));
@@ -199,7 +200,7 @@ impl App {
                                             lp.text(fr.center(), Align2::CENTER_CENTER, *o, FontId::monospace(15.0), EDGE);
                                         }
                                     if resp.drag_stopped()
-                                        && let Some(pos) = ui.ctx().input(|inp| inp.pointer.interact_pos()) && zone.expand(14.0).contains(pos) { rs.sel = Some(i); }
+                                        && let Some(pos) = ui.ctx().input(|inp| inp.pointer.interact_pos()) && zone.expand(14.0).contains(pos) { rs.sel = Some(i); audio::play(audio::Sfx::Snap); }
                                 }
                             });
                         }

@@ -6,7 +6,7 @@ computer.
 
 ## Quick start (players)
 
-1. Unzip `CodeForge-1.4.0-windows.zip` anywhere.
+1. Unzip `CodeForge-1.5.0-windows.zip` anywhere.
 2. Double-click **CodeForge.exe**.
 3. Choose a name, a hero and your first course, then start learning.
 
@@ -39,6 +39,12 @@ Nothing to install, no account, no internet needed.
 - **Certificates**: finish a course to earn its certificate (name, course, skills, date, number), which
   you can save as an image. Separate from the badge, which grows bronze → silver → gold as you go.
 - **Text size**: Normal, Large or Huge in Settings.
+- **Music and sound**: a title theme, a dungeon theme and a fast battle theme for duels, plus distinct
+  sounds for every kind of button, right and wrong answers, rewards, level-ups and duel hits. All of it
+  is synthesised by the app itself (no audio files). Volumes in Settings; `--export-audio <dir>` writes
+  everything as WAV files.
+- **Animated welcome**: the logo is forged in front of you: the iron head drops, the handle slides in,
+  the runes `< / >` fly into place and a final hammer strike sends sparks flying.
 - **Progress**: XP and levels, gems, a daily streak with streak savers, 7 weekly leagues against
   computer rivals, 12 achievements and an adventure log.
 - **Keyboard friendly**: Enter = next/check/continue, 1–5 = pick an answer, Esc = leave a lesson,
