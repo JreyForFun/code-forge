@@ -74,14 +74,8 @@
   60% { opacity: 0.8; scale: 0.99; }
   100% { opacity: 1; scale: 1.03; }
 }
-/* hero torches hang in the side walls, outside the content */
-.hero .torch { top: 34%; left: calc(((100% - 1280px) / 2 + 40px) / 2 - 24px); }
-.hero .torch--b { left: auto; right: calc(((100% - 1280px) / 2 + 40px) / 2 - 24px); }
-@media (max-width: 1359px) { .hero .torch { display: none; } }
 
-/* snuffed or reduced motion: torches burn still */
-.torches-out .torch::after, .torches-out .torch::before { animation: none; }
-.torches-out .torch::before { opacity: 0.7; }
+/* reduced motion: torches burn still */
 @media (prefers-reduced-motion: reduce) {
   .torch::after, .torch::before { animation: none; }
 }
@@ -167,16 +161,6 @@
   box-shadow: 0 4px 0 var(--stone-deep), 0 7px 0 #05070d, 0 16px 28px rgb(0 0 0 / 0.55);
 }
 .nav > .wrap { image-rendering: auto; }
-.torch-toggle {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px;
-  background: rgb(12 16 28 / 0.7); border: 2px solid var(--line); border-radius: var(--radius);
-  font-family: var(--label); font-size: 0.875rem; color: var(--ink-2); cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease, transform 160ms var(--ease-out);
-}
-.torch-toggle:hover { color: var(--ink); border-color: #3e4c78; }
-.torch-toggle:active { transform: translateY(1px); }
-.torch-toggle svg { image-rendering: pixelated; transition: filter 200ms ease; }
-.torch-toggle[aria-pressed="false"] svg { filter: grayscale(1) brightness(0.55); }
 
 .footer { border-top: 0; box-shadow: inset 0 4px 0 var(--stone-deep); }
 
@@ -185,18 +169,137 @@
 }
 @media (max-width: 960px) {
   .nav__links { display: none; }
-  .torch-toggle { margin-left: auto; }
-  .nav .btn { margin-left: 0; }
-  .nav__row { gap: 10px; }
+  .nav .btn { margin-left: auto; }
 }
 @media (max-width: 480px) {
-  .torch-toggle__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .chest { width: 96px; height: 96px; }
 }
-@media (max-width: 400px) {
-  .wordmark { display: none; }
+@media (max-width: 359px) {
+  .nav .wordmark { display: none; }
 }
 
 /* words that must not break at their hyphen */
 .keep { white-space: nowrap; }
 .btn { text-align: center; }
+
+/* =====================================================================
+   HERO: a game title screen. The crest (hammer between two torches),
+   the call, and the way in. The walls and carried light stay as they are.
+   ===================================================================== */
+.hero__title {
+  display: grid; justify-items: center; text-align: center; gap: 28px;
+  max-width: calc(980px + 2 * var(--gutter));
+}
+.hero__crest { display: flex; align-items: center; justify-content: center; gap: clamp(28px, 6vw, 72px); margin-bottom: 4px; }
+.forge--hero { width: clamp(136px, 15vw, 200px); margin: 0; }
+.torch--crest { top: -10px; }
+.hero h1 {
+  font-size: clamp(1.5rem, 0.8rem + 3vw, 3.4rem); line-height: 1.35;
+  max-width: 18ch;
+}
+.hero__lead { max-width: 40em; margin-inline: auto; }
+.hero__actions { justify-content: center; }
+.hero__facts { justify-content: center; }
+/* the wall torches move in to frame the title on wide screens */
+.hero .room__torches .torch { top: 30%; left: calc(50% - 620px); }
+.hero .room__torches .torch--b { left: auto; right: calc(50% - 620px); }
+@media (max-width: 1359px) { .hero .room__torches .torch { display: none; } }
+
+/* =====================================================================
+   DOWNLOAD: gates. Open ones are lit gold; sealed ones are cold stone.
+   ===================================================================== */
+.gates { list-style: none; margin: 4px 0 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.gate {
+  display: flex; align-items: center; gap: 14px; height: 100%; min-height: 76px; padding: 14px 18px 16px;
+  border: 3px solid var(--outline); border-radius: var(--radius);
+  text-decoration: none; text-align: left;
+}
+.gate__icon { flex: none; image-rendering: pixelated; }
+.gate__text { display: grid; gap: 6px; }
+.gate__name { font-family: var(--label); font-size: 1rem; line-height: 1.2; }
+.gate__meta { font-family: var(--body); font-size: 0.9375rem; line-height: 1.2; }
+.gate--open {
+  color: #1a1424; background: var(--gold);
+  box-shadow: inset 0 3px 0 var(--gold-hi), inset 0 -5px 0 var(--gold-lo), 0 0 40px -10px rgb(250 204 21 / 0.45);
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out), filter 160ms ease;
+}
+.gate--open .gate__meta { color: #5b4306; }
+.gate--open:hover { transform: translateY(-2px); filter: brightness(1.06); }
+.gate--open:active { transform: translateY(2px); box-shadow: inset 0 2px 0 var(--gold-hi), inset 0 -2px 0 var(--gold-lo); transition-duration: 80ms; }
+.gate--sealed {
+  color: var(--ink-3); background: rgb(16 21 36 / 0.92);
+  box-shadow: inset 0 0 0 2px var(--line), inset 0 -5px 0 rgb(5 7 13 / 0.8);
+  cursor: not-allowed;
+}
+.gate--sealed .gate__name { color: var(--ink-2); }
+.gate--sealed .gate__meta { color: var(--ember); font-family: var(--label); font-size: 0.8125rem; }
+.download__meta { margin-top: 0; }
+
+/* =====================================================================
+   FOOTER: the dungeon floor. Brand and tagline, the way around, the gates.
+   ===================================================================== */
+.footer {
+  position: relative; padding-block: calc(48px + clamp(48px, 7vh, 72px)) 0;
+  background:
+    linear-gradient(rgb(5 7 13 / 0.9), rgb(5 7 13 / 0.94)),
+    url("assets/ui/wall2.png") 0 0 / 48px 48px,
+    var(--outline);
+  image-rendering: pixelated;
+  box-shadow: none;
+}
+.footer::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 48px;
+  background: url("assets/ui/ledge.png") 0 0 / 144px 48px repeat-x;
+  filter: brightness(0.42);
+}
+.footer > .wrap { image-rendering: auto; }
+.footer__grid { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); gap: clamp(32px, 5vw, 64px); }
+.footer__brand { display: grid; gap: 18px; justify-items: start; align-content: start; }
+.footer__brand .wordmark { font-size: 1rem; }
+.footer__tag { color: var(--ink-2); font-size: 1.125rem; max-width: 22em; }
+.footer__h { font-family: var(--label); font-size: 0.875rem; letter-spacing: 0.04em; color: var(--gold); margin-bottom: 14px; text-shadow: none; }
+.footer__col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.footer__col a, .footer__soon {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 40px;
+  color: var(--ink-2); font-size: 1.0625rem; text-decoration: none;
+}
+.footer__col a {
+  background-image: linear-gradient(var(--gold), var(--gold));
+  background-size: 0 2px; background-repeat: no-repeat; background-position: 0 calc(100% - 8px);
+  transition: color 160ms ease, background-size 220ms var(--ease-out);
+}
+.footer__col a:hover { color: var(--ink); background-size: 100% 2px; }
+.footer__soon { color: var(--ink-3); }
+.soon {
+  font-family: var(--label); font-size: 0.6875rem; letter-spacing: 0.04em; color: var(--ember);
+  padding: 3px 6px 4px; border: 2px solid rgb(240 138 36 / 0.45); border-radius: 2px;
+}
+.footer__base {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap;
+  margin-top: clamp(48px, 7vh, 72px); padding-block: 22px 28px;
+  border-top: 2px solid rgb(45 56 88 / 0.6);
+}
+.footer__copy, .footer__top, .credits summary { font-family: var(--label); font-size: 0.8125rem; color: var(--ink-3); }
+.footer__copy { padding-block: 12px; }
+.credits { flex: 1 1 320px; max-width: 46em; }
+.credits summary {
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px;
+  transition: color 160ms ease;
+}
+.credits summary::-webkit-details-marker { display: none; }
+.credits summary::before { content: ""; width: 0; height: 0; border-left: 6px solid currentColor; border-block: 5px solid transparent; transition: rotate 160ms var(--ease-out); }
+.credits[open] summary::before { rotate: 90deg; }
+.credits summary:hover, .footer__top:hover { color: var(--ink); }
+.credits p { color: var(--ink-3); font-size: 0.9375rem; line-height: 1.6; padding-bottom: 8px; }
+.footer__top { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; transition: color 160ms ease; }
+
+@media (max-width: 960px) {
+  .footer__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .footer__brand { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .gates { grid-template-columns: minmax(0, 1fr); }
+  .footer__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .footer__base { flex-direction: column; gap: 0; }
+  .credits { flex: none; }
+}

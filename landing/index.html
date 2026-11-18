@@ -35,10 +35,6 @@
         <a href="#courses">Courses</a>
         <a href="#rules">Rules</a>
       </nav>
-      <button class="torch-toggle" type="button" aria-pressed="true" data-torch-toggle>
-        <svg viewBox="0 0 8 10" width="16" height="20" aria-hidden="true" shape-rendering="crispEdges"><path fill="#f08a24" d="M3 0h2v1h1v2h1v4H6v1H2V7H1V3h1V1h1z"/><path fill="#facc15" d="M3 3h2v1h1v3H2V4h1z"/><rect x="3" y="8" width="2" height="2" fill="#8b5a2b"/></svg>
-        <span class="torch-toggle__label">Torches</span>
-      </button>
       <a class="btn btn--gold btn--sm" href="#download">Download</a>
     </div>
   </header>
@@ -51,9 +47,10 @@
         <span class="torch"></span>
         <span class="torch torch--b"></span>
       </div>
-      <div class="wrap hero__grid">
-        <div class="hero__copy">
-          <button class="forge" type="button" aria-label="Strike the hammer" data-forge>
+      <div class="wrap hero__title">
+        <div class="hero__crest">
+          <span class="torch torch--inline torch--crest" aria-hidden="true"></span>
+          <button class="forge forge--hero" type="button" aria-label="Strike the hammer" data-forge>
             <span class="forge__glow" aria-hidden="true"></span>
             <span class="forge__stack" aria-hidden="true">
               <img class="forge__layer" data-part="handle" src="assets/logo/logo_handle.png" alt="" width="48" height="48">
@@ -64,23 +61,20 @@
             </span>
             <span class="forge__sparks" aria-hidden="true"></span>
           </button>
-
-          <h1 id="hero-title" data-enter>Learn to code in a <span class="keep">pixel-art</span> dungeon.</h1>
-          <p class="lead" data-enter>Pick a quest, read a short scroll, fill in the missing code, then type it yourself and watch it run. 181 lessons in HTML, CSS, JavaScript, Python and SQL.</p>
-          <div class="actions" data-enter>
-            <a class="btn btn--gold" href="#download">Download for Windows</a>
-            <a class="btn btn--stone" href="#quest">Try the first quest</a>
-          </div>
-          <ul class="facts" data-enter>
-            <li>Works offline</li>
-            <li>No account</li>
-            <li>Nothing to install</li>
-          </ul>
+          <span class="torch torch--inline torch--crest torch--b" aria-hidden="true"></span>
         </div>
 
-        <figure class="device device--hero" data-enter>
-          <img src="assets/shots/learn.png" width="500" height="900" alt="The Code Forge Learn screen: the HTML course with 4 of 27 lessons cleared, hearts, torches and crystals, and the next quest, Elements: Lists.">
-        </figure>
+        <h1 id="hero-title" data-enter>Every hero starts at <span class="keep">level one.</span></h1>
+        <p class="lead hero__lead" data-enter>Pick a quest, study the scroll, then cast the spell yourself and watch it work. 181 quests wait across five schools of code: HTML, CSS, JavaScript, Python and SQL.</p>
+        <div class="actions hero__actions" data-enter>
+          <a class="btn btn--gold btn--lg" href="#download">Begin your quest</a>
+          <a class="btn btn--stone btn--lg" href="#quest">Try a quest first</a>
+        </div>
+        <ul class="facts hero__facts" data-enter>
+          <li>Plays offline</li>
+          <li>No account</li>
+          <li>Your save stays with you</li>
+        </ul>
       </div>
     </section>
 
@@ -240,13 +234,15 @@
             </div>
             <span class="torch torch--inline torch--d"></span>
           </div>
-          <h2 id="download-title">Unzip it, <span class="keep">double-click,</span> start your first quest.</h2>
-          <p class="lead">Code Forge is one small program for Windows. No installer, no account, no internet. Your progress is saved on your own computer, and the previous save is always kept as a backup.</p>
-          <div class="actions">
-            <!-- Update this link when the build is hosted (currently the local dist build). -->
-            <a class="btn btn--gold btn--lg" href="https://github.com/JreyForFun/code-forge/releases/latest" data-chest-trigger>Download Code Forge 1.0.0</a>
-          </div>
-          <p class="download__meta">For Windows &middot; 4&nbsp;MB zip</p>
+          <h2 id="download-title">Choose your gate, hero.</h2>
+          <p class="lead">Code Forge plays fully offline and keeps your save on your own device. No account, no sign-up.</p>
+          <ul class="gates" aria-label="Downloads">
+            <li><a class="gate gate--open" href="https://github.com/JreyForFun/code-forge/releases/latest" data-chest-trigger><svg class="gate__icon" viewBox="0 0 8 8" width="24" height="24" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h2v4h2v1H6v1H5v1H3V6H2V5H1V4h2z"/><rect x="0" y="7" width="8" height="1" fill="currentColor"/></svg><span class="gate__text"><span class="gate__name">Download for Windows</span><span class="gate__meta">Unzip and play</span></span></a></li>
+            <li><a class="gate gate--open" href="https://github.com/JreyForFun/code-forge/releases/latest" data-chest-trigger><svg class="gate__icon" viewBox="0 0 8 8" width="24" height="24" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h2v4h2v1H6v1H5v1H3V6H2V5H1V4h2z"/><rect x="0" y="7" width="8" height="1" fill="currentColor"/></svg><span class="gate__text"><span class="gate__name">Download for Android</span><span class="gate__meta">Phones and tablets</span></span></a></li>
+            <li><div class="gate gate--sealed" aria-disabled="true"><svg class="gate__icon" viewBox="0 0 8 9" width="24" height="27" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h4v1h1v3H6V1H2v3H1V1h1z"/><path fill="currentColor" d="M0 4h8v5H0z"/><rect x="3" y="5" width="2" height="2" fill="#0b0e17"/></svg><span class="gate__text"><span class="gate__name">iOS</span><span class="gate__meta">Coming soon</span></span></div></li>
+            <li><div class="gate gate--sealed" aria-disabled="true"><svg class="gate__icon" viewBox="0 0 8 9" width="24" height="27" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h4v1h1v3H6V1H2v3H1V1h1z"/><path fill="currentColor" d="M0 4h8v5H0z"/><rect x="3" y="5" width="2" height="2" fill="#0b0e17"/></svg><span class="gate__text"><span class="gate__name">Mac</span><span class="gate__meta">Coming soon</span></span></div></li>
+          </ul>
+          <p class="download__meta">Version 1.0.0</p>
         </div>
 
         <div class="rules" id="rules">
@@ -263,12 +259,51 @@
   </main>
 
   <footer class="footer">
-    <div class="wrap footer__row">
-      <a class="brand" href="#top" aria-label="Code Forge, back to top">
-        <img src="assets/logo/logo_mark.png" width="28" height="28" alt="">
-        <span class="wordmark wordmark--sm"><span class="wordmark__a">CODE</span> <span class="wordmark__b">FORGE</span></span>
-      </a>
-      <p class="footer__credits">Screens from Code Forge 1.0.0. Fonts: Press Start 2P, Pixelify Sans and Silkscreen (SIL OFL). Dungeon walls, frames and chest by Kenney (CC0). Badges from the Achievement Icon Pack by GTORAVERSE.</p>
+    <div class="wrap footer__grid">
+      <div class="footer__brand">
+        <a class="brand" href="#top" aria-label="Code Forge, back to top">
+          <img src="assets/logo/logo_mark.png" width="44" height="44" alt="">
+          <span class="wordmark"><span class="wordmark__a">CODE</span> <span class="wordmark__b">FORGE</span></span>
+        </a>
+        <p class="footer__tag">Learn to code, one quest at a time.</p>
+        <a class="btn btn--gold btn--sm" href="#download">Begin your quest</a>
+      </div>
+      <nav class="footer__col" aria-label="Explore">
+        <h2 class="footer__h">Explore</h2>
+        <ul>
+          <li><a href="#quest">How a quest works</a></li>
+          <li><a href="#courses">Courses and badges</a></li>
+          <li><a href="#rules">Rules of the dungeon</a></li>
+          <li><a href="#download">Download</a></li>
+        </ul>
+      </nav>
+      <nav class="footer__col" aria-label="Schools of code">
+        <h2 class="footer__h">Schools</h2>
+        <ul>
+          <li><a href="#courses">HTML</a></li>
+          <li><a href="#courses">CSS</a></li>
+          <li><a href="#courses">JavaScript</a></li>
+          <li><a href="#courses">Python</a></li>
+          <li><a href="#courses">SQL</a></li>
+        </ul>
+      </nav>
+      <div class="footer__col">
+        <h2 class="footer__h">Play on</h2>
+        <ul>
+          <li><a href="https://github.com/JreyForFun/code-forge/releases/latest">Windows</a></li>
+          <li><a href="https://github.com/JreyForFun/code-forge/releases/latest">Android</a></li>
+          <li><span class="footer__soon">iOS <span class="soon">Soon</span></span></li>
+          <li><span class="footer__soon">Mac <span class="soon">Soon</span></span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="wrap footer__base">
+      <p class="footer__copy">Code Forge &middot; 2026</p>
+      <details class="credits">
+        <summary>Art and font credits</summary>
+        <p>Fonts: Press Start 2P, Pixelify Sans and Silkscreen (SIL Open Font License). Dungeon walls, frames and chest by Kenney (CC0). Badges from the Achievement Icon Pack by GTORAVERSE. Screens are from Code Forge itself.</p>
+      </details>
+      <a class="footer__top" href="#top">Back to the surface</a>
     </div>
   </footer>
 

@@ -13,6 +13,8 @@ pub struct Onboard {
     /// when the current step appeared (steps slide in)
     pub step_t0: f64,
     pub last_step: usize,
+    /// height of the step's content last frame, to centre it vertically on tall screens
+    pub content_h: f32,
 }
 
 const STEPS: usize = 4;
@@ -39,7 +41,7 @@ const BEATS: [(f32, Sfx); 6] = [(0.55, Sfx::Forge), (1.0, Sfx::Snap), (1.45, Sfx
 /// The welcome logo: the parts of the sketch fly together and are forged into the hammer:
 /// the iron head drops onto the anvil, the handle slides in, the runes < / > fly into place, and a
 /// final strike sends sparks flying. Afterwards the runes glow and embers drift up.
-fn forge_logo(ui: &mut egui::Ui, t: f32, fired: &mut u8) {
+pub fn forge_logo(ui: &mut egui::Ui, t: f32, fired: &mut u8) {
     let scale = 4.0;
     let (area, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 48.0 * scale + 24.0), Sense::hover());
     let p = ui.painter().with_clip_rect(area.expand(40.0));
@@ -128,7 +130,12 @@ impl App {
             if ob.step != ob.last_step || ob.step_t0 == 0.0 { ob.step_t0 = now_s; ob.last_step = ob.step; }
             let appear = ease_out(((now_s - ob.step_t0) / 0.35) as f32);
             if appear < 1.0 { ui.ctx().request_repaint(); }
+            let view_h = ui.clip_rect().height();
             scroll_centered(ui, |ui| {
+                // centre the step vertically when it is shorter than the screen
+                let pad = ((view_h - ob.content_h - 2.0 * SCREEN_PAD as f32) / 2.0).max(0.0);
+                ui.add_space(pad);
+                let top_y = ui.cursor().top();
                 // step dots
                 ui.set_opacity(appear);
                 ui.horizontal(|ui| {
@@ -216,6 +223,7 @@ impl App {
                         }
                     }
                 }
+                ob.content_h = ui.cursor().top() - top_y;
             });
         });
         if finish {
@@ -228,5 +236,41 @@ impl App {
         } else {
             self.onboard = Some(ob);
         }
+    }
+}
+
+impl App {
+    /// The opening animation on every start after the first-run welcome: the hammer is forged again
+    /// (about 3 seconds), the title is hammered out and the hero is welcomed back. Tap to skip.
+    pub fn splash_screen(&mut self, ctx: &mut egui::Ui) {
+        let now_s = ctx.ctx().input(|i| i.time);
+        let Some((t0, mut fired)) = self.splash else { return };
+        let t0 = if t0 < 0.0 { now_s } else { t0 };
+        let t = (now_s - t0) as f32;
+        let skip = ctx.ctx().input(|i| i.pointer.any_released() || i.key_pressed(egui::Key::Enter) || i.key_pressed(egui::Key::Escape));
+        let end = 3.4;
+        egui::CentralPanel::default().frame(screen_frame(BG)).show(ctx, |ui| {
+            floor(ui.painter(), ui.clip_rect(), true);
+            let fade = ((end - t) / 0.4).clamp(0.0, 1.0);
+            ui.set_opacity(fade);
+            let view = ui.clip_rect();
+            centered(ui, |ui| {
+                ui.add_space(((view.height() - 330.0) / 2.0).max(0.0));
+                forge_logo(ui, t, &mut fired);
+                let shown = (((t - 2.4) / 0.06).max(0.0) as usize).min(10);
+                let (tr, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 34.0), Sense::hover());
+                let full = "CODE FORGE";
+                let part: String = full.chars().take(shown).collect();
+                let gal = ui.painter().layout_no_wrap(full.to_string(), FontId::new(24.0, press()), GOLD);
+                let x0 = tr.center().x - gal.size().x / 2.0;
+                ui.painter().text(Pos2::new(x0 + 2.0, tr.center().y + 2.0), Align2::LEFT_CENTER, &part, FontId::new(24.0, press()), EDGE);
+                ui.painter().text(Pos2::new(x0, tr.center().y), Align2::LEFT_CENTER, &part, FontId::new(24.0, press()), GOLD);
+                ui.add_space(SP_S);
+                ui.set_opacity(fade * ((t - 2.7) / 0.4).clamp(0.0, 1.0));
+                ui.vertical_centered(|ui| ui.label(body(format!("Welcome back, {}!", self.s.name), 16.0).color(INK)));
+            });
+        });
+        ctx.ctx().request_repaint();
+        self.splash = if t >= end || (skip && t > 0.15) { None } else { Some((t0, fired)) };
     }
 }

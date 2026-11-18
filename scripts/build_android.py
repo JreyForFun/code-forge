@@ -61,13 +61,37 @@ def main():
     (build / "res/mipmap-xxxhdpi").mkdir(parents=True)
     from PIL import Image
     Image.open(ROOT / "assets/icon.png").convert("RGBA").resize((192, 192), Image.NEAREST).save(build / "res/mipmap-xxxhdpi/ic_launcher.png")
+    # adaptive icon (Android 8+): stone-wall background + the hammer inside the safe zone, so the
+    # launcher's circle/squircle mask is filled instead of showing a small square in a white circle
+    S = 432                                               # 108dp at xxxhdpi
+    wall = Image.open(ROOT / "assets/ui/wall.png").convert("RGBA").resize((48, 48), Image.NEAREST)
+    bg = Image.new("RGBA", (S, S), (22, 19, 34, 255))
+    for y in range(0, S, 48):
+        for x in range(0, S, 48): bg.alpha_composite(wall, (x, y))
+    shade = Image.new("RGBA", (S, S), (16, 12, 28, 150))
+    bg.alpha_composite(shade)
+    bg.save(build / "res/mipmap-xxxhdpi/ic_launcher_background.png")
+    mark = Image.open(ROOT / "assets/art/logo_mark.png").convert("RGBA")
+    k = 264 // mark.width                                  # whole-number scale inside the 66dp safe zone
+    mark = mark.resize((mark.width * k, mark.height * k), Image.NEAREST)
+    fg = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    fg.alpha_composite(mark, ((S - mark.width) // 2, (S - mark.height) // 2))
+    fg.save(build / "res/mipmap-xxxhdpi/ic_launcher_foreground.png")
+    (build / "res/mipmap-anydpi-v26").mkdir(parents=True)
+    adaptive = """<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+  <background android:drawable="@mipmap/ic_launcher_background"/>
+  <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+"""
+    for n in ["ic_launcher", "ic_launcher_round"]: (build / f"res/mipmap-anydpi-v26/{n}.xml").write_text(adaptive, encoding="utf-8")
     vcode = int("".join(f"{int(x):02d}" for x in version.split(".")))
     (build / "AndroidManifest.xml").write_text(f'''<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="{APP_ID}"
     android:versionCode="{vcode}" android:versionName="{version}">
   <uses-sdk android:minSdkVersion="{MIN_SDK}" android:targetSdkVersion="{TARGET_SDK}"/>
   <uses-feature android:glEsVersion="0x00030000" android:required="true"/>
-  <application android:label="Code Forge" android:icon="@mipmap/ic_launcher" android:hasCode="false"
+  <application android:label="Code Forge" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:hasCode="false"
       android:extractNativeLibs="true" android:allowBackup="true">
     <activity android:name="android.app.NativeActivity" android:exported="true"
         android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|uiMode|density"

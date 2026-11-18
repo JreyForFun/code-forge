@@ -88,6 +88,11 @@ struct App {
     /// Android: whether we asked for the on-screen keyboard.
     #[cfg_attr(not(target_os = "android"), allow(dead_code))]
     kb_open: bool,
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    kb_t: f64,
+    /// The opening animation shown every time the app starts (after the first-run welcome):
+    /// start time (set on the first frame) and which of its sounds already played.
+    splash: Option<(f64, u8)>,
 }
 
 impl App {
@@ -113,7 +118,8 @@ impl App {
         let cur = (s.course as usize).min(courses.len() - 1);
         let onboard = if s.onboarded { None } else { Some(onboarding::Onboard::default()) };
         let mut a = App { s, tab: Tab::Learn, screen: Screen::Main, modal: Modal::None, courses, cur, open_mod: None, opp: 0, sub_train: 0, sub_create: 0,
-            input: String::new(), cat: 0, query: String::new(), view_key: 999, view_t0: 0.0, toasts: VecDeque::new(), demo, shot, frames: 0, save_warned: false, onboard, audio: None, pending_import: None, cert_input: String::new(), kb_open: false };
+            input: String::new(), cat: 0, query: String::new(), view_key: 999, view_t0: 0.0, toasts: VecDeque::new(), demo, shot, frames: 0, save_warned: false, onboard, audio: None, pending_import: None, cert_input: String::new(), kb_open: false, kb_t: 0.0, splash: None };
+        if !demo && a.onboard.is_none() { a.splash = Some((-1.0, 0)); }
         if a.shot.is_none() && !cfg!(test) { a.audio = audio::Audio::new(); }
         if tampered {
             a.log("the save file was changed outside Code Forge; gems were reset");
@@ -233,7 +239,7 @@ impl App {
         let sounds = audio::take();
         #[cfg(target_arch = "wasm32")]
         if let Some(a) = &mut self.audio && !sounds.is_empty() { a.unlock(); }
-        let want = if self.onboard.is_some() { audio::Track::Title } else {
+        let want = if self.onboard.is_some() || self.splash.is_some() { audio::Track::Title } else {
             match &self.screen {
                 Screen::Run(rs) if matches!(rs.kind, Kind::Duel(_)) => audio::Track::Battle,
                 Screen::Complete(c) if c.duel.is_some() => audio::Track::Battle,
@@ -636,14 +642,24 @@ impl App {
         {
             // open the phone keyboard while a text box has focus, close it otherwise
             let want = ctx.egui_wants_keyboard_input();
-            if want != self.kb_open { self.kb_open = want; platform::soft_keyboard(want); }
-            // keep the bottom buttons (NEXT, CHECK...) above the keyboard, and clear of the gesture bar
-            if !self.kb_open { egui::Panel::bottom("gesture_space").exact_size(14.0).resizable(false).frame(egui::Frame::new().fill(BG2)).show(ui, |_| {}); }
-            if self.kb_open {
-                let ppp = ctx.pixels_per_point();
-                let h = ctx.content_rect().height();
-                let inset = platform::keyboard_inset_px(h * ppp).map(|px| px / ppp).unwrap_or(h * 0.42);
-                egui::Panel::bottom("keyboard_space").exact_size(inset).resizable(false).frame(egui::Frame::new().fill(BG)).show(ui, |_| {});
+            let now_t = ctx.input(|i| i.time);
+            let ppp = ctx.pixels_per_point();
+            let h = ctx.content_rect().height();
+            // how much of the screen the keyboard really covers right now (None = keyboard closed)
+            let inset = platform::keyboard_inset_px(h * ppp).map(|px| px / ppp);
+            if want != self.kb_open {
+                self.kb_open = want;
+                if !want || inset.is_none() { platform::soft_keyboard(want); }
+                self.kb_t = now_t;
+            } else if want && inset.is_none() && now_t - self.kb_t > 0.8 && ctx.input(|i| i.pointer.any_released()) {
+                // the player closed the keyboard and tapped the text box again: bring it back
+                platform::soft_keyboard(true);
+                self.kb_t = now_t;
+            }
+            // lift the bottom buttons (NEXT, CHECK...) above the keyboard only while it is open
+            match inset.filter(|_| want) {
+                Some(px) => { egui::Panel::bottom("keyboard_space").exact_size(px).resizable(false).frame(egui::Frame::new().fill(BG)).show(ui, |_| {}); }
+                None => { egui::Panel::bottom("gesture_space").exact_size(14.0).resizable(false).frame(egui::Frame::new().fill(BG2)).show(ui, |_| {}); }
             }
         }
         if self.onboard.is_none() && self.modal == Modal::None && matches!(self.screen, Screen::Main) && !self.s.res_seen && self.s.res_place > 0 {
@@ -659,6 +675,11 @@ impl App {
         self.tick();
         if self.s.hearts < MAX_HEARTS { ctx.request_repaint_after(std::time::Duration::from_secs(1)); }
         if self.onboard.is_none() { self.week_check(); }
+        if self.splash.is_some() && self.onboard.is_none() {
+            self.splash_screen(ui);
+            self.draw_toast(&ctx);
+            return;
+        }
         if self.onboard.is_some() {
             self.onboarding_screen(ui);
             self.modals(&ctx);
@@ -913,9 +934,11 @@ fn day_label(d: u64) -> String {
 fn avatar_grid(ui: &mut egui::Ui, cur: &mut u32) -> bool {
     let mut picked = false;
     let cols = 4;
-    let size = ((ui.available_width() - (cols as f32 - 1.0) * 10.0) / cols as f32).clamp(52.0, 76.0);
+    let size = ((ui.available_width() - (cols as f32 - 1.0) * 10.0) / cols as f32).clamp(52.0, 96.0);
+    let lead = ((ui.available_width() - (cols as f32 * size + (cols as f32 - 1.0) * 10.0)) / 2.0).max(0.0);
     for row in AVATARS.chunks(cols).enumerate() {
         ui.horizontal(|ui| {
+            ui.add_space(lead); // centre the grid
             ui.spacing_mut().item_spacing.x = 10.0;
             for (j, a) in row.1.iter().enumerate() {
                 let i = (row.0 * cols + j) as u32;
