@@ -1,0 +1,38 @@
+name: Accessibility barrier
+description: Something in Code Forge is hard or impossible for you to use.
+title: "[Accessibility]: "
+labels: ["accessibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for telling us. You don't need to know the technical cause; describe what you
+        experienced. See [ACCESSIBILITY.md](https://github.com/JreyForFun/code-forge/blob/main/ACCESSIBILITY.md) for what we support
+        today. Prefer to talk privately? Open an issue titled "Private contact requested" instead.
+  - type: textarea
+    id: barrier
+    attributes:
+      label: What got in your way?
+      placeholder: On the lesson screen I can't reach the CHECK button using only the keyboard.
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Which screen or lesson?
+  - type: input
+    id: device
+    attributes:
+      label: Device and operating system
+      placeholder: Windows 11 laptop / Android 14 phone
+    validations:
+      required: true
+  - type: input
+    id: at
+    attributes:
+      label: Assistive technology or settings you use (if any)
+      placeholder: NVDA, TalkBack, Windows Magnifier, large text, switch control...
+  - type: textarea
+    id: better
+    attributes:
+      label: What would work better for you?

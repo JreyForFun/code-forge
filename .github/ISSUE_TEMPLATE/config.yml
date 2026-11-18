@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/JreyForFun/code-forge/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
+  - name: Download Code Forge
+    url: https://github.com/JreyForFun/code-forge/releases/latest
+    about: Get the latest Windows and Android builds.
+  - name: Help and common fixes
+    url: https://github.com/JreyForFun/code-forge/blob/main/SUPPORT.md
+    about: Install problems, missing progress, no sound and other quick fixes.

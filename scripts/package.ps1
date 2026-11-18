@@ -21,7 +21,8 @@ if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force $stage | Out-Null
 $target = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { "target" }
 Copy-Item (Join-Path $target "release\code_forge.exe")(Join-Path $stage "CodeForge.exe")
-Copy-Item README.md, CREDITS.md $stage
+Copy-Item (Join-Path $root "scripts/zip-readme.txt") (Join-Path $stage "README.txt")
+Copy-Item LICENSE, CREDITS.md $stage
 $zip = Join-Path $root "dist\CodeForge-$version-windows.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Compress-Archive -Path "$stage\*" -DestinationPath $zip

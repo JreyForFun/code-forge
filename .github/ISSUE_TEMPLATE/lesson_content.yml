@@ -1,0 +1,39 @@
+name: Lesson mistake or unclear explanation
+description: A typo, a wrong answer, a confusing explanation, or an exercise that won't accept a correct answer.
+title: "[Lesson]: "
+labels: ["content"]
+body:
+  - type: dropdown
+    id: course
+    attributes:
+      label: Course
+      options: [HTML, CSS, JavaScript, Python, SQL]
+    validations:
+      required: true
+  - type: input
+    id: lesson
+    attributes:
+      label: Chapter and lesson
+      placeholder: "Chapter 2: Text, lesson 3: Bold and Italic"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of problem?
+      options:
+        - Typo or grammar
+        - The explanation is confusing
+        - The explanation is wrong
+        - My correct answer was marked wrong
+        - A wrong answer was accepted
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Quote the text, or paste the code you typed. Say what you think it should be.
+    validations:
+      required: true

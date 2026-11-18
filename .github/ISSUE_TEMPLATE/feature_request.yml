@@ -1,0 +1,30 @@
+name: Feature or course idea
+description: Suggest a new feature, a course, or an improvement.
+title: "[Idea]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would this help with?
+      description: Describe the problem or wish first, before the solution.
+      placeholder: I forget what I learned a week later, so...
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How could Code Forge solve it? Sketches and examples from other apps are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything else you considered?
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to help build this

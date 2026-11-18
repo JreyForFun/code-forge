@@ -8,3 +8,4 @@ mechanics.json
 android/target/
 android/*.keystore
 android/build/
+android/keystore.properties

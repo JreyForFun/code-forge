@@ -2,7 +2,7 @@
 
 Uses the Android SDK/NDK and JDK already on this PC (no extra tools):
   1. cargo builds the game for arm64 Android with the NDK's clang
-  2. aapt2 packages the manifest and launcher icon
+  2. aapt2 packages the manifest and launcher icon (adaptive icon on Android 8+)
   3. the native libraries are added, then zipalign + apksigner sign the APK
 
 usage:  python scripts/build_android.py
@@ -116,14 +116,28 @@ def main():
             z.write(so, f"lib/{abi}/libcode_forge.so")
             if cxx_shared.exists(): z.write(cxx_shared, f"lib/{abi}/libc++_shared.so")
     run([bt / "zipalign.exe", "-f", "-p", "4", build / "base.apk", build / "aligned.apk"])
-    ks = ROOT / "android/codeforge.keystore"
+    # signing key: android/codeforge.keystore, password in android/keystore.properties (both gitignored;
+    # keep a backup of them: without this key an update can't be installed over the released app).
+    # The CODEFORGE_KEYSTORE_PASS environment variable overrides the file.
+    ks, props = ROOT / "android/codeforge.keystore", ROOT / "android/keystore.properties"
+    pw = os.environ.get("CODEFORGE_KEYSTORE_PASS")
+    if not pw and props.exists():
+        pw = dict(l.split("=", 1) for l in props.read_text(encoding="utf-8").splitlines() if "=" in l).get("storePassword", "").strip()
     if not ks.exists():
-        run([jdk / "bin/keytool.exe", "-genkeypair", "-keystore", ks, "-alias", "codeforge", "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000",
-             "-storepass", "codeforge", "-keypass", "codeforge", "-dname", "CN=Code Forge, O=Code Forge, C=PH"])
+        if not pw:
+            import secrets, string
+            pw = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(28))
+            props.write_text(f"storePassword={pw}\nkeyAlias=codeforge\n", encoding="utf-8")
+            print(f"new signing key: back up {ks} and {props}!")
+        subprocess.run([str(jdk / "bin/keytool.exe"), "-genkeypair", "-keystore", str(ks), "-storetype", "PKCS12", "-alias", "codeforge", "-keyalg", "RSA", "-keysize", "2048",
+                        "-validity", "10000", "-storepass", pw, "-keypass", pw, "-dname", "CN=Code Forge, O=Code Forge, C=PH"], check=True)
+    if not pw: sys.exit(f"no keystore password: put storePassword=... in {props} or set CODEFORGE_KEYSTORE_PASS")
     out = ROOT / f"dist/CodeForge-{version}-android.apk"
     out.parent.mkdir(exist_ok=True)
     apksigner = bt / "lib/apksigner.jar"
-    run([jdk / "bin/java.exe", "-jar", apksigner, "sign", "--ks", ks, "--ks-pass", "pass:codeforge", "--key-pass", "pass:codeforge", "--out", out, build / "aligned.apk"])
+    print("> apksigner sign ...")  # not echoed in full: the command holds the password
+    subprocess.run([str(jdk / "bin/java.exe"), "-jar", str(apksigner), "sign", "--ks", str(ks), "--ks-pass", f"pass:{pw}", "--key-pass", f"pass:{pw}",
+                    "--out", str(out), str(build / "aligned.apk")], check=True)
     print(f"\nDone: {out} ({out.stat().st_size / 1e6:.1f} MB)")
 
 if __name__ == "__main__":
