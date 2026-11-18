@@ -17,9 +17,7 @@
   <link rel="preload" href="assets/fonts/PixelifySans.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="dungeon.css">
-  <script>
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('js-motion');
-  </script>
+  <script src="boot.js"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -65,7 +63,7 @@
         </div>
 
         <h1 id="hero-title" data-enter>Every hero starts at <span class="keep">level one.</span></h1>
-        <p class="lead hero__lead" data-enter>Pick a quest, study the scroll, then cast the spell yourself and watch it work. 181 quests wait across five schools of code: HTML, CSS, JavaScript, Python and SQL.</p>
+        <p class="lead hero__lead" data-enter>Pick a quest, study the scroll, then cast the spell yourself and watch it work. Earn your XP, claim your badges and rise from apprentice to master.</p>
         <div class="actions hero__actions" data-enter>
           <a class="btn btn--gold btn--lg" href="#download">Begin your quest</a>
           <a class="btn btn--stone btn--lg" href="#quest">Try a quest first</a>
@@ -208,6 +206,10 @@
             </tr>
           </tbody>
         </table>
+        <div class="sealed-hall">
+          <svg class="sealed-hall__lock" viewBox="0 0 8 9" width="24" height="27" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h4v1h1v3H6V1H2v3H1V1h1z"/><path fill="currentColor" d="M0 4h8v5H0z"/><rect x="3" y="5" width="2" height="2" fill="#0b0e17"/></svg>
+          <p class="sealed-hall__text"><span class="sealed-hall__name">Sealed halls</span>Deeper halls are still being carved beneath the forge. New schools will open their doors soon, so sharpen your skills while you wait.</p>
+        </div>
         </div>
 
         <h3 class="between__title">Between quests</h3>
@@ -237,8 +239,8 @@
           <h2 id="download-title">Choose your gate, hero.</h2>
           <p class="lead">Code Forge plays fully offline and keeps your save on your own device. No account, no sign-up.</p>
           <ul class="gates" aria-label="Downloads">
-            <li><a class="gate gate--open" href="https://github.com/JreyForFun/code-forge/releases/latest" data-chest-trigger><svg class="gate__icon" viewBox="0 0 8 8" width="24" height="24" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h2v4h2v1H6v1H5v1H3V6H2V5H1V4h2z"/><rect x="0" y="7" width="8" height="1" fill="currentColor"/></svg><span class="gate__text"><span class="gate__name">Download for Windows</span><span class="gate__meta">Unzip and play</span></span></a></li>
-            <li><a class="gate gate--open" href="https://github.com/JreyForFun/code-forge/releases/latest" data-chest-trigger><svg class="gate__icon" viewBox="0 0 8 8" width="24" height="24" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h2v4h2v1H6v1H5v1H3V6H2V5H1V4h2z"/><rect x="0" y="7" width="8" height="1" fill="currentColor"/></svg><span class="gate__text"><span class="gate__name">Download for Android</span><span class="gate__meta">Phones and tablets</span></span></a></li>
+            <li><a class="gate gate--open" href="https://github.com/JreyForFun/code-forge/releases/download/v1.0.0/CodeForge-1.0.0-windows.zip" data-chest-trigger><svg class="gate__icon" viewBox="0 0 8 8" width="24" height="24" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h2v4h2v1H6v1H5v1H3V6H2V5H1V4h2z"/><rect x="0" y="7" width="8" height="1" fill="currentColor"/></svg><span class="gate__text"><span class="gate__name">Download for Windows</span><span class="gate__meta">.zip &middot; unzip and play</span></span></a></li>
+            <li><a class="gate gate--open" href="https://github.com/JreyForFun/code-forge/releases/download/v1.0.0/CodeForge-1.0.0-android.apk" data-chest-trigger><svg class="gate__icon" viewBox="0 0 8 8" width="24" height="24" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h2v4h2v1H6v1H5v1H3V6H2V5H1V4h2z"/><rect x="0" y="7" width="8" height="1" fill="currentColor"/></svg><span class="gate__text"><span class="gate__name">Download for Android</span><span class="gate__meta">.apk &middot; phones and tablets</span></span></a></li>
             <li><div class="gate gate--sealed" aria-disabled="true"><svg class="gate__icon" viewBox="0 0 8 9" width="24" height="27" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h4v1h1v3H6V1H2v3H1V1h1z"/><path fill="currentColor" d="M0 4h8v5H0z"/><rect x="3" y="5" width="2" height="2" fill="#0b0e17"/></svg><span class="gate__text"><span class="gate__name">iOS</span><span class="gate__meta">Coming soon</span></span></div></li>
             <li><div class="gate gate--sealed" aria-disabled="true"><svg class="gate__icon" viewBox="0 0 8 9" width="24" height="27" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h4v1h1v3H6V1H2v3H1V1h1z"/><path fill="currentColor" d="M0 4h8v5H0z"/><rect x="3" y="5" width="2" height="2" fill="#0b0e17"/></svg><span class="gate__text"><span class="gate__name">Mac</span><span class="gate__meta">Coming soon</span></span></div></li>
           </ul>
@@ -267,6 +269,7 @@
         </a>
         <p class="footer__tag">Learn to code, one quest at a time.</p>
         <a class="btn btn--gold btn--sm" href="#download">Begin your quest</a>
+        <a class="footer__repo" href="https://github.com/JreyForFun/code-forge" target="_blank" rel="noopener"><svg viewBox="0 0 8 8" width="16" height="16" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M2 0h4v1h1v1h1v4H7v1H6v1H5V6h1V3H5V2H3v1H2v3h1v1H2V6H1V5H0V2h1V1h1z"/></svg><span>JreyForFun/code-forge</span></a>
       </div>
       <nav class="footer__col" aria-label="Explore">
         <h2 class="footer__h">Explore</h2>
@@ -275,6 +278,7 @@
           <li><a href="#courses">Courses and badges</a></li>
           <li><a href="#rules">Rules of the dungeon</a></li>
           <li><a href="#download">Download</a></li>
+          <li><a href="https://github.com/JreyForFun/code-forge" target="_blank" rel="noopener">Source on GitHub</a></li>
         </ul>
       </nav>
       <nav class="footer__col" aria-label="Schools of code">
@@ -290,8 +294,8 @@
       <div class="footer__col">
         <h2 class="footer__h">Play on</h2>
         <ul>
-          <li><a href="https://github.com/JreyForFun/code-forge/releases/latest">Windows</a></li>
-          <li><a href="https://github.com/JreyForFun/code-forge/releases/latest">Android</a></li>
+          <li><a href="https://github.com/JreyForFun/code-forge/releases/download/v1.0.0/CodeForge-1.0.0-windows.zip">Windows</a></li>
+          <li><a href="https://github.com/JreyForFun/code-forge/releases/download/v1.0.0/CodeForge-1.0.0-android.apk">Android</a></li>
           <li><span class="footer__soon">iOS <span class="soon">Soon</span></span></li>
           <li><span class="footer__soon">Mac <span class="soon">Soon</span></span></li>
         </ul>

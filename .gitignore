@@ -1,5 +1,5 @@
 target/
-shots/
+/shots/
 dist/
 assets/*.zip
 design/audio/
@@ -9,3 +9,4 @@ android/target/
 android/*.keystore
 android/build/
 android/keystore.properties
+.playwright-cli/

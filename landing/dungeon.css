@@ -303,3 +303,28 @@
   .footer__base { flex-direction: column; gap: 0; }
   .credits { flex: none; }
 }
+
+/* ---- sealed halls: more courses are coming ---- */
+.sealed-hall {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 4px 14px;
+  border-top: 2px dashed var(--line);
+  color: var(--ink-3);
+}
+.sealed-hall__lock { flex: none; color: var(--ember); image-rendering: pixelated; }
+.sealed-hall__text { margin: 0; color: var(--ink-3); font-size: 1rem; line-height: 1.45; max-width: 64ch; }
+.sealed-hall__name {
+  display: block; margin-bottom: 2px;
+  font-family: var(--label); font-size: 0.8125rem; letter-spacing: 0.04em;
+  color: var(--ember); text-transform: uppercase;
+}
+
+/* ---- repo link in the footer ---- */
+.footer__repo {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--label); font-size: 0.8125rem; color: var(--ink-2);
+  text-decoration: none; transition: color 160ms ease;
+}
+.footer__repo svg { image-rendering: pixelated; color: var(--ink-3); transition: color 160ms ease; }
+.footer__repo:hover, .footer__repo:hover svg { color: var(--gold); }
+.footer__repo:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
