@@ -678,6 +678,7 @@ impl App {
         if self.splash.is_some() && self.onboard.is_none() {
             self.splash_screen(ui);
             self.draw_toast(&ctx);
+            self.screenshot(&ctx);
             return;
         }
         if self.onboard.is_some() {
@@ -1033,6 +1034,8 @@ fn main() -> eframe::Result {
                 "preview" => app.screen = Screen::Preview(1),
                 "preview-js" => app.screen = Screen::Preview(2),
                 "notes" => app.screen = Screen::Notes(2, 1, 4),
+                "splash" => app.splash = Some((-1.0, 0)),
+                "hero-pick" => app.onboard = Some(onboarding::Onboard { step: 1, ..Default::default() }),
                 "week" => { app.s.res_place = 2; app.s.res_from = 2; app.s.res_to = 3; app.s.res_xp = 180; app.s.res_gems = 6; app.s.res_seen = false; }
                 "cert" => { app.s.ach.insert(app.courses[0].badge_id(), today()); app.s.cert_names.insert("html".into(), "Ada Lovelace".into()); app.screen = Screen::Certificate(0); }
                 "certname" => { app.s.ach.insert(app.courses[0].badge_id(), today()); app.screen = Screen::Certificate(0); }
