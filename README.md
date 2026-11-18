@@ -127,6 +127,19 @@ Read a short scroll, fill in the missing code, then forge it yourself and watch 
 <img src="docs/screenshots/desktop.png" alt="Code Forge on a laptop screen" width="820">
 </div>
 
+## 🔒 Sealed halls: more coming soon
+
+The forge is still burning, and deeper halls are being carved beneath it.
+
+- 🚪 **New schools of code**: more courses will open their doors in future updates
+- 📜 **More quests** in the halls you already know: new lessons, projects and challenges
+- ⚔️ **New foes** for the Duel Arena and fresh trials between quests
+
+Sharpen your skills while you wait: every badge and certificate you earn now stays yours. Have a
+hall you'd like us to open next?
+[Leave your wish at the forge](https://github.com/JreyForFun/code-forge/issues/new?template=feature_request.yml)
+and ⭐ the repo to hear when the doors open.
+
 ## 🔄 Your progress
 
 - **Saved automatically** on your device (`%APPDATA%\code_forge\save.txt` on Windows). The previous
