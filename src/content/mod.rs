@@ -228,4 +228,41 @@ mod tests {
         assert_eq!(s.best.get("javascript/hello-console"), Some(&(90, 2)));
         assert!(s.qdone.is_empty());
     }
+
+    /// Every checkpoint project tells ONE story: the code on its slide is exactly what the learner
+    /// types, the explanation shows that same code, the questions don't repeat each other, and the
+    /// code runs cleanly.
+    #[test]
+    fn checkpoint_projects_tell_one_story() {
+        let mut bad = vec![];
+        for c in all() {
+            for m in &c.modules {
+                for l in m.lessons.iter().filter(|l| l.project) {
+                    let id = format!("{} / {}", c.name, l.title);
+                    let head = if l.title.starts_with("Final") { "FINAL PROJECT" } else { "CHECKPOINT PROJECT" };
+                    if !l.slides.first().is_some_and(|s| s.0.starts_with(head)) { bad.push(format!("{}: first slide must start with {}", id, head)); }
+                    if l.qs.len() != 7 { bad.push(format!("{}: {} questions, expected 7", id, l.qs.len())); }
+                    if l.summary.len() != 4 || l.explain.len() < 600 { bad.push(format!("{}: needs a full explanation and 4 summary points", id)); }
+                    let program = l.slides.last().map(|s| s.0).unwrap_or("");
+                    let copies: Vec<&str> = l.qs.iter().filter_map(|q| match q { Q::Type { answer, guide: true, .. } => Some(*answer), _ => None }).collect();
+                    match copies.as_slice() {
+                        [a] if crate::lesson::norm_code(a, c.lang) == crate::lesson::norm_code(program, c.lang) => {}
+                        _ => bad.push(format!("{}: the typed project must be exactly the code on the slide", id)),
+                    }
+                    for line in program.lines().map(str::trim).filter(|x| !x.is_empty()) {
+                        if !l.explain.contains(line) { bad.push(format!("{}: explanation is missing the line `{}`", id, line)); }
+                    }
+                    if run(c.lang, program).iter().any(|(k, _)| *k == Kind::Err) { bad.push(format!("{}: the project code doesn't run", id)); }
+                    let mut prompts = HashSet::new();
+                    let mut fills = HashSet::new();
+                    for q in &l.qs {
+                        let (p, fill_answer) = match q { Q::Mc { q, .. } => (*q, None), Q::Fill { prompt, opts, right, .. } => (*prompt, opts.get(*right).copied()), Q::Type { prompt, .. } => (*prompt, None) };
+                        if !prompts.insert(p) { bad.push(format!("{}: question asked twice: {}", id, p)); }
+                        if let Some(a) = fill_answer && !fills.insert(a) { bad.push(format!("{}: two gaps with the same answer `{}`", id, a)); }
+                    }
+                }
+            }
+        }
+        assert!(bad.is_empty(), "{} project problems:\n{}", bad.len(), bad.join("\n"));
+    }
 }

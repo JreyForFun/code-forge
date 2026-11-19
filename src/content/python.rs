@@ -142,26 +142,38 @@ Using a forward slash /n instead of \n prints the characters /n literally. The e
 For long text, Python also allows triple quotes """...""", which can span several lines without any \n."##,
         &["A backslash starts an escape character.", "\\n is a new line and \\t is a tab.", "\\\" puts a quote inside a string; \\\\ is a real backslash.", "Use the backslash \\, not the slash /."]),
         p("Project: Snail Mail", &[
-            (r#"Write a letter to a friend in the next village, using several prints, a blank line and escape characters."#, "letter"),
-            (r#"print("Dear Rook,\n")
-print("The slimes are back.")
-print("\t- Pix")"#, "scroll_fire"),
+            (r##"CHECKPOINT PROJECT
+
+Write a letter to a friend in the next village, using several prints, a comment, a blank line and escape characters."##, "letter"),
+            (r##"# Letter to Rook
+print("Dear Rook,\n")
+print("The slimes are back in the cellar.")
+print("Bring your biggest broom!")
+print()
+print("Your friend,\n\tPix")"##, "scroll_fire"),
         ], vec![
-            quiz("How do you add an empty line?", &["print() or \\n", "#", "print(\"\\t\")"], 0, "An empty print() or \\n gives a blank line."),
-            quiz("Which line indents the signature?", &["print(\"\\t- Pix\")", "print(\"- Pix\")", "# - Pix"], 0, "\\t adds a tab."),
-            fill("Start the letter with a greeting and a blank line.", r#"print("Dear Rook,___")"#, &["\\n", "\\t", "/n"], 0, "\\n adds the line break."),
-            fill("Add a note for yourself that Python ignores.", "___ signature goes last", &["#", "//", "\\n"], 0, "Comments start with #."),
-            copy("Type the closing line.", r#"print("Your friend,\n\tPix")"#, "A newline, then a tab."),
-            recall("From memory: print Hello Rook! followed by a new line and See you soon.", r#"print("Hello Rook!\nSee you soon.")"#, "One print with \\n."),
+            quiz("How do you add an empty line?", &["print() or \\n", "#", "print(\"\\t\")"], 0, "An empty print() or a \\n gives a blank line."),
+            quiz("Which line indents the signature?", &["print(\"Your friend,\\n\\tPix\")", "print(\"Your friend, Pix\")", "# Your friend, Pix"], 0, "\\t pushes Pix to the right after the line break."),
+            fill("Start the letter with a greeting and a blank line.", r##"print("Dear Rook,___")"##, &["\\n", "\\t", "/n"], 0, "\\n adds the line break."),
+            fill("Add a label for yourself that Python ignores.", r##"___ Letter to Rook"##, &["#", "//", "\\n"], 0, "Comments start with #."),
+            quiz("How many lines does print(\"Your friend,\\n\\tPix\") print?", &["2", "1", "3"], 0, "\\n splits it into two lines."),
+            copy("Type the whole letter.", r##"# Letter to Rook
+print("Dear Rook,\n")
+print("The slimes are back in the cellar.")
+print("Bring your biggest broom!")
+print()
+print("Your friend,\n\tPix")"##, "A real letter, laid out by Python."),
+            recall("From memory: print Hello Rook! followed by a new line and See you soon.", r##"print("Hello Rook!\nSee you soon.")"##, "One print with \\n."),
         ]).with(r##"## Your first real program
 In this project you write a short letter that Python prints neatly. It uses everything from the Hello World chapter: print(), strings, comments and escape characters.
 
 ## Plan the letter
-- A greeting: Dear Rook,
-- A blank line.
-- Two or three lines of news.
-- A sign-off, indented with a tab.
+- A label for yourself (a comment).
+- A greeting: Dear Rook, followed by a blank line.
+- Two lines of news.
+- An empty line, then a sign-off with the name indented.
 
+## Build it
     # Letter to Rook
     print("Dear Rook,\n")
     print("The slimes are back in the cellar.")
@@ -170,14 +182,14 @@ In this project you write a short letter that Python prints neatly. It uses ever
     print("Your friend,\n\tPix")
 
 ## Things to notice
-- print() with nothing inside prints an empty line.
-- \n inside the text adds a line break at that spot.
-- \t pushes the name to the right like a real signature.
 - The comment at the top is a label for you; it is not printed.
+- \n inside the text adds a line break at that spot.
+- print() with nothing inside prints an empty line.
+- \t pushes the name to the right like a real signature.
 
 ## Check your work
 Run it and compare the output with your plan. If quotes or brackets are missing, Python points to the line. Fix the first error first: later errors are often caused by it."##,
-        &["Plan the output before writing code.", "print() alone prints a blank line.", "Combine \\n and \\t to lay out text.", "Fix the first error first."]),
+        &["Plan the output before writing code.", "Comments label your code and are never printed.", "print() alone prints a blank line.", "Combine \\n and \\t to lay out text."]),
     ])
 }
 
@@ -400,21 +412,26 @@ round() keeps numbers tidy: f"{round(3.14159, 2)}" gives 3.14.
 - To show a real curly brace, double it: f"{{ }}"."##,
         &["An f-string starts with f before the quotes.", "{expression} inserts a value, converted to text automatically.", "Any expression works inside the braces.", "Without the f, the braces are printed literally."]),
         p("Project: Temperature Converter", &[
-            (r#"Convert a temperature from Celsius to Fahrenheit:
+            (r##"CHECKPOINT PROJECT
 
-F = C * 9 / 5 + 32"#, "flame"),
-            (r#"celsius = 25
+Convert a temperature from Celsius to Fahrenheit with the formula F = C * 9 / 5 + 32, and print the result in a sentence."##, "flame"),
+            (r##"celsius = 25
 fahrenheit = celsius * 9 / 5 + 32
-print(f"{celsius}C is {fahrenheit}F")"#, "hourglass"),
+print(f"{celsius}C is {fahrenheit}F")"##, "hourglass"),
         ], vec![
-            quiz("What is 100 Celsius in Fahrenheit (100 * 9 / 5 + 32)?", &["212", "180", "132"], 0, "180 + 32 = 212."),
-            quiz("Why store the formula result in a variable?", &["To reuse and print it clearly", "Variables are faster", "It is required"], 0, "Named results make code readable."),
-            fill("Apply the formula.", "f = c * 9 / 5 ___ 32", &["+", "-", "*"], 0, "Multiply, divide, then add 32."),
-            fill("Print the result with an f-string.", "f = 77\nprint(___\"{f}F\")", &["f", "str", "%"], 0, "f-strings start with f."),
-            copy("Type the converter.", "c = 30\nf = c * 9 / 5 + 32\nprint(f\"{c}C = {f}F\")", "Formula plus f-string."),
-            recall("From memory: store 0 in c, compute f with c * 9 / 5 + 32, and print f.", "c = 0\nf = c * 9 / 5 + 32\nprint(f)", "0C is 32F."),
+            quiz("What is 100 Celsius in Fahrenheit (100 * 9 / 5 + 32)?", &["212", "180", "132"], 0, "100 * 9 / 5 is 180, plus 32 is 212."),
+            quiz("Why store the result in a variable?", &["To name it and print it clearly", "Variables are faster", "It is required"], 0, "Named results make code readable."),
+            fill("Apply the formula.", r##"fahrenheit = celsius * 9 / 5 ___ 32"##, &["+", "-", "*"], 0, "Multiply, divide, then add 32."),
+            fill("Print the result with an f-string.", r##"print(___"{celsius}C is {fahrenheit}F")"##, &["f", "str", "%"], 0, "f-strings start with f."),
+            quiz("Why does it print 77.0F and not 77F?", &["/ always gives a float in Python", "Python adds .0 to every number", "Because of the f-string"], 0, "Division with / always gives a float, even 4 / 2 is 2.0."),
+            copy("Type the converter.", r##"celsius = 25
+fahrenheit = celsius * 9 / 5 + 32
+print(f"{celsius}C is {fahrenheit}F")"##, "Prints 25C is 77.0F."),
+            recall("From memory: store 0 in celsius, compute fahrenheit with celsius * 9 / 5 + 32, and print fahrenheit.", r##"celsius = 0
+fahrenheit = celsius * 9 / 5 + 32
+print(fahrenheit)"##, "Prints 32.0: / makes a float."),
         ]).with(r##"## A useful little tool
-Travellers from the northern realms measure temperature in Fahrenheit; your village uses Celsius. Your converter fixes the confusion. It combines variables, maths, type conversion and f-strings.
+Travellers from the northern realms measure temperature in Fahrenheit; your village uses Celsius. Your converter fixes the confusion. It combines variables, maths and f-strings.
 
 ## The formula
     fahrenheit = celsius * 9 / 5 + 32
@@ -426,14 +443,19 @@ Python follows the usual order: multiply and divide from left to right, then add
     fahrenheit = celsius * 9 / 5 + 32
     print(f"{celsius}C is {fahrenheit}F")
 
+It prints: 25C is 77.0F
+
+## Why 77.0?
+In Python, / always gives a float (a number with a decimal point), even when the answer is a whole number: 4 / 2 is 2.0. So the result is 77.0, not 77.
+
 ## Make it nicer
 - Round the result: round(fahrenheit, 1).
 - Go the other way too: celsius = (fahrenheit - 32) * 5 / 9. The brackets matter here.
 - In a real program you would read the temperature with float(input("Celsius? ")).
 
 ## Check
-Test values you know: 0C should be 32F and 100C should be 212F. Testing with known answers is how programmers make sure a formula is right."##,
-        &["Turn a formula into code with variables.", "Brackets control the order of operations.", "Print results with f-strings and round().", "Test with values whose answers you already know."]),
+Test values you know: 0C should be 32.0F and 100C should be 212.0F. Testing with known answers is how programmers make sure a formula is right."##,
+        &["Turn a formula into code with variables.", "* and / happen before +.", "/ always gives a float, like 77.0.", "Test with values whose answers you already know."]),
     ])
 }
 
@@ -615,23 +637,47 @@ This is always True, because "Sun" on its own counts as True. Repeat the compari
 0, empty text "" and empty lists [] count as False; most other values count as True. So if name: means "if name is not empty"."##,
         &["and needs both sides True; or needs at least one.", "not flips a boolean.", "Check ranges with two comparisons joined by and.", "Repeat the comparison on both sides of or."]),
         p("Project: Grade Calculator", &[
-            (r#"Turn a test score into a letter grade:
+            (r##"CHECKPOINT PROJECT
 
-90+ A, 80+ B, 70+ C, 60+ D, below F"#, "book"),
-            (r#"score = 84
+Turn a test score into a letter grade: 90+ A, 80+ B, 70+ C, 60+ D, below that F."##, "book"),
+            (r##"score = 84
 if score >= 90:
     grade = "A"
 elif score >= 80:
     grade = "B"
-...
-print(f"Grade: {grade}")"#, "medallion"),
+elif score >= 70:
+    grade = "C"
+elif score >= 60:
+    grade = "D"
+else:
+    grade = "F"
+print(f"Grade: {grade}")"##, "medallion"),
         ], vec![
             quiz("Score 84: which grade?", &["A", "B", "C"], 1, "84 is not >= 90 but is >= 80."),
-            quiz("Why is the score >= 90 check first?", &["Otherwise high scores would match a lower grade first", "It is shorter", "Python requires it"], 0, "First match wins."),
-            fill("Add the C grade.", "elif score ___ 70:\n    grade = \"C\"", &[">=", "<=", "=="], 0, "At least 70."),
-            fill("Catch every other score.", "___:\n    grade = \"F\"", &["else", "elif", "if"], 0, "else is the default."),
-            copy("Type this.", "score = 91\nif score >= 90:\n    grade = \"A\"\nelse:\n    grade = \"B\"\nprint(grade)", "Set grade in each branch."),
-            recall("From memory: set score to 65; if score >= 60 set grade to \"Pass\", else \"Fail\"; print grade.", "score = 65\nif score >= 60:\n    grade = \"Pass\"\nelse:\n    grade = \"Fail\"\nprint(grade)", "Choose a value, then print."),
+            quiz("Why is the score >= 90 check first?", &["Otherwise high scores would match a lower grade first", "It is shorter", "Python requires it"], 0, "The first match wins."),
+            fill("Add the C grade.", r##"elif score ___ 70:
+    grade = "C""##, &[">=", "<=", "=="], 0, "At least 70."),
+            fill("Catch every other score.", r##"___:
+    grade = "F""##, &["else", "elif", "if"], 0, "else is the default."),
+            quiz("Score 60: which grade?", &["D", "F", "C"], 0, "60 >= 60, so it is a D: boundaries matter."),
+            copy("Type the calculator.", r##"score = 84
+if score >= 90:
+    grade = "A"
+elif score >= 80:
+    grade = "B"
+elif score >= 70:
+    grade = "C"
+elif score >= 60:
+    grade = "D"
+else:
+    grade = "F"
+print(f"Grade: {grade}")"##, "Prints Grade: B."),
+            recall("From memory: set score to 65; if score >= 60 set grade to \"Pass\", else \"Fail\"; print grade.", r##"score = 65
+if score >= 60:
+    grade = "Pass"
+else:
+    grade = "Fail"
+print(grade)"##, "Choose a value, then print."),
         ]).with(r##"## Scores to grades
 The guild academy needs a program that turns test scores into letter grades. This project uses if, elif and else in the right order.
 
@@ -654,7 +700,9 @@ The guild academy needs a program that turns test scores into letter grades. Thi
         grade = "D"
     else:
         grade = "F"
-    print(f"Score {score}: grade {grade}")
+    print(f"Grade: {grade}")
+
+It prints: Grade: B
 
 ## Why it works
 Because the checks go from the highest to the lowest and the first match wins, we never need to write "score >= 80 and score < 90". By the time Python reaches the B check, it already knows the score is below 90.
@@ -850,20 +898,38 @@ break and continue are great for searching and filtering, but many of them in on
 pass does nothing at all; it is a placeholder where Python needs a block but you have nothing to write yet."##,
         &["break leaves the loop immediately.", "continue skips to the next round.", "while True plus break loops until something happens.", "pass is an empty placeholder block."]),
         p("Project: FizzBuzz", &[
-            (r#"Count from 1 to 15. For multiples of 3 print Fizz, of 5 print Buzz, of both print FizzBuzz."#, "orb_red"),
-            (r#"for n in range(1, 16):
+            (r##"CHECKPOINT PROJECT
+
+Count from 1 to 15. For multiples of 3 print Fizz, for multiples of 5 print Buzz, for multiples of both print FizzBuzz, and print every other number as it is."##, "orb_red"),
+            (r##"for n in range(1, 16):
     if n % 15 == 0:
         print("FizzBuzz")
     elif n % 3 == 0:
         print("Fizz")
-    ..."#, "staff"),
+    elif n % 5 == 0:
+        print("Buzz")
+    else:
+        print(n)"##, "staff"),
         ], vec![
             quiz("What should 15 print?", &["Fizz", "Buzz", "FizzBuzz"], 2, "15 is a multiple of 3 and 5."),
-            quiz("Why check n % 15 first?", &["Otherwise 15 would print Fizz", "15 is the biggest", "It is shorter"], 0, "First match wins."),
-            fill("Test for multiples of 3.", "if n % 3 ___ 0:\n    print(\"Fizz\")", &["==", "=", "!="], 0, "No remainder means a multiple."),
-            fill("Count from 1 to 15.", "for n in range(1, ___):\n    print(n)", &["16", "15", "14"], 0, "The stop number is not included."),
-            copy("Type this.", "for n in range(1, 4):\n    if n % 3 == 0:\n        print(\"Fizz\")\n    else:\n        print(n)", "Prints 1, 2, Fizz."),
-            recall("From memory: loop n from 1 to 5; if n % 5 == 0 print Buzz, else print n.", "for n in range(1, 6):\n    if n % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(n)", "Prints 1 2 3 4 Buzz."),
+            quiz("Why check n % 15 first?", &["Otherwise 15 would print Fizz", "15 is the biggest", "It is shorter"], 0, "The first match wins."),
+            fill("Test for multiples of 3.", r##"elif n % 3 ___ 0:"##, &["==", "=", "!="], 0, "No remainder means a multiple."),
+            fill("Count from 1 to 15.", r##"for n in range(1, ___):"##, &["16", "15", "14"], 0, "The stop number is not included."),
+            quiz("What does 10 print?", &["Buzz", "Fizz", "10"], 0, "10 is a multiple of 5, but not of 3."),
+            copy("Type the whole FizzBuzz.", r##"for n in range(1, 16):
+    if n % 15 == 0:
+        print("FizzBuzz")
+    elif n % 3 == 0:
+        print("Fizz")
+    elif n % 5 == 0:
+        print("Buzz")
+    else:
+        print(n)"##, "1, 2, Fizz, 4, Buzz ... FizzBuzz."),
+            recall("From memory: loop n from 1 to 5; if n % 5 == 0 print Buzz, else print n.", r##"for n in range(1, 6):
+    if n % 5 == 0:
+        print("Buzz")
+    else:
+        print(n)"##, "Prints 1 2 3 4 Buzz."),
         ]).with(r##"## A famous puzzle
 FizzBuzz is a classic programming exercise, sometimes used in job interviews. It combines loops, the remainder operator and if / elif / else.
 
@@ -889,7 +955,7 @@ Count from 1 to 15:
 15 is a multiple of 3, so if the Fizz check came first, it would win and FizzBuzz would never print. A number divisible by both 3 and 5 is divisible by 15, so that check goes on top.
 
 ## Check
-The first fifteen lines should be: 1, 2, Fizz, 4, Buzz, Fizz, 7, 8, Fizz, Buzz, 11, Fizz, 13, 14, FizzBuzz."##,
+The fifteen lines should be: 1, 2, Fizz, 4, Buzz, Fizz, 7, 8, Fizz, Buzz, 11, Fizz, 13, 14, FizzBuzz."##,
         &["% tells you whether a number divides evenly.", "Put the most specific check (15) first.", "range(1, 16) counts from 1 to 15.", "Compare your output with the expected list."]),
     ])
 }
@@ -1084,44 +1150,65 @@ The loop unpacks two values each round: i and hero.
 Removing items from the list you are looping over makes Python skip items. Build a new list instead, as above."##,
         &["for item in list visits every item.", "Totals live in a variable created before the loop.", "sum(), max() and min() are handy shortcuts.", "enumerate() gives the index and the item."]),
         p("Project: Shopping List", &[
-            (r#"Build a market list: add items, remove what you bought, and print a numbered list."#, "money_bag"),
-            (r#"shopping = ["bread", "apples"]
+            (r##"CHECKPOINT PROJECT
+
+Build a market list: add an item, remove one you already have (checking first), and print how many are left with a numbered list."##, "money_bag"),
+            (r##"shopping = ["bread", "apples"]
 shopping.append("cheese")
-shopping.remove("bread")
+if "bread" in shopping:
+    shopping.remove("bread")
+print(f"{len(shopping)} things to buy:")
 for i, item in enumerate(shopping):
-    print(f"{i + 1}. {item}")"#, "letter"),
+    print(f"{i + 1}. {item}")"##, "letter"),
         ], vec![
             quiz("Why print i + 1?", &["People count from 1, indexes from 0", "To skip an item", "It is required"], 0, "Friendly numbering starts at 1."),
-            quiz("What does len(shopping) tell you?", &["How many items are left", "The first item", "The total price"], 0, "len counts items."),
-            fill("Add milk.", "shopping.___(\"milk\")", &["append", "insert", "pop"], 0, "append adds to the end."),
-            fill("Check before removing.", "if \"eggs\" ___ shopping:\n    shopping.remove(\"eggs\")", &["in", "of", "=="], 0, "in checks membership."),
-            copy("Type this.", "items = [\"pie\"]\nitems.append(\"ale\")\nprint(len(items))", "Two items now."),
-            recall("From memory: make items = [\"bread\"], append \"jam\", and print items.", "items = [\"bread\"]\nitems.append(\"jam\")\nprint(items)", "append, then print."),
+            quiz("What does len(shopping) tell you?", &["How many items are on the list", "The first item", "The total price"], 0, "len counts items."),
+            fill("Add cheese to the end.", r##"shopping.___("cheese")"##, &["append", "insert", "pop"], 0, "append adds to the end."),
+            fill("Check before removing.", r##"if "bread" ___ shopping:
+    shopping.remove("bread")"##, &["in", "of", "=="], 0, "in checks whether the item is there."),
+            quiz("What is the first line of the numbered list?", &["1. apples", "1. bread", "0. apples"], 0, "bread was removed, and numbering starts at 1."),
+            copy("Type the shopping list.", r##"shopping = ["bread", "apples"]
+shopping.append("cheese")
+if "bread" in shopping:
+    shopping.remove("bread")
+print(f"{len(shopping)} things to buy:")
+for i, item in enumerate(shopping):
+    print(f"{i + 1}. {item}")"##, "2 things to buy: apples and cheese."),
+            recall("From memory: make items = [\"bread\"], append \"jam\", and print items.", r##"items = ["bread"]
+items.append("jam")
+print(items)"##, "Prints ['bread', 'jam']."),
         ]).with(r##"## A list that changes
 The innkeeper needs a shopping list for market day. Your program builds it, changes it, and prints it neatly.
 
 ## Plan
 1. Start with a few items.
-2. Add new items with append (and one at the front with insert).
-3. Remove an item you already have, checking it is there first.
-4. Print the number of items and a numbered list.
+2. Add a new item to the end with append.
+3. Remove an item you already have, checking with in first.
+4. Print how many items are left, then a numbered list.
 
+## Build it
     shopping = ["bread", "apples"]
     shopping.append("cheese")
-    shopping.insert(0, "salt")
     if "bread" in shopping:
         shopping.remove("bread")
     print(f"{len(shopping)} things to buy:")
     for i, item in enumerate(shopping):
         print(f"{i + 1}. {item}")
 
-## Extra ideas
-- Sort the list alphabetically before printing.
-- Keep a second list, bought, and move items from one to the other with pop and append.
+It prints:
 
-## Check
-Does the numbering start at 1? Does removing a missing item crash, or did you check with in first?"##,
-        &["append and insert add items; remove deletes them.", "Check with in before removing.", "enumerate plus i + 1 gives friendly numbering.", "len() reports how many items remain."]),
+    2 things to buy:
+    1. apples
+    2. cheese
+
+## Things to notice
+- remove() fails if the item isn't there, so the in check keeps the program safe.
+- enumerate gives each item with its index, and i + 1 turns 0, 1 into friendly numbers.
+
+## Extra ideas
+- Sort the list alphabetically with shopping.sort() before printing.
+- Add an item at the front with shopping.insert(0, "salt")."##,
+        &["append adds items; remove deletes them.", "Check with in before removing.", "enumerate plus i + 1 gives friendly numbering.", "len() reports how many items remain."]),
     ])
 }
 
@@ -1316,42 +1403,61 @@ A function can READ a variable created outside it (a global):
 But relying on globals makes code harder to follow. Passing values as parameters and returning results keeps functions independent and easy to test."##,
         &["param=value gives a parameter a default.", "Defaults go after parameters without defaults.", "Variables created inside a function are local.", "Prefer parameters and return values over globals."]),
         p("Project: Tip Calculator", &[
-            (r#"Write a function that adds a tip to a tavern bill and splits it between friends."#, "coins"),
-            (r#"def split_bill(total, people, tip=10):
+            (r##"CHECKPOINT PROJECT
+
+Write a function that adds a tip to a tavern bill and splits it between friends, then print each share with two decimals, like money."##, "coins"),
+            (r##"def split_bill(total, people, tip=10):
     with_tip = total + total * tip / 100
-    return with_tip / people"#, "money_bag"),
+    return with_tip / people
+
+print(f"Each pays {split_bill(40, 4):.2f} gold")
+print(f"With a 20% tip: {split_bill(40, 4, 20):.2f} gold")"##, "money_bag"),
         ], vec![
             quiz("Why give tip a default?", &["Most bills use the usual tip, so callers can skip it", "Defaults are faster", "Python requires it"], 0, "Defaults cover the common case."),
-            quiz("split_bill(40, 4) with a 10% tip gives...", &["11", "10", "44"], 0, "44 split 4 ways is 11."),
-            fill("Return each person's share.", "def share(total, people):\n    ___ total / people", &["return", "print", "give"], 0, "Return the value."),
-            fill("Add the tip percentage.", "def with_tip(total, tip=10):\n    return total + total * tip / ___", &["100", "10", "1"], 0, "A percentage is divided by 100."),
-            copy("Type this.", "def share(total, people):\n    return total / people\nprint(share(30, 3))", "Prints 10.0."),
-            recall("From memory: define add_tip(total) that returns total * 1.1, then print add_tip(50).", "def add_tip(total):\n    return total * 1.1\nprint(add_tip(50))", "Prints about 55."),
+            quiz("What does split_bill(40, 4) return?", &["11.0", "10.0", "44.0"], 0, "40 plus a 10% tip is 44.0, split 4 ways is 11.0."),
+            fill("Give each person's share back to the caller.", r##"    ___ with_tip / people"##, &["return", "print", "give"], 0, "return hands the value back."),
+            fill("Add the tip percentage.", r##"with_tip = total + total * tip / ___"##, &["100", "10", "1"], 0, "A percentage is divided by 100."),
+            quiz("What does :.2f do in {split_bill(40, 4):.2f}?", &["Shows the number with exactly 2 decimals", "Rounds it to 2", "Adds 2 to it"], 0, "11.0 is shown as 11.00, like money."),
+            copy("Type the calculator.", r##"def split_bill(total, people, tip=10):
+    with_tip = total + total * tip / 100
+    return with_tip / people
+
+print(f"Each pays {split_bill(40, 4):.2f} gold")
+print(f"With a 20% tip: {split_bill(40, 4, 20):.2f} gold")"##, "Each pays 11.00 gold."),
+            recall("From memory: define add_tip(total) that returns total + total * 10 / 100, then print add_tip(50).", r##"def add_tip(total):
+    return total + total * 10 / 100
+print(add_tip(50))"##, "Prints 55.0."),
         ]).with(r##"## A handy function
 Splitting a bill after a feast is always a puzzle. Your function does it in one call, using parameters, a default value and a return value.
 
 ## Plan
-1. Take the bill total, the number of people, and a tip percentage (default 10).
+1. Take the bill total, the number of people, and a tip percentage (10 unless the caller says otherwise).
 2. Add the tip: total + total * tip / 100.
-3. Divide by the number of people.
-4. Return the share, rounded to 2 decimals.
+3. Return the total divided by the number of people.
+4. Print the shares with two decimals, like money.
 
+## Build it
     def split_bill(total, people, tip=10):
         with_tip = total + total * tip / 100
-        return round(with_tip / people, 2)
+        return with_tip / people
 
-    print(split_bill(40, 4))       # 11.0
-    print(split_bill(40, 4, 20))   # 12.0
+    print(f"Each pays {split_bill(40, 4):.2f} gold")
+    print(f"With a 20% tip: {split_bill(40, 4, 20):.2f} gold")
+
+It prints:
+
+    Each pays 11.00 gold
+    With a 20% tip: 12.00 gold
+
+## Showing money
+split_bill(40, 4) returns 11.0. Inside an f-string, :.2f after a value shows it with exactly two decimals: {split_bill(40, 4):.2f} becomes 11.00.
 
 ## Why return instead of print?
-Because the caller can now use the share: compare it to how much gold each person has, add it to a running total, or print it in a nicer message.
+Because the caller can now use the share: compare it to how much gold each person has, add it to a running total, or print it in a nicer message, as we do here.
 
 ## Guard against mistakes
-What if people is 0? Dividing by zero is an error. A careful version checks first:
-
-    if people <= 0:
-        return 0"##,
-        &["Combine parameters, defaults and return in one function.", "Percentages: multiply by the percent, divide by 100.", "Return results so callers can reuse them.", "Guard against bad input like dividing by zero."]),
+What if people is 0? Dividing by zero is an error. A careful version checks first and returns 0 when people is 0 or less."##,
+        &["Combine parameters, defaults and return in one function.", "Percentages: multiply by the percent, divide by 100.", "Return results so callers can reuse them.", ":.2f in an f-string shows two decimals."]),
     ])
 }
 
@@ -1500,49 +1606,57 @@ Dictionaries remember the order in which keys were added, so loops go through th
 stats.keys() gives the keys, and len(stats) tells you how many pairs there are."##,
         &["for key in d loops over the keys.", "d.values() gives the values.", "for k, v in d.items() gives both.", "len(d) counts the pairs."]),
         p("Project: Inventory", &[
-            (r#"Track a hero's inventory as item: count pairs, add loot, use items and print a report."#, "chest"),
-            (r#"inv = {"potion": 2, "arrow": 10}
+            (r##"CHECKPOINT PROJECT
+
+Track a hero's inventory as item: count pairs. Use a potion, pick up a gem (even if you have none yet) and print a report."##, "chest"),
+            (r##"inv = {"potion": 2, "arrow": 10}
 inv["potion"] -= 1
-inv["gem"] = 1
+inv["gem"] = inv.get("gem", 0) + 1
 for item, n in inv.items():
-    print(f"{item}: {n}")"#, "gem_green"),
+    print(f"{item}: {n}")"##, "gem_green"),
         ], vec![
             quiz("Why use a dictionary for an inventory?", &["Each item name maps to its count", "Dictionaries are sorted", "Lists can't hold numbers"], 0, "Look up counts by name."),
-            quiz("How do you add 5 arrows when arrow may be missing?", &["inv[\"arrow\"] = inv.get(\"arrow\", 0) + 5", "inv.arrow += 5", "inv[\"arrow\"] + 5"], 0, "get with a default handles missing keys."),
-            fill("Use one potion.", "inv = {\"potion\": 2}\ninv[\"potion\"] ___ 1", &["-=", "+=", "="], 0, "-= subtracts."),
-            fill("Print each item and count.", "for item, n in inv.___():\n    print(item, n)", &["items", "values", "keys"], 0, ".items() gives pairs."),
-            copy("Type this.", "inv = {\"arrow\": 10}\ninv[\"arrow\"] -= 3\nprint(inv[\"arrow\"])", "Prints 7."),
-            recall("From memory: make inv = {\"gem\": 1}, add 1 to inv[\"gem\"], print inv.", "inv = {\"gem\": 1}\ninv[\"gem\"] += 1\nprint(inv)", "Prints {'gem': 2}."),
+            quiz("Why inv.get(\"gem\", 0) instead of inv[\"gem\"]?", &["There is no gem yet, and get gives 0 instead of an error", "get is faster", "Square brackets don't work on dictionaries"], 0, "get with a default handles missing keys."),
+            fill("Use one potion.", r##"inv["potion"] ___ 1"##, &["-=", "+=", "="], 0, "-= subtracts."),
+            fill("Print each item and its count.", r##"for item, n in inv.___():"##, &["items", "values", "keys"], 0, ".items() gives key and value pairs."),
+            quiz("What is printed for the potion?", &["potion: 1", "potion: 2", "potion: 3"], 0, "It started at 2 and one was used."),
+            copy("Type the inventory.", r##"inv = {"potion": 2, "arrow": 10}
+inv["potion"] -= 1
+inv["gem"] = inv.get("gem", 0) + 1
+for item, n in inv.items():
+    print(f"{item}: {n}")"##, "potion: 1, arrow: 10, gem: 1."),
+            recall("From memory: make inv = {\"gem\": 1}, add 1 to inv[\"gem\"], print inv.", r##"inv = {"gem": 1}
+inv["gem"] += 1
+print(inv)"##, "Prints {'gem': 2}."),
         ]).with(r##"## A real inventory
 Every adventure game has an inventory. A dictionary is perfect: item names are keys, counts are values.
 
 ## Plan
 1. Start with a few items.
-2. Pick up loot: add to existing counts, or create new items.
-3. Use an item: subtract one, and remove it when the count reaches zero.
+2. Use an item: subtract one from its count.
+3. Pick up loot: add one, even for an item you don't have yet.
 4. Print a tidy report.
 
+## Build it
     inv = {"potion": 2, "arrow": 10}
+    inv["potion"] -= 1
+    inv["gem"] = inv.get("gem", 0) + 1
+    for item, n in inv.items():
+        print(f"{item}: {n}")
 
-    def pick_up(item, n):
-        inv[item] = inv.get(item, 0) + n
+It prints:
 
-    def use(item):
-        if inv.get(item, 0) > 0:
-            inv[item] -= 1
-            if inv[item] == 0:
-                del inv[item]
-
-    pick_up("gem", 1)
-    use("potion")
-    for item, count in inv.items():
-        print(f"{item}: {count}")
+    potion: 1
+    arrow: 10
+    gem: 1
 
 ## Things to notice
-- get(item, 0) makes new items start at zero.
-- Using an item you do not have does nothing instead of crashing.
-- The functions change the dictionary created outside them, because dictionaries are shared, not copied."##,
-        &["Map item names to counts in a dictionary.", "get(key, 0) handles items you don't have yet.", "Remove keys when a count reaches zero.", "Functions can update a dictionary passed to or shared with them."]),
+- inv["gem"] would be an error before the first gem exists. inv.get("gem", 0) gives 0 instead, so new items start at zero.
+- .items() hands the loop each key with its value.
+
+## Level up
+Put the two actions in functions, pick_up(item) and use(item), and delete an item with del inv[item] when its count reaches zero."##,
+        &["Map item names to counts in a dictionary.", "get(key, 0) handles items you don't have yet.", "-= and += update a count in place.", ".items() loops over keys and values together."]),
     ])
 }
 
@@ -1694,18 +1808,57 @@ Inside a class, a method can call another with self.other_method().
 Keeping the data (hp) and the actions (take_hit) together means the rules live in one place: every hero takes damage the same way."##,
         &["Methods are functions defined inside a class.", "Every method takes self as its first parameter.", "Call them with object.method(arguments).", "Methods can read and change the object's attributes."]),
         p("Project: Bank Account", &[
-            (r#"Build a BankAccount class for the guild bank: deposit, withdraw (if there is enough gold) and show the balance."#, "coin_gold"),
-            (r#"class BankAccount:
+            (r##"CHECKPOINT PROJECT
+
+Build a BankAccount class for the guild bank: deposit, withdraw only if there is enough gold, and show the balance."##, "coin_gold"),
+            (r##"class BankAccount:
     def __init__(self, owner, balance=0):
         self.owner = owner
-        self.balance = balance"#, "money_bag"),
+        self.balance = balance
+    def deposit(self, amount):
+        self.balance += amount
+    def withdraw(self, amount):
+        if amount <= self.balance:
+            self.balance -= amount
+        else:
+            print("Not enough gold!")
+acc = BankAccount("Pix")
+acc.deposit(50)
+acc.withdraw(80)
+acc.withdraw(20)
+print(f"{acc.owner} has {acc.balance} gold")"##, "money_bag"),
         ], vec![
             quiz("Where should the withdraw rule (enough gold?) live?", &["Inside the withdraw method", "In every place that withdraws", "In __init__"], 0, "Rules belong with the data."),
-            quiz("Why give balance a default of 0?", &["New accounts start empty", "Defaults are required", "To hide it"], 0, "Common starting value."),
-            fill("Add money to the balance.", "def deposit(self, amount):\n    self.balance ___ amount", &["+=", "-=", "="], 0, "+= adds."),
-            fill("Only withdraw when there is enough.", "def withdraw(self, amount):\n    if amount ___ self.balance:\n        self.balance -= amount", &["<=", ">=", "=="], 0, "The amount must be at most the balance."),
-            copy("Type this.", "class Account:\n    def __init__(self):\n        self.balance = 0\n    def deposit(self, n):\n        self.balance += n\na = Account()\na.deposit(50)\nprint(a.balance)", "Prints 50."),
-            recall("From memory: class Wallet with __init__ setting self.gold = 10 and a method spend(self, n) that subtracts n; spend 3 and print gold.", "class Wallet:\n    def __init__(self):\n        self.gold = 10\n    def spend(self, n):\n        self.gold -= n\nw = Wallet()\nw.spend(3)\nprint(w.gold)", "Prints 7."),
+            quiz("Why give balance a default of 0?", &["New accounts start empty", "Defaults are required", "To hide it"], 0, "The common starting value."),
+            fill("Add money to the balance.", r##"def deposit(self, amount):
+    self.balance ___ amount"##, &["+=", "-=", "="], 0, "+= adds."),
+            fill("Only withdraw when there is enough.", r##"if amount ___ self.balance:
+    self.balance -= amount"##, &["<=", ">=", "=="], 0, "The amount must be at most the balance."),
+            quiz("What does the program print last?", &["Pix has 30 gold", "Pix has 50 gold", "Pix has -30 gold"], 0, "50 in, 80 refused, 20 out: 30 left."),
+            copy("Type the bank.", r##"class BankAccount:
+    def __init__(self, owner, balance=0):
+        self.owner = owner
+        self.balance = balance
+    def deposit(self, amount):
+        self.balance += amount
+    def withdraw(self, amount):
+        if amount <= self.balance:
+            self.balance -= amount
+        else:
+            print("Not enough gold!")
+acc = BankAccount("Pix")
+acc.deposit(50)
+acc.withdraw(80)
+acc.withdraw(20)
+print(f"{acc.owner} has {acc.balance} gold")"##, "Not enough gold! then Pix has 30 gold."),
+            recall("From memory: class Wallet with __init__ setting self.gold = 10 and a method spend(self, n) that subtracts n; spend 3 and print gold.", r##"class Wallet:
+    def __init__(self):
+        self.gold = 10
+    def spend(self, n):
+        self.gold -= n
+w = Wallet()
+w.spend(3)
+print(w.gold)"##, "Prints 7."),
         ]).with(r##"## A class with rules
 The guild bank wants a program for its accounts. Each account has an owner and a balance, and money can only be withdrawn if there is enough.
 
@@ -1714,35 +1867,37 @@ The guild bank wants a program for its accounts. Each account has an owner and a
         def __init__(self, owner, balance=0):
             self.owner = owner
             self.balance = balance
-
         def deposit(self, amount):
             self.balance += amount
-
         def withdraw(self, amount):
             if amount <= self.balance:
                 self.balance -= amount
-                return True
-            print("Not enough gold!")
-            return False
+            else:
+                print("Not enough gold!")
+    acc = BankAccount("Pix")
+    acc.deposit(50)
+    acc.withdraw(80)
+    acc.withdraw(20)
+    print(f"{acc.owner} has {acc.balance} gold")
 
-        def report(self):
-            return f"{self.owner}: {self.balance} gold"
+It prints:
 
-    acct = BankAccount("Pix")
-    acct.deposit(100)
-    acct.withdraw(30)
-    acct.withdraw(500)
-    print(acct.report())   # Pix: 70 gold
+    Not enough gold!
+    Pix has 30 gold
+
+## Follow the gold
+- The account starts at 0 (the default), then 50 is deposited.
+- Withdrawing 80 is refused: 80 is more than 50, so the else branch prints the warning.
+- Withdrawing 20 works, leaving 30.
 
 ## What you practised
 - __init__ with a default value.
-- Methods that change the object's state.
+- Methods that change the object's state through self.
 - A rule (no overdrawing) kept inside the class, so it can never be skipped.
-- Returning True/False so the caller knows whether it worked.
 
 ## Level up
-Create two accounts and write a transfer that withdraws from one and deposits into the other only if the withdrawal succeeded."##,
-        &["Keep data and the rules for changing it in one class.", "Methods can refuse invalid actions.", "Return True/False to report success.", "Several objects of one class each keep their own state."]),
+Create two accounts and write a transfer that withdraws from one and deposits into the other only if there is enough gold."##,
+        &["Keep data and the rules for changing it in one class.", "Methods change the object through self.", "Methods can refuse invalid actions.", "Each object keeps its own state."]),
     ])
 }
 
@@ -1762,8 +1917,8 @@ print(sqrt(16))"#, "hammer"),
             quiz("After import math, how do you call sqrt?", &["math.sqrt(9)", "sqrt.math(9)", "math(sqrt, 9)"], 0, "module.function()."),
             fill("Load the module.", "___ math\nprint(math.sqrt(9))", &["import", "include", "use"], 0, "import module."),
             fill("Take only sqrt.", "from math ___ sqrt\nprint(sqrt(9))", &["import", "use", "get"], 0, "from module import name."),
-            copy("Type this.", "import math\nprint(math.sqrt(25))", "Prints 5."),
-            recall("From memory: from math import sqrt, then print sqrt(49).", "from math import sqrt\nprint(sqrt(49))", "Prints 7."),
+            copy("Type this.", "import math\nprint(math.sqrt(25))", "Prints 5.0 (sqrt always gives a float)."),
+            recall("From memory: from math import sqrt, then print sqrt(49).", "from math import sqrt\nprint(sqrt(49))", "Prints 7.0."),
         ]).with(r##"## Toolboxes of code
 Python comes with hundreds of modules: ready-made collections of functions for maths, dates, random numbers, files, the internet and more. You load one with import.
 
@@ -1880,46 +2035,57 @@ random.choice gives every item the same chance. To make something rarer, put it 
         print("Legendary!")"##,
         &["random.randint(a, b) includes both a and b.", "random.choice(list) picks one item fairly.", "random.random() < 0.25 happens about 25% of the time.", "Test random code by running it many times."]),
         p("Final Project: Magic 8-Ball", &[
-            (r#"Build a fortune teller: store answers in a list, pick one at random, and print the question with its answer."#, "mystic_figure"),
-            (r#"import random
-answers = ["Yes", "No", "Maybe"]
-print(random.choice(answers))"#, "crystal_purple"),
+            (r##"FINAL PROJECT
+
+Build a fortune teller: store answers in a list, write a function that picks one at random, and print each question with its answer."##, "mystic_figure"),
+            (r##"import random
+answers = ["Yes", "No", "Ask again later"]
+def ask(question):
+    answer = random.choice(answers)
+    return f"{question} -> {answer}"
+print(ask("Will I find the dragon?"))
+print(ask("Is the tavern open?"))"##, "crystal_purple"),
         ], vec![
             quiz("Which module picks the answer?", &["random", "math", "time"], 0, "Chance comes from random."),
-            quiz("Why keep answers in a list?", &["Easy to add answers and pick one with choice", "Lists are required", "To sort them"], 0, "random.choice works on lists."),
-            fill("Load the module.", "___ random\nprint(random.choice([\"Yes\"]))", &["import", "from", "load"], 0, "import random."),
-            fill("Pick one answer.", "import random\nanswers = [\"Yes\", \"No\"]\nprint(random.___(answers))", &["choice", "randint", "pick"], 0, "choice picks an item."),
-            copy("Type this.", "import random\nanswers = [\"Yes\", \"No\", \"Ask again\"]\nprint(random.choice(answers))", "A random answer."),
-            recall("From memory: import random, make answers = [\"Yes\", \"No\"], print a random choice.", "import random\nanswers = [\"Yes\", \"No\"]\nprint(random.choice(answers))", "random.choice(answers)."),
+            quiz("Why keep the answers in a list?", &["Easy to add answers and pick one with choice", "Lists are required", "To sort them"], 0, "random.choice works on lists."),
+            fill("Load the module.", r##"___ random"##, &["import", "from", "load"], 0, "import random."),
+            fill("Pick one answer.", r##"answer = random.___(answers)"##, &["choice", "randint", "pick"], 0, "choice picks one item from a list."),
+            quiz("What does ask() return?", &["The question and a random answer in one string", "Only the answer", "Nothing: it prints"], 0, "return f\"{question} -> {answer}\" builds one string."),
+            copy("Type the 8-Ball.", r##"import random
+answers = ["Yes", "No", "Ask again later"]
+def ask(question):
+    answer = random.choice(answers)
+    return f"{question} -> {answer}"
+print(ask("Will I find the dragon?"))
+print(ask("Is the tavern open?"))"##, "A random answer for each question."),
+            recall("From memory: import random, make answers = [\"Yes\", \"No\"], print a random choice.", r##"import random
+answers = ["Yes", "No"]
+print(random.choice(answers))"##, "random.choice(answers)."),
         ]).with(r##"## The oracle of the guild
 Your final Python project is a Magic 8-Ball that answers any yes/no question. It brings together modules, lists, functions and f-strings.
 
 ## Build it
     import random
-
-    answers = [
-        "It is certain.",
-        "The stars say no.",
-        "Ask again after supper.",
-        "Signs point to yes.",
-        "Very doubtful.",
-    ]
-
+    answers = ["Yes", "No", "Ask again later"]
     def ask(question):
         answer = random.choice(answers)
         return f"{question} -> {answer}"
-
     print(ask("Will I find the dragon?"))
     print(ask("Is the tavern open?"))
+
+It prints something like:
+
+    Will I find the dragon? -> Yes
+    Is the tavern open? -> Ask again later
 
 ## What you combined
 - import random for chance.
 - A list of answers that is easy to extend.
 - A function with a parameter and a return value.
-- An f-string for the final message.
+- An f-string that puts the question and the answer together.
 
 ## Level up
-- Make rare answers: add common answers twice so the rare one appears less often.
+- Add more answers to the list: the function doesn't need to change.
 - Count how often each answer appears in 100 asks using a dictionary.
 - Wrap it in a class Oracle with a method ask.
 

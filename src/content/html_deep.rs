@@ -211,38 +211,43 @@ Put an <img> inside an <a> to make a clickable picture."##,
                 fill("Load the picture from the img folder.", "<img src=\"___\" alt=\"Knight\">", &["img/knight.png", "knight", "<knight.png>"], 0, "A folder name, a slash, then the file name."),
             ]),
         d("Project: Wanted Poster", r##"## Your first real page
-In this project you combine everything from the Elements chapter into one wanted poster for the tavern wall. Before writing, plan the outline the way a poster designer would:
+The sheriff needs a WANTED poster for the Goblin King, and the Elements chapter gave you every tool for it. Plan the poster before you write a single tag:
 
-- A big title: "WANTED" in an <h1>.
-- A picture of the outlaw with useful alt text.
-- The name as an <h2>.
-- A short description in a <p>, with the crime in <strong>.
-- A list of known tricks in a <ul>.
-- The reward on its own line.
+- A big title: WANTED in an <h1>.
+- A picture of the outlaw, with alt text for anyone who can't see it.
+- The reward in a paragraph, with the amount in bold.
+- A list of things to look out for.
 
 ## Build it step by step
-Write one element, check it, then add the next. A tidy order makes your code easy to read:
+Write one element, look at the preview, then add the next:
 
     <h1>WANTED</h1>
-    <img src="slime.png" alt="A grinning green slime">
-    <h2>Sir Slime</h2>
-    <p>Wanted for <strong>stealing pies</strong>.</p>
+    <img src="goblin.png" alt="Goblin King">
+    <p>Reward: <b>500 gold</b></p>
     <ul>
-      <li>Squeezes under doors</li>
+      <li>Green skin</li>
+      <li>Loves shiny coins</li>
     </ul>
-    <p>Reward: 100 gold</p>
+
+## Why each tag?
+- <h1> is the one main title of the page, so screen readers and search engines know what it is about.
+- alt="Goblin King" is read aloud when the picture can't be seen, and shown if the image fails to load.
+- <b> makes the reward stand out.
+- <ul> with <li> items makes a bullet list. The order of the clues doesn't matter, so the list is unordered.
 
 ## Check your work
-- Does every opening tag have a matching closing tag (except <img>)?
-- Is the outline right: one <h1>, then an <h2>?
-- Would a person who cannot see the picture still understand it from the alt text?
+- Does every opening tag have a matching closing tag (except <img>, which has none)?
+- Is </b> closed before </p>?
+- Would someone who can't see the picture still know who is wanted?
 
 These three checks catch most beginner mistakes on any page."##,
-            &["Plan the outline (title, picture, name, details) before coding.", "Build one element at a time and check it.", "Every image needs meaningful alt text.", "Check closing tags and heading order at the end."],
+            &["Plan the parts (title, picture, details, list) before coding.", "Build one element at a time and check the preview.", "Every image needs alt text that says what it shows.", "Close tags in the right order: </b> before </p>."],
             vec![
-                quiz("What is the poster's main title element?", &["<h1>", "<title>", "<p>"], 0, "The one main title is the <h1>."),
-                fill("Mark the crime as important.", "<p>Wanted for <___>stealing pies</strong>.</p>", &["strong", "b", "em"], 0, "<strong> marks importance."),
-                quiz("Which line is broken?", &["<li>Squeezes under doors</li>", "<h2>Sir Slime<h2>", "<p>Reward: 100 gold</p>"], 1, "The <h2> closing tag is missing its slash."),
+                quiz("What is the poster's main title element?", &["<h1>", "<title>", "<p>"], 0, "The one main title of the page is the <h1>."),
+                fill("Make the clues a bullet list.", r##"<___>
+  <li>Green skin</li>
+</ul>"##, &["ul", "ol", "li"], 0, "<ul> starts an unordered (bullet) list."),
+                quiz("Which line is broken?", &["<li>Green skin</li>", "<h1>WANTED<h1>", "<p>Reward: <b>500 gold</b></p>"], 1, "The closing </h1> is missing its slash."),
             ]),
         d("Page Skeleton", r##"## Every page has the same skeleton
 A complete HTML file follows the same shape every time:
@@ -395,33 +400,33 @@ title="..." adds a small tooltip when the mouse rests on an element. It is handy
                 fill("End the comment.", "<!-- shop section ___", &["-->", "--!>", "/-->"], 0, "Comments close with -->."),
             ]),
         d("Project: Hero Profile Card", r##"## A card made of boxes
-Cards are everywhere on the web: profile cards, product cards, game cards. A card is a box (<div>) holding a picture, a name, some details and maybe a link. In this project you build a hero profile card using the Structure chapter skills.
+Cards are everywhere on the web: profile cards, product cards, game cards. A card is a box (<div>) holding a picture, a name and a few details. In this project you build a profile card for Ada the Brave with the Structure chapter skills.
 
 ## Plan the boxes
 - An outer <div class="card"> holds everything.
-- Inside: an <img> avatar, an <h2> name and a <p> with the class.
-- A <ul class="stats"> lists the hero's stats.
-- A link to the hero's quest log.
+- Inside: an <img> avatar, 120 pixels wide.
+- An <h2> with the hero's name, marked with id="name".
+- A <p class="role"> with the level, and the role word wrapped in a <span>.
 
-    <div class="card" id="hero-pix">
-      <img src="pix.png" alt="Pix the wizard">
-      <h2>Pix</h2>
-      <p>Level 3 <span class="role">Wizard</span></p>
-      <ul class="stats">
-        <li>HP: 30</li>
-      </ul>
+## Build it
+    <div class="card">
+      <img src="ada.png" alt="Ada" width="120">
+      <h2 id="name">Ada the Brave</h2>
+      <p class="role">Level 4 <span>Wizard</span></p>
     </div>
 
-## Why classes now?
-Right now the card looks plain, but because each part has a class, the CSS course can style every card at once. Giving the card an id lets you link straight to this one hero.
+## Why class, id and span?
+- class="card" is a label many elements can share: every hero card on the page can use it, so the CSS course can style them all at once.
+- id="name" is unique: only one element on the page may have it, which suits a single, special part.
+- <span> wraps a few words inside a line without starting a new line, so you can style just "Wizard" later.
 
 ## Check
-Indent each level, close tags in reverse order, and give the image honest alt text."##,
-            &["A card is an outer <div> that groups related content.", "Classes label the parts so CSS can style every card the same way.", "An id names one specific card.", "Indent levels and close tags in reverse order."],
+Indent each level inside the div, close tags in reverse order (</span> before </p>, </p> before </div>), and give the image honest alt text."##,
+            &["A card is an outer <div> that groups related content.", "Classes label parts many elements share; an id is unique.", "<span> marks a few words inside a line.", "Indent each level and close tags in reverse order."],
             vec![
-                quiz("Why give the card a class instead of an id?", &["Many cards can share one class", "Classes are faster", "ids are not allowed on divs"], 0, "Several cards will share the style."),
-                fill("Label the role word inside the line.", "<p>Level 3 <___ class=\"role\">Wizard</span></p>", &["span", "div", "p"], 0, "<span> is the inline container."),
-                quiz("Which wraps the whole card?", &["<div class=\"card\">", "<span class=\"card\">", "<card>"], 0, "A block container groups the card."),
+                quiz("Why give the card a class instead of an id?", &["Many cards can share one class", "Classes are faster", "ids are not allowed on divs"], 0, "Every hero card can share class=\"card\"; an id must be unique."),
+                fill("Wrap the role word without starting a new line.", r##"<p class="role">Level 4 <___>Wizard</span></p>"##, &["span", "div", "h2"], 0, "<span> is the inline container; a div would start a new line."),
+                quiz("How wide is the avatar picture?", &["120 pixels", "120 percent", "As wide as the card"], 0, "width=\"120\" on an <img> means 120 pixels."),
             ]),
         d("Your First Form", r##"## Forms collect information
 Sign-up pages, search boxes and checkout pages are all forms. A form gathers what the visitor types or picks and sends it somewhere.
@@ -599,37 +604,44 @@ Browser checks are for convenience. Anyone can switch them off, so a real websit
                 fill("A name of at least 3 letters.", "<input name=\"hero\" ___=\"3\">", &["minlength", "min", "length"], 0, "minlength counts characters."),
             ]),
         d("Project: Tavern Sign-Up", r##"## Build a complete form
-The tavern needs a sign-up sheet for its quest board. You will build one complete, friendly form using every Forms skill.
+The Pixel Tavern needs a sign-up sheet for its quest board. You will build one complete form with the Forms chapter skills.
 
 ## Plan the fields first
-- Hero name: text, required, at least 3 letters.
-- Email: email type, required.
-- Class: radio buttons (Warrior, Mage, Rogue): pick one.
-- Interests: checkboxes (quests, feasts, duels): pick any.
-- Home realm: dropdown.
-- A message to the innkeeper: textarea.
-- A submit button.
+- A heading, so people know what the form is for.
+- Hero name: a text box that can't be left empty, with a label.
+- Class: a dropdown with the choices Knight and Mage.
+- A button that sends the form.
 
 ## Build it
-    <form action="/signup" method="post">
-      <label for="hero">Hero name</label>
-      <input id="hero" name="hero" required minlength="3">
-      <label for="mail">Email</label>
-      <input type="email" id="mail" name="mail" required>
-      <button type="submit">Sign up</button>
+    <form>
+      <h2>Join the Tavern</h2>
+      <label for="nm">Name</label>
+      <input type="text" id="nm" required>
+      <select>
+        <option>Knight</option>
+        <option>Mage</option>
+      </select>
+      <input type="submit" value="Sign up">
     </form>
+
+## How the parts connect
+- for="nm" on the label matches id="nm" on the input. Clicking the word Name now puts the cursor in the box, and screen readers read the label aloud.
+- required stops the form from being sent while the name is empty.
+- A <select> shows its <option>s as a dropdown: perfect when there are several choices and exactly one may be picked.
+- type="submit" turns the input into the button that sends everything.
 
 ## Final checklist
 - Every field has a label connected with for and id.
-- Every field has a name, so its value is sent.
-- Radios share one name; checkboxes each have a value.
 - Required fields are marked as required.
-- The form uses post because it collects personal data."##,
-            &["Plan every field and its type before writing code.", "Connect each label to its field with for and id.", "Give every field a name so its value is sent.", "Use post for personal data and mark required fields."],
+- The button's value says what will happen: Sign up."##,
+            &["Plan every field and its type before writing code.", "Connect each label to its field with for and id.", "required stops empty fields from being sent.", "A <select> dropdown lets people pick one choice."],
             vec![
-                quiz("Which method fits a sign-up form?", &["get", "post", "put it in the URL"], 1, "post keeps personal data out of the address."),
-                fill("The button that sends the form:", "<button type=\"___\">Sign up</button>", &["submit", "send", "go"], 0, "type=\"submit\" sends the form."),
-                quiz("The class choices Warrior/Mage/Rogue (pick one) should be:", &["Checkboxes", "Radio buttons with the same name", "Three text boxes"], 1, "Exactly one choice: radios."),
+                quiz("What does for=\"nm\" on the label connect to?", &["The input with id=\"nm\"", "The form's name", "The submit button"], 0, "for matches the id of the field it labels."),
+                fill("Add the Mage choice to the dropdown.", r##"<select>
+  <option>Knight</option>
+  <___>Mage</option>
+</select>"##, &["option", "select", "li"], 0, "Each choice in a dropdown is an <option>."),
+                quiz("Why a dropdown for the class?", &["The hero picks exactly one class from a list", "Dropdowns are required in forms", "So they can type any class"], 0, "A <select> shows a list and keeps one choice."),
             ]),
         d("Why Semantics?", r##"## Meaningful tags
 "Semantic" means "about meaning". Semantic HTML uses elements that describe what content is: <nav> for navigation, <article> for a story, <footer> for the bottom of the page.
@@ -792,44 +804,42 @@ While you are adding meaning: <time datetime="2026-05-01">May Day</time> marks a
                 fill("Caption the picture.", "<figure>\n  <img src=\"orb.png\" alt=\"Glowing orb\">\n  <___>The Orb of Code</figcaption>\n</figure>", &["figcaption", "caption", "label"], 0, "Captions use <figcaption>."),
             ]),
         d("Final Project: Adventure Blog", r##"## Put the whole course together
-Your final project is a small blog page about your adventures, built with a complete skeleton and semantic layout.
+Your final HTML project is Ada's adventure blog, built with real semantic structure: every part of the page says what it is.
 
 ## The outline
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Pix's Adventure Blog</title>
-      </head>
-      <body>
-        <header>
-          <h1>Pix's Adventures</h1>
-          <nav>...</nav>
-        </header>
-        <main>
-          <article>
-            <h2>Day 1: The Slime Cave</h2>
-            <figure>...</figure>
-            <p>...</p>
-          </article>
-        </main>
-        <footer>...</footer>
-      </body>
-    </html>
+- A <header> at the top with the blog's name and a <nav> menu.
+- A <main> area holding the blog posts.
+- Each post is an <article> with its own heading.
+- A <footer> at the bottom.
 
-## Requirements
-- A full skeleton with <title> and charset.
-- A header with the blog name and a nav menu of links.
-- At least one article with a heading, a figure with caption, paragraphs and a list.
-- A footer with your name and the year.
+## Build it
+    <header>
+      <h1>Ada's Adventure Log</h1>
+      <nav><a href="#day1">Day 1</a></nav>
+    </header>
+    <main>
+      <article id="day1">
+        <h2>Day 1: The Cave</h2>
+        <p>I found a <b>glowing gem</b>.</p>
+      </article>
+    </main>
+    <footer>Thanks for reading!</footer>
+
+## Why semantic tags?
+Divs would look the same, but these tags tell browsers, search engines and screen readers what each part is. A screen-reader user can jump straight to the <main> content or the <nav> menu.
+
+## The jump link
+The link's href="#day1" points to the element with id="day1". Clicking Day 1 scrolls straight to that article: a menu that works without a second page.
 
 ## Review like a pro
-Read your code from top to bottom and ask: does each element say what its content is? Would a screen-reader user find the main content and the menu? Are all tags closed and indented? If yes, you have finished the HTML course. Next stop: CSS, to make it beautiful."##,
-            &["A complete page combines the skeleton with semantic layout.", "Header + nav at the top, main with articles, footer at the bottom.", "Use figures, lists and headings inside articles.", "Review for meaning, accessibility and tidy closing tags."],
+Read your code from top to bottom: does each element say what its content is? Are all tags closed and indented? If yes, you have finished the HTML course. Next stop: CSS, to make it beautiful."##,
+            &["Header + nav at the top, main with articles, footer at the bottom.", "Each blog post is a self-contained <article>.", "href=\"#id\" jumps to the element with that id.", "Semantic tags help screen readers and search engines."],
             vec![
-                quiz("Where does the blog's menu belong?", &["In <nav> inside the <header>", "In <footer> only", "In <head>"], 0, "The main menu is a nav in the header."),
-                fill("Each blog post should be an:", "<___>\n  <h2>Day 1</h2>\n</article>", &["article", "section", "post"], 0, "Posts stand on their own."),
-                quiz("What goes in <head>?", &["The <title> and <meta charset>", "The blog posts", "The footer"], 0, "Head = information about the page."),
+                quiz("Where does the Day 1 link take you?", &["To the article with id=\"day1\"", "To a new page called day1", "To the top of the page"], 0, "#day1 jumps to the element with that id."),
+                fill("Put the posts in the page's main area.", r##"<___>
+  <article id="day1">...</article>
+</main>"##, &["main", "body", "section"], 0, "<main> holds the page's main content."),
+                quiz("Which tag holds the closing message at the bottom?", &["<footer>", "<header>", "<nav>"], 0, "The footer closes the page."),
             ]),
     ]
 }

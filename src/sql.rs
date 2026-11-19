@@ -40,14 +40,15 @@ impl Val {
 fn b(x: bool) -> Val { Val::N(if x { 1.0 } else { 0.0 }) }
 
 #[derive(Clone)]
-pub struct Table { pub name: String, pub cols: Vec<String>, pub rows: Vec<Vec<Val>> }
+/// `key`: the INTEGER PRIMARY KEY column, numbered automatically when an INSERT leaves it out.
+pub struct Table { pub name: String, pub cols: Vec<String>, pub rows: Vec<Vec<Val>>, pub key: Option<usize> }
 
 pub fn sample_tables() -> Vec<Table> {
     let t = |s: &str| Val::T(s.into());
     let n = |x: f64| Val::N(x);
     let cols = |c: &[&str]| c.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     vec![
-        Table { name: "heroes".into(), cols: cols(&["id", "name", "class", "hp", "level", "guild_id"]), rows: vec![
+        Table { key: Some(0), name: "heroes".into(), cols: cols(&["id", "name", "class", "hp", "level", "guild_id"]), rows: vec![
             vec![n(1.0), t("Aria"), t("mage"), n(8.0), n(3.0), n(1.0)],
             vec![n(2.0), t("Borin"), t("knight"), n(15.0), n(4.0), n(2.0)],
             vec![n(3.0), t("Cael"), t("rogue"), n(11.0), n(2.0), n(1.0)],
@@ -55,7 +56,7 @@ pub fn sample_tables() -> Vec<Table> {
             vec![n(5.0), t("Elm"), t("mage"), n(6.0), n(1.0), n(3.0)],
             vec![n(6.0), t("Finn"), t("ranger"), n(12.0), n(3.0), Val::Null],
         ]},
-        Table { name: "items".into(), cols: cols(&["id", "name", "type", "price"]), rows: vec![
+        Table { key: Some(0), name: "items".into(), cols: cols(&["id", "name", "type", "price"]), rows: vec![
             vec![n(1.0), t("Potion"), t("potion"), n(5.0)],
             vec![n(2.0), t("Sword"), t("weapon"), n(30.0)],
             vec![n(3.0), t("Shield"), t("armor"), n(25.0)],
@@ -63,12 +64,12 @@ pub fn sample_tables() -> Vec<Table> {
             vec![n(5.0), t("Torch"), t("tool"), n(3.0)],
             vec![n(6.0), t("Elixir"), t("potion"), n(12.0)],
         ]},
-        Table { name: "guilds".into(), cols: cols(&["id", "name", "city"]), rows: vec![
+        Table { key: Some(0), name: "guilds".into(), cols: cols(&["id", "name", "city"]), rows: vec![
             vec![n(1.0), t("Moon Circle"), t("Silverpine")],
             vec![n(2.0), t("Iron Wall"), t("Stonehold")],
             vec![n(3.0), t("Green Path"), t("Silverpine")],
         ]},
-        Table { name: "quests".into(), cols: cols(&["id", "title", "reward", "hero_id"]), rows: vec![
+        Table { key: Some(0), name: "quests".into(), cols: cols(&["id", "title", "reward", "hero_id"]), rows: vec![
             vec![n(1.0), t("Slime Cave"), n(20.0), n(3.0)],
             vec![n(2.0), t("Dragon Peak"), n(150.0), n(4.0)],
             vec![n(3.0), t("Lost Cat"), n(5.0), n(1.0)],
@@ -595,6 +596,11 @@ impl Db {
             if vals.len() != targets.len() { return Err(format!("{} values for {} columns.", vals.len(), targets.len())); }
             let mut row = vec![Val::Null; self.tables[ti].cols.len()];
             for (k, v) in targets.iter().zip(vals) { row[*k] = v; }
+            // a key left out gets the next number, as in real databases
+            if let Some(k) = self.tables[ti].key && row[k] == Val::Null {
+                let next = self.tables[ti].rows.iter().filter_map(|r| r[k].num()).fold(0.0, f64::max) + 1.0;
+                row[k] = Val::N(next);
+            }
             self.tables[ti].rows.push(row);
             n += 1;
             if !p.sym(",") { break; }
@@ -649,13 +655,17 @@ impl Db {
         Ok(Outcome::Done(format!("{} row{} deleted from {}", n, if n == 1 { "" } else { "s" }, tn)))
     }
 
-    fn skip_type(p: &mut P) {
-        // column types and constraints: INTEGER, TEXT, REAL, VARCHAR(20), PRIMARY KEY, NOT NULL...
+    /// Skip a column's type and constraints (INTEGER, TEXT, VARCHAR(20), PRIMARY KEY, NOT NULL...).
+    /// Returns true when the column is a PRIMARY KEY.
+    fn skip_type(p: &mut P) -> bool {
         let mut depth = 0;
+        let mut key = false;
         while let Some(t) = p.peek() {
+            if tok_text(t).eq_ignore_ascii_case("PRIMARY") { key = true; }
             match t { Tok::Sym(s) if s == "(" => depth += 1, Tok::Sym(s) if s == ")" => { if depth == 0 { break; } depth -= 1; } Tok::Sym(s) if s == "," && depth == 0 => break, Tok::Sym(s) if s == ";" => break, _ => {} }
             p.i += 1;
         }
+        key
     }
 
     fn create(&mut self, p: &mut P) -> Result<Outcome, String> {
@@ -664,13 +674,14 @@ impl Db {
         if self.table_idx(&tn).is_ok() { return Err(format!("A table named {} already exists.", tn)); }
         p.need_sym("(", "List the columns in brackets: CREATE TABLE pets (name TEXT, age INTEGER).")?;
         let mut cols = vec![];
+        let mut key = None;
         loop {
             cols.push(p.name("a column name")?);
-            Self::skip_type(p);
+            if Self::skip_type(p) && key.is_none() { key = Some(cols.len() - 1); }
             if !p.sym(",") { break; }
         }
         p.need_sym(")", "The column list needs a closing ).")?;
-        self.tables.push(Table { name: tn.clone(), cols: cols.clone(), rows: vec![] });
+        self.tables.push(Table { name: tn.clone(), cols: cols.clone(), rows: vec![], key });
         Ok(Outcome::Done(format!("Table {} created with columns {}", tn, cols.join(", "))))
     }
 
@@ -681,7 +692,7 @@ impl Db {
         p.need_kw("ADD", "Write ALTER TABLE name ADD column TYPE.")?;
         p.kw("COLUMN");
         let c = p.name("a column name")?;
-        Self::skip_type(p);
+        let _ = Self::skip_type(p);
         let t = &mut self.tables[ti];
         if t.cols.iter().any(|x| x.eq_ignore_ascii_case(&c)) { return Err(format!("{} already has a column {}.", tn, c)); }
         t.cols.push(c.clone());
@@ -792,5 +803,12 @@ mod tests {
         assert!(query("SELECT * heroes").is_err());
         assert!(query("SELECT * FROM heroes LIMIT 2 WHERE hp > 1").unwrap_err().contains("order"));
         assert!(query("SELECT * FROM heroes WHERE name = 'x").unwrap_err().contains("quote"));
+    }
+
+    #[test]
+    fn primary_keys_are_numbered_automatically() {
+        assert_eq!(run_all("INSERT INTO items (name, type, price) VALUES ('Lantern', 'tool', 9); SELECT id FROM items WHERE name = 'Lantern'"), vec!["1 row inserted into items", "7"]);
+        assert_eq!(run_all("CREATE TABLE pets (id INTEGER PRIMARY KEY, name TEXT); INSERT INTO pets (name) VALUES ('Pip'), ('Mog'); SELECT id FROM pets"), vec!["Table pets created with columns id, name", "2 rows inserted into pets", "1,2"]);
+        assert_eq!(run_all("CREATE TABLE toys (name TEXT); INSERT INTO toys VALUES ('Ball'); SELECT name FROM toys"), vec!["Table toys created with columns name", "1 row inserted into toys", "Ball"], "tables without a key are unchanged");
     }
 }

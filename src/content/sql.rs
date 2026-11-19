@@ -171,37 +171,39 @@ Aliases matter more when columns are calculated (price * 2) or come from totals 
 An alias with a space needs quotes: AS 'hit points'. Most people use underscores instead: hit_points."##,
         &["SELECT DISTINCT shows each different row once.", "AS renames a column in the result only.", "Aliases make calculated columns readable.", "Use underscores (or quotes) for multi-word aliases."]),
         p("Project: Hero Roster", &[
-            (r#"The guild master wants a tidy roster: names, classes and levels, with friendly headers, plus a list of classes in the guild."#, "helmet_knight"),
-            (r#"SELECT name AS hero, class, level FROM heroes;
-SELECT DISTINCT class FROM heroes;"#, "banner_royal"),
+            (r##"CHECKPOINT PROJECT
+
+The guild master wants a tidy roster: names, classes and levels, with a friendly header for the name, plus a list of the classes in the guild."##, "helmet_knight"),
+            (r##"SELECT name AS hero, class, level FROM heroes;
+SELECT DISTINCT class FROM heroes;"##, "banner_royal"),
         ], vec![
             quiz("Which query lists every class once?", &["SELECT DISTINCT class FROM heroes;", "SELECT class FROM heroes;", "SELECT * FROM class;"], 0, "DISTINCT removes duplicates."),
-            quiz("Can one answer contain two queries?", &["Yes, separated by semicolons", "No"], 0, "Each statement ends with ;"),
-            fill("Give the name column a friendly header.", "SELECT name ___ hero, class FROM heroes;", &["AS", "=", "TO"], 0, "AS sets the header."),
-            fill("Choose the roster columns.", "SELECT name, class, ___ FROM heroes;", &["level", "levels", "*"], 0, "Name the column."),
-            copy("Type the roster query.", "SELECT name AS hero, class, level FROM heroes;", "Three columns, one alias."),
-            recall("From memory: show each different guild_id in heroes once.", "SELECT DISTINCT guild_id FROM heroes;", "DISTINCT guild_id."),
+            quiz("Can one answer contain two queries?", &["Yes, separated by semicolons", "No"], 0, "Each statement ends with ; and gets its own result."),
+            fill("Give the name column a friendly header.", r##"SELECT name ___ hero, class, level FROM heroes;"##, &["AS", "=", "TO"], 0, "AS sets the header."),
+            fill("Choose the roster columns.", r##"SELECT name AS hero, class, ___ FROM heroes;"##, &["level", "levels", "*"], 0, "Name the column exactly."),
+            quiz("What is the header of the first column in the roster?", &["hero", "name", "heroes"], 0, "AS hero renames it in the result."),
+            copy("Type both queries.", r##"SELECT name AS hero, class, level FROM heroes;
+SELECT DISTINCT class FROM heroes;"##, "A roster and a list of classes."),
+            recall("From memory: show each different guild_id in heroes once.", r##"SELECT DISTINCT guild_id FROM heroes;"##, "DISTINCT guild_id."),
         ]).with(r##"## Your first report
 Reports are what databases are for: answering a real question for a real person. The guild master asks for two things:
 
 1. A roster with each hero's name, class and level, with a friendly header for the name.
 2. A list of the different classes in the guild.
 
-## Query 1
+## The queries
     SELECT name AS hero, class, level FROM heroes;
-
-## Query 2
     SELECT DISTINCT class FROM heroes;
 
 You can run both at once: each statement ends with a semicolon and gets its own result table.
 
 ## Think like a reporter
-Before writing a query, say the question in plain words: "show me the name, class and level of every hero". Then map each word to SQL: "show" → SELECT, "every hero" → FROM heroes. This habit makes even big queries easier.
+Before writing a query, say the question in plain words: "show me the name, class and level of every hero". Then map each word to SQL: "show" becomes SELECT, "every hero" becomes FROM heroes. This habit makes even big queries easier.
 
 ## Check
 - Do the headers read nicely?
 - Does the class list have no repeats?
-- Did you avoid SELECT * where specific columns were asked for?"##,
+- Did you name exactly the columns that were asked for, instead of SELECT *?"##,
         &["Say the question in plain words, then translate it to SQL.", "Name exactly the columns asked for.", "Use AS for friendly headers and DISTINCT for unique lists.", "Several statements can run one after another."]),
     ])
 }
@@ -412,20 +414,24 @@ COUNT(guild_id) counts only rows that have a value, while COUNT(*) counts all ro
 New records often start with some fields unknown, optional fields are left blank, and LEFT JOINs (last chapter) fill in NULL when there is no match."##,
         &["NULL means no value: unknown or missing.", "NULL is not 0 and not empty text.", "Use IS NULL / IS NOT NULL, never = NULL.", "Totals like COUNT(column) skip NULLs."]),
         p("Project: Item Finder", &[
-            (r#"Build the shop's search filters: cheap items, potions, names containing a word, and a price range."#, "potion_red"),
-            (r#"SELECT name, price FROM items
-WHERE type IN ('potion', 'tool') AND price < 10;"#, "money_bag"),
+            (r##"CHECKPOINT PROJECT
+
+Build the shop's best filter: cheap potions and tools, under 10 gold, with their prices."##, "potion_red"),
+            (r##"SELECT name, price FROM items
+WHERE type IN ('potion', 'tool') AND price < 10;"##, "money_bag"),
         ], vec![
             quiz("Which condition finds items that cost 5 to 12 (inclusive)?", &["price BETWEEN 5 AND 12", "price > 5 AND price < 12", "price IN (5, 12)"], 0, "BETWEEN includes both ends."),
             quiz("Why use brackets in type = 'tool' AND (price < 5 OR price > 20)?", &["AND runs before OR, so brackets group the OR", "Brackets are decoration", "SQL requires them always"], 0, "Brackets control the order."),
-            fill("Names containing 'ion'.", "SELECT name FROM items WHERE name LIKE ___;", &["'%ion%'", "'ion'", "'_ion'"], 0, "% on both sides means contains."),
-            fill("Potions or tools.", "SELECT name FROM items WHERE type ___ ('potion', 'tool');", &["IN", "=", "LIKE"], 0, "IN checks a list."),
-            copy("Type the filter.", "SELECT name, price FROM items WHERE type IN ('potion', 'tool') AND price < 10;", "Two conditions."),
-            recall("From memory: show the name of items whose price is between 8 and 30.", "SELECT name FROM items WHERE price BETWEEN 8 AND 30;", "BETWEEN 8 AND 30."),
+            fill("Names containing 'ion'.", r##"SELECT name FROM items WHERE name LIKE ___;"##, &["'%ion%'", "'ion'", "'_ion'"], 0, "% on both sides means contains."),
+            fill("Potions or tools.", r##"SELECT name FROM items WHERE type ___ ('potion', 'tool');"##, &["IN", "=", "LIKE"], 0, "IN checks a list."),
+            quiz("Which items does the project's filter return?", &["Potion, Map and Torch", "Potion and Elixir", "Every item"], 0, "Potions and tools under 10: Elixir costs 12, so it's out."),
+            copy("Type the filter.", r##"SELECT name, price FROM items
+WHERE type IN ('potion', 'tool') AND price < 10;"##, "Two conditions joined by AND."),
+            recall("From memory: show the name of items whose price is between 8 and 30.", r##"SELECT name FROM items WHERE price BETWEEN 8 AND 30;"##, "BETWEEN 8 AND 30."),
         ]).with(r##"## Shop search filters
 The shopkeeper's website needs filters, and every filter is a WHERE clause. This project combines everything from the Filtering chapter.
 
-## The filters
+## Build the pieces first
 1. Cheap items (under 10 gold):
 
     SELECT name, price FROM items WHERE price < 10;
@@ -434,22 +440,19 @@ The shopkeeper's website needs filters, and every filter is a WHERE clause. This
 
     SELECT name FROM items WHERE type IN ('potion', 'tool');
 
-3. Search for a word:
-
-    SELECT name FROM items WHERE name LIKE '%or%';
-
-4. A price range:
-
-    SELECT name FROM items WHERE price BETWEEN 8 AND 30;
-
-5. Combined: cheap potions or tools.
-
+## The project: both at once
     SELECT name, price FROM items
     WHERE type IN ('potion', 'tool') AND price < 10;
 
+AND keeps only rows where both conditions are true: Potion (5), Map (8) and Torch (3). The Elixir is a potion, but at 12 gold it's not cheap.
+
+## More filters to try
+- Search for a word: WHERE name LIKE '%or%'.
+- A price range: WHERE price BETWEEN 8 AND 30.
+
 ## Check each filter
 Look at the full table first (SELECT * FROM items) and predict which rows each filter should return, THEN run it. Comparing your prediction with the result is the fastest way to catch a wrong operator or a missing bracket."##,
-        &["Every search filter is a WHERE condition.", "Combine IN, LIKE and BETWEEN with AND / OR.", "Use brackets when mixing AND and OR.", "Predict the result before running the query."]),
+        &["Every search filter is a WHERE condition.", "IN checks a list of values.", "AND keeps rows where both conditions are true.", "Predict the result before running the query."]),
     ])
 }
 
@@ -584,18 +587,24 @@ You can calculate anywhere a value is allowed:
 || glues text: SELECT name || ' the ' || class FROM heroes; gives "Aria the mage"."##,
         &["SELECT can calculate new columns with + - * / %.", "Calculations never change the stored data.", "Name calculated columns with AS.", "UPPER, LOWER, LENGTH and ROUND are handy functions."]),
         p("Project: Leaderboard", &[
-            (r#"Build the guild leaderboard: a power score (hp + level * 5), sorted from best to worst, top 3 only."#, "gold_trophy"),
-            (r#"SELECT name, hp + level * 5 AS power
+            (r##"CHECKPOINT PROJECT
+
+Build the guild leaderboard: a power score (hp + level * 5), sorted from best to worst, top 3 only."##, "gold_trophy"),
+            (r##"SELECT name, hp + level * 5 AS power
 FROM heroes
 ORDER BY power DESC
-LIMIT 3;"#, "banner_royal"),
+LIMIT 3;"##, "banner_royal"),
         ], vec![
             quiz("In hp + level * 5, what happens first?", &["level * 5", "hp + level", "Left to right"], 0, "Multiplication before addition."),
             quiz("Can ORDER BY use the alias power?", &["Yes", "No"], 0, "ORDER BY can use output aliases."),
-            fill("Best first.", "SELECT name, hp + level * 5 AS power FROM heroes ORDER BY power ___;", &["DESC", "ASC", "TOP"], 0, "Largest first."),
-            fill("Only the top 3.", "SELECT name FROM heroes ORDER BY hp DESC ___ 3;", &["LIMIT", "TOP", "MAX"], 0, "LIMIT 3."),
-            copy("Type the leaderboard.", "SELECT name, hp + level * 5 AS power FROM heroes ORDER BY power DESC LIMIT 3;", "Calculate, sort, limit."),
-            recall("From memory: show the 2 heroes with the highest level, name and level only.", "SELECT name, level FROM heroes ORDER BY level DESC LIMIT 2;", "ORDER BY level DESC LIMIT 2."),
+            fill("Best first.", r##"ORDER BY power ___"##, &["DESC", "ASC", "TOP"], 0, "DESC puts the largest first."),
+            fill("Only the top 3.", r##"___ 3;"##, &["LIMIT", "TOP", "MAX"], 0, "LIMIT keeps the first rows."),
+            quiz("Who tops the leaderboard?", &["Dara, with 43", "Borin, with 35", "Aria, with 23"], 0, "Dara: 18 + 5 * 5 = 43."),
+            copy("Type the leaderboard.", r##"SELECT name, hp + level * 5 AS power
+FROM heroes
+ORDER BY power DESC
+LIMIT 3;"##, "Calculate, sort, limit."),
+            recall("From memory: show the 2 heroes with the highest level, name and level only.", r##"SELECT name, level FROM heroes ORDER BY level DESC LIMIT 2;"##, "ORDER BY level DESC LIMIT 2."),
         ]).with(r##"## A real leaderboard
 Every game has a leaderboard. Yours ranks heroes by a power score that the database calculates.
 
@@ -613,10 +622,9 @@ Every game has a leaderboard. Yours ranks heroes by a power score that the datab
 ## How it runs
 Think of the database working in this order:
 1. FROM heroes: take all rows.
-2. (WHERE would filter here.)
-3. SELECT: calculate power for each row.
-4. ORDER BY power DESC: sort by the new column.
-5. LIMIT 3: keep the first three.
+2. SELECT: calculate power for each row.
+3. ORDER BY power DESC: sort by the new column.
+4. LIMIT 3: keep the first three.
 
 That is why ORDER BY can use the alias power even though it is defined in SELECT.
 
@@ -799,41 +807,45 @@ Writing WHERE COUNT(*) > 1 is an error, and Code Forge's message points you to H
 SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT."##,
         &["HAVING filters groups after the totals are calculated.", "WHERE filters rows before grouping.", "Conditions on totals go in HAVING.", "Order: WHERE, GROUP BY, HAVING, ORDER BY, LIMIT."]),
         p("Project: Guild Report", &[
-            (r#"The guild council wants a report: how many heroes each class has, their average hp, and only classes with at least 2 members."#, "banner_royal"),
-            (r#"SELECT class, COUNT(*) AS members, AVG(hp) AS avg_hp
+            (r##"CHECKPOINT PROJECT
+
+The guild council wants a report: how many heroes each class has, their average hp, and only classes with at least 2 members."##, "banner_royal"),
+            (r##"SELECT class, COUNT(*) AS members, AVG(hp) AS avg_hp
 FROM heroes
 GROUP BY class
-HAVING COUNT(*) >= 2;"#, "book"),
+HAVING COUNT(*) >= 2;"##, "book"),
         ], vec![
-            quiz("Where does the 'at least 2 members' rule go?", &["HAVING COUNT(*) >= 2", "WHERE COUNT(*) >= 2", "LIMIT 2"], 0, "It's about a total."),
+            quiz("Where does the 'at least 2 members' rule go?", &["HAVING COUNT(*) >= 2", "WHERE COUNT(*) >= 2", "LIMIT 2"], 0, "It's about a group's total, so it goes in HAVING."),
             quiz("Why use AS members?", &["A readable header instead of COUNT(*)", "It counts faster", "It is required"], 0, "Readable reports."),
-            fill("Group the heroes by class.", "SELECT class, COUNT(*) FROM heroes ___ BY class;", &["GROUP", "ORDER", "SORT"], 0, "GROUP BY."),
-            fill("Average hp per class.", "SELECT class, ___(hp) AS avg_hp FROM heroes GROUP BY class;", &["AVG", "SUM", "MID"], 0, "AVG."),
-            copy("Type the report.", "SELECT class, COUNT(*) AS members, AVG(hp) AS avg_hp FROM heroes GROUP BY class HAVING COUNT(*) >= 2;", "Group, total, filter."),
-            recall("From memory: show each item type with its most expensive price as top_price.", "SELECT type, MAX(price) AS top_price FROM items GROUP BY type;", "MAX per type."),
+            fill("Group the heroes by class.", r##"___ BY class"##, &["GROUP", "ORDER", "SORT"], 0, "GROUP BY makes one group per class."),
+            fill("Average hp per class.", r##"___(hp) AS avg_hp"##, &["AVG", "SUM", "MID"], 0, "AVG gives the average."),
+            quiz("Which classes appear in the report?", &["mage and knight", "All four classes", "rogue and ranger"], 0, "Only mage and knight have 2 members."),
+            copy("Type the report.", r##"SELECT class, COUNT(*) AS members, AVG(hp) AS avg_hp
+FROM heroes
+GROUP BY class
+HAVING COUNT(*) >= 2;"##, "Group, total, filter."),
+            recall("From memory: show each item type with its most expensive price as top_price.", r##"SELECT type, MAX(price) AS top_price FROM items GROUP BY type;"##, "MAX per type."),
         ]).with(r##"## A council report
 Reports with totals per category are the heart of business data: sales per month, players per level, gold per guild. The council asks:
 
 - For each class: how many heroes, and their average hp.
 - Only classes with at least two members.
-- Biggest classes first.
 
 ## The query
-    SELECT class,
-           COUNT(*) AS members,
-           AVG(hp) AS avg_hp
+    SELECT class, COUNT(*) AS members, AVG(hp) AS avg_hp
     FROM heroes
     GROUP BY class
-    HAVING COUNT(*) >= 2
-    ORDER BY members DESC;
+    HAVING COUNT(*) >= 2;
 
 ## Read it in running order
-FROM heroes → GROUP BY class → calculate COUNT and AVG for each group → HAVING keeps big groups → SELECT shapes the columns → ORDER BY sorts.
+FROM heroes, then GROUP BY class, then COUNT and AVG are calculated for each group, then HAVING keeps the big groups, and finally SELECT shapes the columns.
+
+## WHERE or HAVING?
+WHERE filters single rows before grouping; HAVING filters whole groups after their totals are known. "At least 2 members" is about a group, so it needs HAVING.
 
 ## Extend it
-- Round the average: ROUND(AVG(hp), 1).
+- Sort the biggest classes first: ORDER BY members DESC.
 - Add the strongest hp per class with MAX(hp).
-- Count only heroes above level 1 by adding WHERE level > 1 before GROUP BY.
 
 ## Check
 Count the knights and mages yourself in SELECT * FROM heroes. Do the numbers match the report?"##,
@@ -970,44 +982,44 @@ Many apps never really delete. Instead they UPDATE a column like is_deleted = 1 
 The Lost Cat quest (reward 5) should be gone."##,
         &["DELETE FROM table WHERE condition removes rows.", "Without WHERE, every row is removed.", "DELETE keeps the table; DROP TABLE removes it.", "Test with SELECT first; many apps use soft deletes."]),
         p("Project: Shop Restock", &[
-            (r#"Restock the shop: add new items, raise tool prices, remove items nobody buys, then show the shop."#, "money_bag"),
-            (r#"INSERT INTO items (name, type, price) VALUES ('Lantern', 'tool', 9);
+            (r##"CHECKPOINT PROJECT
+
+Restock the shop: add a lantern, raise tool prices, remove the torches nobody buys, then show the shop."##, "money_bag"),
+            (r##"INSERT INTO items (name, type, price) VALUES ('Lantern', 'tool', 9);
 UPDATE items SET price = price + 2 WHERE type = 'tool';
 DELETE FROM items WHERE name = 'Torch';
-SELECT * FROM items;"#, "lantern"),
+SELECT * FROM items;"##, "lantern"),
         ], vec![
             quiz("In what order should you check your changes?", &["Run the change, then SELECT to see the result", "SELECT never helps", "Changes show automatically"], 0, "Always confirm with a SELECT."),
-            quiz("Which statement would empty the whole shop by mistake?", &["DELETE FROM items;", "DELETE FROM items WHERE price > 100;", "SELECT * FROM items;"], 0, "No WHERE = every row."),
-            fill("Add a new item.", "___ INTO items (name, type, price) VALUES ('Lantern', 'tool', 9);", &["INSERT", "UPDATE", "ADD"], 0, "INSERT adds rows."),
-            fill("Raise tool prices.", "UPDATE items ___ price = price + 2 WHERE type = 'tool';", &["SET", "VALUES", "TO"], 0, "SET."),
-            copy("Type the restock.", "INSERT INTO items (name, type, price) VALUES ('Lantern', 'tool', 9);\nSELECT * FROM items;", "Insert, then look."),
-            recall("From memory: delete every item of type armor, then show all items.", "DELETE FROM items WHERE type = 'armor';\nSELECT * FROM items;", "Delete, then select."),
+            quiz("Which statement would empty the whole shop by mistake?", &["DELETE FROM items;", "DELETE FROM items WHERE price > 100;", "SELECT * FROM items;"], 0, "No WHERE means every row."),
+            fill("Add a new item.", r##"___ INTO items (name, type, price) VALUES ('Lantern', 'tool', 9);"##, &["INSERT", "UPDATE", "ADD"], 0, "INSERT adds rows."),
+            fill("Raise tool prices.", r##"UPDATE items ___ price = price + 2 WHERE type = 'tool';"##, &["SET", "VALUES", "TO"], 0, "SET gives the new value."),
+            quiz("What does the lantern cost at the end?", &["11", "9", "13"], 0, "It was inserted at 9 before tool prices went up by 2."),
+            copy("Type the restock.", r##"INSERT INTO items (name, type, price) VALUES ('Lantern', 'tool', 9);
+UPDATE items SET price = price + 2 WHERE type = 'tool';
+DELETE FROM items WHERE name = 'Torch';
+SELECT * FROM items;"##, "Insert, update, delete, then look."),
+            recall("From memory: delete every item of type armor, then show all items.", r##"DELETE FROM items WHERE type = 'armor';
+SELECT * FROM items;"##, "Delete, then select."),
         ]).with(r##"## Running the shop
 The shopkeeper hands you a list of changes. Each change is one statement; together they restock the shop.
 
 ## The changes
-1. New stock arrives:
-
-    INSERT INTO items (name, type, price)
-    VALUES ('Lantern', 'tool', 9), ('Bow', 'weapon', 22);
-
-2. Tools are in demand, so raise their prices:
-
+    INSERT INTO items (name, type, price) VALUES ('Lantern', 'tool', 9);
     UPDATE items SET price = price + 2 WHERE type = 'tool';
-
-3. Nobody buys torches any more:
-
     DELETE FROM items WHERE name = 'Torch';
+    SELECT * FROM items;
 
-4. Show the new shop, most expensive first:
-
-    SELECT name, type, price FROM items ORDER BY price DESC;
-
-## Think before you change
-For each UPDATE and DELETE, ask: "which rows will this touch?" Run the WHERE as a SELECT first if you are unsure. One missing WHERE can change every row.
+1. New stock arrives: a lantern. The id is left out, so the database numbers it for you.
+2. Tools are in demand, so every tool costs 2 more.
+3. Nobody buys torches any more, so they go.
+4. Show the shop to check the result.
 
 ## Order matters
-If you raised tool prices BEFORE inserting the lantern, would the lantern get the price rise? (No: it was not in the table yet.) Statements run one after another, each seeing the results of the ones before."##,
+Statements run one after another, each seeing the results of the ones before. The lantern was inserted BEFORE the price rise, so it costs 11, not 9. Swap the first two lines and it would stay at 9.
+
+## Think before you change
+For each UPDATE and DELETE, ask: "which rows will this touch?" Run the WHERE as a SELECT first if you are unsure. One missing WHERE can change every row."##,
         &["INSERT, UPDATE and DELETE each change data in one way.", "Statements run in order, each seeing earlier changes.", "Check which rows a WHERE touches before changing them.", "Finish with a SELECT to confirm the result."]),
     ])
 }
@@ -1143,47 +1155,47 @@ Real databases can also rename tables or columns and remove columns (ALTER TABLE
 Nobody designs a perfect table on day one. Adding columns later is normal; good names and types make it painless."##,
         &["ALTER TABLE ... ADD COLUMN name TYPE adds a column.", "Existing rows get NULL in the new column.", "Fill new columns with UPDATE.", "ALTER changes structure; UPDATE changes data."]),
         p("Project: Pet Shelter", &[
-            (r#"Build the shelter's database: create a pets table with a key, add some pets, then answer questions about them."#, "potion_red"),
-            (r#"CREATE TABLE pets (id INTEGER PRIMARY KEY, name TEXT, species TEXT, age INTEGER);
+            (r##"CHECKPOINT PROJECT
+
+Build the shelter's database: create a pets table with a key, add two pets, then find the older ones."##, "potion_red"),
+            (r##"CREATE TABLE pets (id INTEGER PRIMARY KEY, name TEXT, species TEXT, age INTEGER);
 INSERT INTO pets VALUES (1, 'Pip', 'owl', 3), (2, 'Mog', 'cat', 7);
-SELECT name FROM pets WHERE age > 5;"#, "chest"),
+SELECT name FROM pets WHERE age > 5;"##, "chest"),
         ], vec![
             quiz("Why does pets need an id column?", &["To identify each pet uniquely", "To sort alphabetically", "SQL requires it"], 0, "Two pets might share a name."),
             quiz("After CREATE TABLE, how many rows does pets have?", &["0", "1", "It copies heroes"], 0, "New tables are empty."),
-            fill("Create the table.", "___ TABLE pets (id INTEGER PRIMARY KEY, name TEXT);", &["CREATE", "INSERT", "ALTER"], 0, "CREATE TABLE."),
-            fill("Add two pets in one statement.", "INSERT INTO pets VALUES (1, 'Pip')___ (2, 'Mog');", &[",", ";", "AND"], 0, "Commas separate rows."),
-            copy("Type the shelter.", "CREATE TABLE pets (id INTEGER PRIMARY KEY, name TEXT, age INTEGER);\nINSERT INTO pets VALUES (1, 'Pip', 3), (2, 'Mog', 7);\nSELECT name FROM pets WHERE age > 5;", "Create, insert, query."),
-            recall("From memory: create table toys (name TEXT), insert 'Ball', then select all toys.", "CREATE TABLE toys (name TEXT);\nINSERT INTO toys VALUES ('Ball');\nSELECT * FROM toys;", "Three statements."),
+            fill("Create the table.", r##"___ TABLE pets (id INTEGER PRIMARY KEY, name TEXT, species TEXT, age INTEGER);"##, &["CREATE", "INSERT", "ALTER"], 0, "CREATE TABLE builds a new table."),
+            fill("Add two pets in one statement.", r##"INSERT INTO pets VALUES (1, 'Pip', 'owl', 3)___ (2, 'Mog', 'cat', 7);"##, &[",", ";", "AND"], 0, "Commas separate rows."),
+            quiz("Which pet does the last query return?", &["Mog", "Pip", "Both"], 0, "Only Mog is older than 5."),
+            copy("Type the shelter.", r##"CREATE TABLE pets (id INTEGER PRIMARY KEY, name TEXT, species TEXT, age INTEGER);
+INSERT INTO pets VALUES (1, 'Pip', 'owl', 3), (2, 'Mog', 'cat', 7);
+SELECT name FROM pets WHERE age > 5;"##, "Create, insert, query."),
+            recall("From memory: create table toys (name TEXT), insert 'Ball', then select all toys.", r##"CREATE TABLE toys (name TEXT);
+INSERT INTO toys VALUES ('Ball');
+SELECT * FROM toys;"##, "Three statements."),
         ]).with(r##"## A database from scratch
-The village shelter wants to track its animals. You will design the table, fill it, and answer the keeper's questions, all in one script.
+The village shelter wants to track its animals. You will design the table, fill it, and answer the keeper's question, all in one script.
 
 ## 1. Design
-One row is one pet. Facts per pet: an id, a name, the species, the age, and whether it has been adopted.
+One row is one pet. Facts per pet: an id, a name, the species and the age.
 
-    CREATE TABLE pets (
-      id INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
-      species TEXT,
-      age INTEGER,
-      adopted INTEGER
-    );
+    CREATE TABLE pets (id INTEGER PRIMARY KEY, name TEXT, species TEXT, age INTEGER);
 
 ## 2. Fill
-    INSERT INTO pets VALUES
-      (1, 'Pip', 'owl', 3, 0),
-      (2, 'Mog', 'cat', 7, 1),
-      (3, 'Bun', 'rabbit', 1, 0);
+    INSERT INTO pets VALUES (1, 'Pip', 'owl', 3), (2, 'Mog', 'cat', 7);
 
 ## 3. Ask
-    SELECT name FROM pets WHERE adopted = 0;          -- still waiting
-    SELECT species, COUNT(*) FROM pets GROUP BY species;
-    SELECT name, age FROM pets ORDER BY age DESC LIMIT 1;   -- oldest
+    SELECT name FROM pets WHERE age > 5;
 
-## 4. Change
-    UPDATE pets SET adopted = 1 WHERE name = 'Pip';
+The answer is Mog, the 7-year-old cat.
 
-You have now used every kind of SQL statement: creating structure, changing data and querying it."##,
-        &["Design: one row per thing, one column per fact, plus an id.", "CREATE the table, INSERT rows, then query.", "Booleans are often stored as 1 and 0.", "One script can build, fill and question a database."]),
+## Why the id?
+Two pets could share a name, but never an id. PRIMARY KEY tells the database this column identifies each row, and if you leave it out of an INSERT, the database numbers the row for you.
+
+## Level up
+- Count the pets per species: SELECT species, COUNT(*) FROM pets GROUP BY species;
+- Track adoptions: ALTER TABLE pets ADD adopted INTEGER, then UPDATE a pet to 1."##,
+        &["Design: one row per thing, one column per fact, plus an id.", "CREATE the table, INSERT rows, then query.", "Commas separate rows in one INSERT.", "One script can build, fill and question a database."]),
     ])
 }
 
@@ -1344,47 +1356,51 @@ The left table is the one written first (after FROM). Swapping the tables change
 - Everything from the first table, matched where possible? LEFT JOIN."##,
         &["LEFT JOIN keeps every row of the first (left) table.", "Unmatched right-side columns become NULL.", "LEFT JOIN + WHERE right.id IS NULL finds rows with no partner.", "The table after FROM is the one that is kept."]),
         p("Final Project: Quest Board", &[
-            (r#"Build the tavern's quest board: every quest, its reward, and the hero and guild taking it, with open quests shown too."#, "scroll_fire"),
-            (r#"SELECT q.title, q.reward, h.name AS hero
+            (r##"FINAL PROJECT
+
+Build the tavern's quest board: every quest, its reward, and the hero and guild taking it, with open quests shown too."##, "scroll_fire"),
+            (r##"SELECT q.title, q.reward, h.name AS hero, g.name AS guild
 FROM quests AS q
 LEFT JOIN heroes AS h ON q.hero_id = h.id
-ORDER BY q.reward DESC;"#, "banner_royal"),
+LEFT JOIN guilds AS g ON h.guild_id = g.id
+ORDER BY q.reward DESC;"##, "banner_royal"),
         ], vec![
             quiz("Why LEFT JOIN from quests?", &["So open quests with no hero still appear", "LEFT is faster", "INNER JOIN can't sort"], 0, "Every quest must be on the board."),
             quiz("Which shows only quests nobody has taken?", &["WHERE h.id IS NULL", "WHERE q.reward > 0", "LIMIT 1"], 0, "No matching hero means NULL."),
-            fill("Join quests to heroes.", "SELECT q.title, h.name FROM quests q LEFT JOIN heroes h ON q.hero_id = ___;", &["h.id", "h.name", "q.id"], 0, "hero_id points to heroes.id."),
-            fill("Biggest rewards first.", "SELECT q.title FROM quests q ORDER BY q.reward ___;", &["DESC", "ASC", "UP"], 0, "Largest first."),
-            copy("Type the quest board.", "SELECT q.title, q.reward, h.name AS hero FROM quests AS q LEFT JOIN heroes AS h ON q.hero_id = h.id ORDER BY q.reward DESC;", "All quests, richest first."),
-            recall("From memory: show the total reward per hero name, joining quests q to heroes h (inner join), grouped by h.name.", "SELECT h.name, SUM(q.reward) FROM quests AS q JOIN heroes AS h ON q.hero_id = h.id GROUP BY h.name;", "Join, then group."),
+            fill("Join quests to heroes.", r##"LEFT JOIN heroes AS h ON q.hero_id = ___"##, &["h.id", "h.name", "q.id"], 0, "hero_id points to heroes.id."),
+            fill("Join each hero to their guild.", r##"LEFT JOIN guilds AS g ON h.guild_id = ___"##, &["g.id", "g.name", "h.id"], 0, "guild_id points to guilds.id."),
+            quiz("What do hero and guild show for the Haunted Mill?", &["NULL: nobody has taken it", "The first hero", "The query fails"], 0, "LEFT JOIN keeps the quest with empty hero and guild."),
+            copy("Type the quest board.", r##"SELECT q.title, q.reward, h.name AS hero, g.name AS guild
+FROM quests AS q
+LEFT JOIN heroes AS h ON q.hero_id = h.id
+LEFT JOIN guilds AS g ON h.guild_id = g.id
+ORDER BY q.reward DESC;"##, "Three tables, richest quests first."),
+            recall("From memory: show the total reward per hero name, joining quests q to heroes h (inner join), grouped by h.name.", r##"SELECT h.name, SUM(q.reward) FROM quests AS q JOIN heroes AS h ON q.hero_id = h.id GROUP BY h.name;"##, "Join, then group."),
         ]).with(r##"## The tavern quest board
-Your final SQL project combines three tables to build a quest board for the tavern wall.
+Your final SQL project combines three tables to build a quest board for the tavern wall: every quest, its reward, the hero who took it and that hero's guild.
 
-## Version 1: every quest and its hero
-    SELECT q.title, q.reward, h.name AS hero
+## The query
+    SELECT q.title, q.reward, h.name AS hero, g.name AS guild
     FROM quests AS q
     LEFT JOIN heroes AS h ON q.hero_id = h.id
+    LEFT JOIN guilds AS g ON h.guild_id = g.id
     ORDER BY q.reward DESC;
 
-LEFT JOIN keeps open quests; their hero shows as NULL.
+## How the joins chain
+- quests is the starting table, so every quest appears.
+- The first LEFT JOIN finds the hero whose id matches the quest's hero_id.
+- The second LEFT JOIN finds that hero's guild through guild_id.
+- An open quest (the Haunted Mill) has no hero, so hero and guild show NULL; LEFT JOIN keeps it on the board anyway.
 
-## Version 2: add the hero's guild
-Joins can chain. Each JOIN adds one more table:
-
-    SELECT q.title, h.name AS hero, g.name AS guild
-    FROM quests AS q
-    JOIN heroes AS h ON q.hero_id = h.id
-    JOIN guilds AS g ON h.guild_id = g.id;
-
-## Version 3: totals per guild
+## Level up: totals per guild
     SELECT g.name AS guild, SUM(q.reward) AS gold
     FROM quests AS q
     JOIN heroes AS h ON q.hero_id = h.id
     JOIN guilds AS g ON h.guild_id = g.id
-    GROUP BY g.name
-    ORDER BY gold DESC;
+    GROUP BY g.name;
 
 ## You made it
 You can now query, filter, sort, total, change, create and join. These are the same skills data analysts and backend developers use every day. You have finished the SQL course!"##,
-        &["LEFT JOIN keeps unmatched rows such as open quests.", "Joins chain: each JOIN adds a table.", "GROUP BY works on joined results for totals per category.", "You've used every core SQL skill."]),
+        &["LEFT JOIN keeps unmatched rows such as open quests.", "Joins chain: each JOIN adds a table.", "Aliases (q, h, g) keep long queries readable.", "You've used every core SQL skill."]),
     ])
 }

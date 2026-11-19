@@ -129,36 +129,41 @@ If one line has an error, the lines after it usually do not run. Read the error 
                 fill("Calculate (2 + 3) times 4.", "console.log(___ * 4);", &["(2 + 3)", "2 + 3", "[2 + 3]"], 0, "Brackets go first."),
             ]),
         d("Project: Shop Receipt", r##"## Print a receipt
-The potion shop needs a receipt printer. You will print a neat receipt with a header, item lines, a divider and a total, using strings, numbers and maths.
+The potion shop needs a receipt printer. Your program prints a title, a line for each item with its cost, and the total, and JavaScript does all the maths.
 
 ## Plan
-- A title line and a divider made of dashes.
-- One line per item: name and price.
-- The total calculated by JavaScript, not by you.
-- A thank-you line.
+- A title line.
+- Two potions at 15 gold each: let JavaScript multiply.
+- One elixir at 40 gold.
+- The total, calculated from the same numbers.
 
-    console.log("== POTION SHOP ==");
-    console.log("Healing potion: 5");
-    console.log("Mana potion: 7");
-    console.log("Antidote: 3");
-    console.log("----------------");
-    console.log("Total: " + (5 + 7 + 3));
-    console.log("Thank you, hero!");
+## Build it
+    console.log("=== POTION SHOP ===");
+    console.log("Potion x2:", 2 * 15);
+    console.log("Elixir x1:", 40);
+    console.log("Total:", 2 * 15 + 40);
+
+It prints:
+
+    === POTION SHOP ===
+    Potion x2: 30
+    Elixir x1: 40
+    Total: 70
+
+## Commas in console.log
+console.log("Total:", 70) prints both values with a space between them. Because the number is a separate value, JavaScript works out 2 * 15 + 40 first (multiplication before addition: 30 + 40) and then prints the result.
 
 ## Why let JavaScript add it up?
-If a price changes, you only change it in one place and the total stays correct. Doing maths by hand and typing the answer causes mistakes.
+If a price changes, the total stays correct. Doing maths by hand and typing the answer causes mistakes.
 
 ## Check
 - Do all the strings have matching quotes?
-- Is the total in brackets so it is added before being joined?
-- Does every line end with a semicolon?
-
-Next chapter: variables, so you can store prices once and reuse them everywhere."##,
-            &["Build output line by line, top to bottom.", "Let the program calculate totals instead of typing them.", "Wrap maths in brackets before joining it to text.", "Check quotes, brackets and semicolons."],
+- Does every line end with a semicolon?"##,
+            &["Build output line by line, top to bottom.", "Let the program calculate totals instead of typing them.", "console.log(a, b) prints several values separated by spaces.", "* happens before +, so 2 * 15 + 40 is 70."],
             vec![
                 quiz("Why calculate the total in code?", &["It stays correct when prices change", "It looks nicer", "It is required"], 0, "Code does the maths reliably."),
-                fill("Add the three prices before joining.", "console.log(\"Total: \" + ___);", &["(5 + 7 + 3)", "5 + 7 + 3", "\"15\""], 0, "Brackets make it add first."),
-                quiz("\"Total: \" + 5 + 7 prints...", &["Total: 12", "Total: 57", "Error"], 1, "Left to right: text joins 5, then 7."),
+                fill("Print the label and the number as two values.", r##"console.log("Elixir x1:"___ 40);"##, &[",", ";", "."], 0, "A comma separates the values console.log prints."),
+                quiz("What does console.log(\"Potion x2:\", 2 * 15) print?", &["Potion x2: 30", "Potion x2: 2 * 15", "Potion x2:30 gold"], 0, "The maths runs first, then both values print with a space."),
             ]),
 
         // ---------------- Variables
@@ -328,37 +333,37 @@ Everything between the backticks is kept exactly, including spaces. `${a}${b}` h
                 quiz("What can go inside ${ }?", &["Only variable names", "Any expression, like price * 2", "Only numbers"], 1, "Any expression works."),
                 fill("Insert the hp value.", "let msg = `HP: ___`;", &["${hp}", "{hp}", "$hp"], 0, "${hp} inserts the value."),
             ]),
-        d("Project: Planet Weight", r##"## How much would you weigh on Mars?
-Gravity is different on every planet, so your weight changes too. In this project you store your Earth weight and each planet's gravity in variables, calculate the weights, and print them with template literals.
-
-## The science
-Weight on a planet = weight on Earth × that planet's gravity factor. For example, Mars has a factor of about 0.38.
+        d("Project: Planet Weight", r##"## How much would a hero weigh on Mars?
+Gravity is weaker on Mars, so a hero weighs less there: about 0.38 times their Earth weight. In this project you store the numbers in variables, calculate the Mars weight and print a sentence.
 
 ## Plan
-    const earthWeight = 50;
-    const marsGravity = 0.38;
-    const jupiterGravity = 2.53;
+1. Store the hero's Earth weight: 60 kg.
+2. Store Mars' gravity factor: 0.38.
+3. Multiply them and keep the result.
+4. Print a sentence with the result inside.
 
-    let marsWeight = earthWeight * marsGravity;
+## Build it
+    const weight = 60;
+    const marsGravity = 0.38;
+    let marsWeight = weight * marsGravity;
     console.log(`On Mars you weigh ${marsWeight} kg`);
 
-## Make it tidy
-Long decimals look messy. Round them:
+It prints: On Mars you weigh 22.8 kg
 
-    console.log(`Jupiter: ${Math.round(earthWeight * jupiterGravity)} kg`);
+## const or let?
+weight and marsGravity never change while the program runs, so const protects them from accidental changes. Change the weight once at the top and the result updates by itself.
 
-## Why constants?
-The gravity factors never change while the program runs, so const protects them from accidental changes. Your Earth weight is const too; change it once at the top and every result updates.
+## Template literals
+Backticks make a template literal: ${marsWeight} drops the variable's value straight into the text, with no + signs needed.
 
 ## Check
 - Are values that never change declared with const?
-- Do your messages use backticks and ${ }?
-- Are results rounded so they read nicely?"##,
-            &["Store fixed values (gravity factors) in const.", "Calculate results from variables, not typed numbers.", "Print with template literals.", "Round long decimals with Math.round."],
+- Does the message use backticks, not quotes?"##,
+            &["Store fixed values in const.", "Calculate results from variables, not typed numbers.", "Backticks and ${ } put values inside text.", "Change a value once at the top and every result follows."],
             vec![
-                quiz("Why declare marsGravity with const?", &["It never changes during the program", "const is faster", "let cannot hold decimals"], 0, "Fixed values belong in const."),
-                fill("Round the result.", "console.log(Math.___(50 * 0.38));", &["round", "fix", "int"], 0, "Math.round gives the nearest whole number."),
-                quiz("Which line prints the weight using a template literal?", &["console.log(`Mars: ${w} kg`);", "console.log(\"Mars: ${w} kg\");", "console.log(Mars: w kg);"], 0, "Backticks with ${ }."),
+                quiz("What does the program print?", &["On Mars you weigh 22.8 kg", "On Mars you weigh ${marsWeight} kg", "On Mars you weigh 60 kg"], 0, "60 * 0.38 is 22.8, placed into the text by ${ }."),
+                fill("Put the result inside the message.", r##"console.log(`On Mars you weigh ${___} kg`);"##, &["marsWeight", "weight", "marsGravity"], 0, "The variable holding the result goes inside ${ }."),
+                quiz("Which line prints the weight using a template literal?", &["console.log(`Mars: ${w} kg`);", "console.log(\"Mars: ${w} kg\");", "console.log(Mars: w kg);"], 0, "Only backticks turn ${ } into a value."),
             ]),
 
         // ---------------- Conditionals
@@ -565,40 +570,37 @@ Random results change every run, so run your code several times and check every 
                 quiz("Math.floor(Math.random() * 6) without + 1 gives...", &["1 to 6", "0 to 5", "0 to 6"], 1, "The + 1 shifts 0-5 to 1-6."),
                 fill("A 10% chance.", "if (Math.random() < ___) { }", &["0.1", "10", "0.01"], 0, "0.1 is 10%."),
             ]),
-        d("Project: Oracle Orb", r##"## Build a magic 8-ball
-The Oracle Orb answers yes/no questions with a random prophecy. You will combine random numbers with an if / else if / else chain.
+        d("Project: Oracle Orb", r##"## Build a magic orb
+The Oracle Orb answers any question with a random prophecy. You combine a random number with an if / else if / else chain.
 
 ## Plan
-1. Store the question in a variable and print it.
-2. Pick a random whole number from 1 to 5.
-3. Use else if to turn each number into an answer.
-4. Print the answer.
+1. Pick a random whole number: 0, 1 or 2.
+2. Turn each number into a different answer.
+3. Print the answer.
 
-    const question = "Will I find the dragon?";
-    let pick = Math.floor(Math.random() * 5) + 1;
-    let answer;
-    if (pick === 1) {
-      answer = "Yes, certainly.";
-    } else if (pick === 2) {
-      answer = "The stars say no.";
-    } else if (pick === 3) {
-      answer = "Ask again tomorrow.";
-    } else if (pick === 4) {
-      answer = "Signs point to yes.";
+## Build it
+    let pick = Math.floor(Math.random() * 3);
+    if (pick === 0) {
+      console.log("Yes, hero.");
+    } else if (pick === 1) {
+      console.log("The stars say no.");
     } else {
-      answer = "Very doubtful.";
+      console.log("Ask again later.");
     }
-    console.log(`${question} -> ${answer}`);
+
+## How the random number works
+Math.random() gives a decimal from 0 up to (but not including) 1. Times 3, that is anywhere from 0 to just under 3. Math.floor drops the decimals, leaving 0, 1 or 2: three answers, all equally likely.
+
+## Why end with else?
+By the time JavaScript reaches the last branch, pick can only be 2. A plain else catches it, and it guarantees the orb always answers, even if you change the numbers later.
 
 ## Check
-- Can every number from 1 to 5 happen? Is there an answer for each?
-- Does the final else catch the last case?
-- Run it several times: do you see different answers?"##,
-            &["Generate a random whole number with Math.floor(Math.random() * N) + 1.", "Map each number to an outcome with if / else if.", "Use a final else as the default.", "Run it several times to test every branch."],
+Run it several times: do you see all three answers?"##,
+            &["Math.floor(Math.random() * 3) gives 0, 1 or 2.", "if / else if / else runs exactly one branch.", "=== compares; = assigns.", "A final else is a safe default."],
             vec![
-                quiz("How many different answers can Math.floor(Math.random() * 5) + 1 select?", &["4", "5", "6"], 1, "1, 2, 3, 4 or 5."),
-                fill("Compare pick strictly with 2.", "} else if (pick ___ 2) {", &["===", "=", "=>"], 0, "=== compares."),
-                quiz("Why end with else instead of else if (pick === 5)?", &["It guarantees there is always an answer", "else is faster", "else if is invalid"], 0, "else is a safe default."),
+                quiz("If pick is 1, what does the orb say?", &["The stars say no.", "Yes, hero.", "Ask again later."], 0, "pick === 1 matches the else if branch."),
+                fill("Check the second answer only when the first didn't match.", r##"} ___ (pick === 1) {"##, &["else if", "if", "elif"], 0, "else if is checked only when the branches above were false."),
+                quiz("Why does the last branch use else with no condition?", &["pick can only be 2 by then, and the orb always answers", "else is faster", "else if is not allowed at the end"], 0, "else is the safe default."),
             ]),
 
         // ---------------- Loops
@@ -736,37 +738,39 @@ In loops inside loops, break and continue act on the innermost loop."##,
                 quiz("for i 1..5, continue when i === 2. What prints?", &["1 3 4 5", "1", "2"], 0, "Round 2 is skipped."),
                 fill("Stop the loop when the key is found.", "if (item === \"key\") {\n  ___;\n}", &["break", "stop", "exit"], 0, "break leaves the loop."),
             ]),
-        d("Project: Lucky Number", r##"## A guessing game
-The guild wizard thinks of a lucky number from 1 to 10. Your program makes guesses until it finds it, then reports how many tries it took.
+        d("Project: Lucky Number", r##"## Roll for luck
+A 10-sided die rolls until it lands on the lucky number 7. Nobody knows how many rolls that will take, so you need a loop that keeps going until it happens, and a counter for the tries.
 
 ## Plan
-1. Pick the secret number with Math.random.
-2. Loop through guesses 1, 2, 3...
-3. Count each try.
-4. When the guess matches, print the result and break.
+1. Store the lucky number, the current roll and a try counter.
+2. While the roll is not the lucky number, roll again and count the try.
+3. Print how many tries it took.
 
-    const secret = Math.floor(Math.random() * 10) + 1;
+## Build it
+    let lucky = 7;
+    let roll = 0;
     let tries = 0;
-    for (let guess = 1; guess <= 10; guess++) {
+    while (roll !== lucky) {
+      roll = Math.floor(Math.random() * 10) + 1;
       tries++;
-      if (guess === secret) {
-        console.log(`Found ${secret} in ${tries} tries!`);
-        break;
-      }
     }
+    console.log(`Rolled a ${lucky}! Tries: ${tries}`);
 
-## Think about it
-- What is the smallest and largest number of tries possible?
-- Why is tries declared outside the loop?
-- What would happen without break? (The loop would keep guessing after finding it.)
+## Why a while loop?
+A for loop is great when you know how many times to repeat. Here you don't: it could take 1 roll or 30. while repeats as long as its condition is true, which is exactly what this needs.
 
-## Level up
-Try a while loop that guesses RANDOM numbers until it hits the secret. That version cannot know in advance how many tries it will need, which is exactly when while is the right tool."##,
-            &["Loops plus a counter can measure how many tries something takes.", "break ends the search once the target is found.", "Declare counters before the loop.", "Use while when the number of tries is unknown."],
+## Small details that matter
+- roll starts at 0, which is never lucky, so the loop always runs at least once.
+- Math.floor(Math.random() * 10) gives 0 to 9; + 1 shifts it to 1 to 10, like a real die.
+- tries is declared before the loop, so it keeps counting across every round.
+
+## Check
+Run it several times: the number of tries changes every time, but the loop always stops on a 7."##,
+            &["while repeats as long as its condition is true.", "Use while when you don't know how many repeats you need.", "Declare counters before the loop.", "Math.floor(Math.random() * 10) + 1 rolls 1 to 10."],
             vec![
-                quiz("Why break after finding the number?", &["To stop guessing once it is found", "break adds a try", "To restart"], 0, "There is no need to keep looping."),
-                fill("Count one more try.", "tries___;", &["++", "--", "+"], 0, "++ adds one."),
-                quiz("The secret is 10. How many tries does the for loop need?", &["1", "10", "11"], 1, "It guesses 1 to 10 in order."),
+                quiz("Why does roll start at 0?", &["0 is never lucky, so the loop runs at least once", "Dice start at 0", "while needs a 0"], 0, "If roll started at 7, the loop would never run."),
+                fill("Make the die roll 1 to 10 instead of 0 to 9.", r##"roll = Math.floor(Math.random() * 10) ___ 1;"##, &["+", "-", "*"], 0, "Adding 1 shifts 0-9 up to 1-10."),
+                quiz("What is the smallest number of tries possible?", &["1", "0", "7"], 0, "The very first roll can be a 7."),
             ]),
 
         // ---------------- Arrays
@@ -978,36 +982,42 @@ You can always write the search yourself with a loop and break. Built-in methods
                 fill("Turn the list into one string separated by commas.", "let text = bag.___(\", \");", &["join", "concat", "string"], 0, "join glues items into text."),
             ]),
         d("Project: Bard's Playlist", r##"## Manage a playlist
-The tavern bard keeps a playlist of songs. Your program builds it, adds and removes songs, searches it, and prints a numbered list.
+The tavern bard keeps a playlist. Your program adds a new song to the end, prints a numbered list, and says how many songs there are.
 
 ## Plan
-    let playlist = ["Dragon Dance", "Ale and Tales"];
-    playlist.push("Moonlit Road");        // add to the end
-    playlist.unshift("Opening Fanfare");  // add to the start
-    let skipped = playlist.pop();         // remove the last song
+1. Start with two songs in an array.
+2. Add "Slime Shuffle" to the end.
+3. Loop over every index and print a numbered line.
+4. Print the total number of songs.
 
-    if (playlist.includes("Dragon Dance")) {
-      console.log("The crowd favourite is on!");
-    }
-
+## Build it
+    const playlist = ["Dragon Waltz", "Goblin Groove"];
+    playlist.push("Slime Shuffle");
     for (let i = 0; i < playlist.length; i++) {
       console.log(`${i + 1}. ${playlist[i]}`);
     }
-    console.log(`Skipped: ${skipped}`);
+    console.log(`${playlist.length} songs`);
 
-## Things to try
-- Print how many songs are left with playlist.length.
-- Find where a song is with indexOf, and handle -1.
-- Sort the songs alphabetically before printing.
+It prints:
+
+    1. Dragon Waltz
+    2. Goblin Groove
+    3. Slime Shuffle
+    3 songs
+
+## Indexes and people
+Arrays count from 0, people count from 1. playlist[0] is the first song, so the loop prints i + 1 as the number and playlist[i] as the song.
+
+## const and push
+const stops the name playlist from being pointed at a different array, but the array itself can still change. That is why push works on a const array.
 
 ## Check
-- Does the numbering start at 1 for people, even though indexes start at 0?
-- Did you print skipped, the value pop() returned?"##,
-            &["push/unshift add songs; pop/shift remove them.", "includes and indexOf search the list.", "Number items for people with i + 1.", "Store the value returned by pop if you need it."],
+Does the numbering start at 1? Does the loop stop after the last song (i < playlist.length, not <=)?"##,
+            &["push adds an item to the end of an array.", "Indexes start at 0; number items for people with i + 1.", "Loop with i < array.length to visit every item.", "A const array can still change its contents."],
             vec![
-                quiz("Why print i + 1 instead of i?", &["People count from 1, indexes from 0", "To skip a song", "It is required"], 0, "Friendly numbering starts at 1."),
-                fill("Add a song at the start.", "playlist.___(\"Overture\");", &["unshift", "push", "shift"], 0, "unshift adds to the front."),
-                quiz("What does skipped hold after playlist.pop()?", &["The removed last song", "The new length", "Nothing"], 0, "pop returns the removed item."),
+                quiz("How many songs does playlist.length give after the push?", &["3", "2", "4"], 0, "Two songs plus the pushed one."),
+                fill("Stop the loop after the last song.", r##"for (let i = 0; i ___ playlist.length; i++) {"##, &["<", "<=", ">"], 0, "With <=, i would reach 3, and there is no playlist[3]."),
+                quiz("Why can a const array still get a new song?", &["const stops reassigning the name, not changing the contents", "push ignores const", "It can't: this is an error"], 0, "The array changes; the name still points at the same array."),
             ]),
 
         // ---------------- Functions
@@ -1190,33 +1200,40 @@ If an inner variable has the same name as an outer one, the inner one hides ("sh
                 quiz("Why keep global variables few?", &["Any code can change them, causing bugs", "They are slower to type", "They cannot hold numbers"], 0, "Shared state is risky."),
             ]),
         d("Project: Palindrome Checker", r##"## Words that read the same backwards
-A palindrome reads the same forwards and backwards: "level", "racecar", "noon". Your function will check any word and return true or false.
+A palindrome reads the same forwards and backwards: "level", "racecar", "noon". Your function builds the word backwards, letter by letter, and returns whether it matches.
 
 ## Plan
 1. Write a function isPalindrome(word).
-2. Make the word lowercase so "Level" still counts.
-3. Reverse it: split it into letters, reverse the array, join it back.
-4. Return whether the reversed word equals the original.
+2. Start with an empty string, reversed.
+3. Loop from the last letter down to the first, adding each one to reversed.
+4. Return whether reversed equals the original word.
 
+## Build it
     function isPalindrome(word) {
-      const lower = word.toLowerCase();
-      const reversed = lower.split("").reverse().join("");
-      return lower === reversed;
+      let reversed = "";
+      for (let i = word.length - 1; i >= 0; i--) {
+        reversed += word[i];
+      }
+      return reversed === word;
     }
+    console.log(isPalindrome("level"));
+    console.log(isPalindrome("hero"));
 
-    console.log(isPalindrome("Level"));    // true
-    console.log(isPalindrome("dragon"));   // false
+It prints true, then false.
 
-## Method chaining
-lower.split("").reverse().join("") calls three methods in a row: each one works on the result of the previous one. Read it left to right: split into letters, reverse them, join them back.
+## Walking backwards
+The last letter of a word is at index word.length - 1 (for "hero", that is 3). The loop starts there, keeps going while i >= 0, and counts down with i--. For "hero", reversed grows: "o", "or", "ore", "oreh".
 
 ## Why return a boolean?
-Returning true/false (instead of printing) lets other code use the answer, for example in an if statement or to count palindromes in a list."##,
-            &["Break a problem into small steps before coding.", "toLowerCase makes comparisons ignore capitals.", "split(\"\").reverse().join(\"\") reverses a string.", "Return booleans so other code can use the answer."],
+Returning true or false (instead of printing) lets other code use the answer, for example in an if statement.
+
+## Level up
+Capital letters count as different characters, so "Level" gives false. Try making the word lowercase first with word.toLowerCase()."##,
+            &["Break a problem into small steps before coding.", "The last index is word.length - 1.", "Count down with i-- to walk a string backwards.", "Return booleans so other code can use the answer."],
             vec![
-                quiz("What does \"abc\".split(\"\") give?", &["\"abc\"", "[\"a\", \"b\", \"c\"]", "\"cba\""], 1, "It splits into letters."),
-                fill("Make the comparison ignore capitals.", "const lower = word.___();", &["toLowerCase", "lower", "small"], 0, "toLowerCase()."),
-                quiz("Why lowercase the word first?", &["So 'Level' counts as a palindrome", "It is faster", "To print it"], 0, "L and l are different characters otherwise."),
+                quiz("For \"hero\", what is reversed at the end?", &["\"oreh\"", "\"hero\"", "\"ore\""], 0, "The letters are added from the last to the first."),
+                fill("Add the current letter to the end of reversed.", r##"reversed ___ word[i];"##, &["+=", "=", "-="], 0, "+= joins the letter onto the text built so far."),
+                quiz("Why does the function return instead of using console.log?", &["So other code can use the answer", "return prints faster", "Functions can't use console.log"], 0, "A returned value can be stored, printed or tested."),
             ]),
 
         // ---------------- Objects
@@ -1404,45 +1421,47 @@ Mixing them up is a common mistake; for arrays, prefer for...of.
                 fill("Loop over the object's keys.", "for (const key ___ stats) { }", &["in", "of", "from"], 0, "for...in loops over keys."),
             ]),
         d("Project: Monster Card", r##"## A bestiary entry
-Build a monster as an object, then write functions that describe it and change it.
+Describe a monster as an object, power it up, then print its card with template literals and a loop over its moves.
 
 ## Plan
+1. Create an object with a name, a type, hp and an array of moves.
+2. Add 10 to its hp.
+3. Print the name with the type, then the hp.
+4. Loop over the moves and print each one.
+
+## Build it
     const monster = {
-      name: "Cave Troll",
-      hp: 80,
-      attacks: ["club", "roar"],
-      loot: { gold: 25, item: "troll tooth" },
+      name: "Sparkmouse",
+      type: "Electric",
+      hp: 35,
+      moves: ["Zap", "Dash"]
     };
-
-    function describe(m) {
-      console.log(`${m.name} (${m.hp} HP)`);
-      console.log(`Attacks: ${m.attacks.join(", ")}`);
-      console.log(`Drops ${m.loot.gold} gold and a ${m.loot.item}`);
+    monster.hp += 10;
+    console.log(`${monster.name} (${monster.type})`);
+    console.log(`HP: ${monster.hp}`);
+    for (const move of monster.moves) {
+      console.log(`- ${move}`);
     }
 
-    function hit(m, damage) {
-      m.hp -= damage;
-      if (m.hp <= 0) {
-        console.log(`${m.name} is defeated!`);
-      }
-    }
+It prints:
 
-    describe(monster);
-    hit(monster, 30);
-    console.log(monster.hp);   // 50
+    Sparkmouse (Electric)
+    HP: 45
+    - Zap
+    - Dash
 
 ## What you practised
-- Nested properties (loot.gold) and arrays inside objects (attacks).
-- Passing an object to a function, which can change it.
-- Combining join with template literals.
+- An object groups facts about one thing as name: value pairs.
+- Dot notation reads and changes a property: monster.hp += 10.
+- An array can live inside an object (moves), and for...of visits each item.
 
 ## Level up
-Put several monsters in an array and loop over it to describe each one."##,
-            &["Model one thing as an object with nested data.", "Functions can read and change objects passed to them.", "join turns an array property into readable text.", "Arrays of objects let you handle many monsters with one loop."],
+Put several monsters in an array and loop over it to print every card."##,
+            &["An object groups facts about one thing as name: value pairs.", "Dot notation reads and changes properties.", "Objects can hold arrays, like a list of moves.", "for...of visits every item in an array."],
             vec![
-                quiz("After hit(monster, 30), is the original monster changed?", &["Yes, objects are shared", "No, the function gets a copy"], 0, "The function changes the same object."),
-                fill("Read the gold inside loot.", "console.log(monster.loot.___);", &["gold", "[gold]", "\"gold\""], 0, "Chain the property names."),
-                quiz("How do you show the attacks as 'club, roar'?", &["m.attacks.join(\", \")", "m.attacks.length", "m.attacks[0]"], 0, "join makes a string."),
+                quiz("After monster.hp += 10, what is monster.hp?", &["45", "35", "10"], 0, "35 + 10 = 45."),
+                fill("Print the monster's type in brackets.", r##"console.log(`${monster.name} (${monster.___})`);"##, &["type", "kind", "class"], 0, "The property is called type."),
+                quiz("What does the loop print first?", &["- Zap", "- Dash", "Sparkmouse"], 0, "for...of starts at the first move."),
             ]),
 
         // ---------------- The Page (DOM)
@@ -1615,42 +1634,40 @@ getElementById is fine for single ids. querySelector is more flexible because it
                 fill("Find the first link inside nav.", "document.querySelector(\"___\");", &["nav a", "#nav.a", "nav>>a"], 0, "A descendant selector, like CSS."),
             ]),
         d("Final Project: Mood Ring", r##"## An interactive mood ring
-Your final JavaScript project brings everything together: a page with mood buttons that change the ring's colour, a text message and a counter, all without reloading.
+Your final JavaScript project brings everything together: a ring on the page that glows a random colour, with a matching mood, every time the player presses Spin.
 
 ## The HTML
     <div id="ring"></div>
-    <p id="mood">Pick a mood</p>
-    <button id="calm">Calm</button>
-    <button id="brave">Brave</button>
+    <button id="spin">Spin</button>
 
 ## The JavaScript
     const ring = document.getElementById("ring");
-    const mood = document.getElementById("mood");
-    let changes = 0;
-
-    function setMood(name, color) {
-      ring.style.backgroundColor = color;
-      mood.textContent = `You feel ${name}`;
-      changes++;
+    const moods = ["calm", "happy", "fierce"];
+    const colors = ["teal", "gold", "crimson"];
+    function setMood(pick) {
+      ring.style.backgroundColor = colors[pick];
+      ring.textContent = `You feel ${moods[pick]}`;
     }
+    const btn = document.getElementById("spin");
+    btn.addEventListener("click", () => {
+      setMood(Math.floor(Math.random() * moods.length));
+    });
 
-    document.getElementById("calm").addEventListener("click", () => setMood("calm", "teal"));
-    document.getElementById("brave").addEventListener("click", () => setMood("brave", "crimson"));
+## How it fits together
+- The two arrays line up: moods[1] is "happy" and colors[1] is "gold", so one index picks a matching pair.
+- setMood(pick) does the changing in one place: the ring's background colour and its text.
+- addEventListener waits for a click and then runs the arrow function, which picks a random index from 0 to moods.length - 1.
 
 ## What you combined
-- Finding elements and storing them in constants.
-- A reusable function with parameters.
-- Changing text and styles.
-- Event listeners with arrow functions.
-- A variable that remembers state between clicks.
+Finding elements, arrays, a function with a parameter, changing styles and text, random numbers and an event listener: the whole course in eleven lines.
 
 ## Level up
-Store the moods in an array of objects and create the buttons with a loop. You have finished the JavaScript course!"##,
-            &["Store elements in constants and reuse them.", "Put shared behaviour in a function with parameters.", "Connect buttons with addEventListener.", "Variables outside handlers remember state between events."],
+Add a second button that always picks "calm" by calling setMood(0). You have finished the JavaScript course!"##,
+            &["Store page elements in constants and reuse them.", "Matching arrays let one index pick a pair of values.", "Put shared behaviour in a function with parameters.", "addEventListener runs code when the player clicks."],
             vec![
-                quiz("Why put the changes into a setMood function?", &["Both buttons reuse the same code", "Functions are required for events", "It makes the ring round"], 0, "One function, many buttons."),
-                fill("Change the ring's colour.", "ring.style.___ = color;", &["backgroundColor", "background-color", "colour"], 0, "camelCase CSS name."),
-                quiz("Where must changes be declared to count across clicks?", &["Outside the handler", "Inside the handler", "In the HTML"], 0, "Inside, it would reset every click."),
+                quiz("Why are the changes inside a setMood function?", &["The changing happens in one place, and any button can reuse it", "Functions are required for events", "It makes the ring round"], 0, "Call setMood from anywhere."),
+                fill("Run the code when the button is clicked.", r##"btn.addEventListener("___", () => {"##, &["click", "press", "tap"], 0, "The event name is \"click\"."),
+                quiz("If the random index is 2, what does the ring show?", &["You feel fierce, in crimson", "You feel happy, in gold", "You feel calm, in teal"], 0, "moods[2] is fierce and colors[2] is crimson."),
             ]),
     ]
 }

@@ -167,33 +167,34 @@ For .menu li a, start at the right: "links, inside list items, inside .menu". Re
                 fill("Style links while the mouse is over them.", "a___ { color: white; }", &[":hover", ".hover", "#hover"], 0, "Pseudo-classes start with a colon."),
             ]),
         d("Project: Bard Concert Flyer", r##"## Style a flyer with selectors only
-The bard is playing at the tavern and needs a flyer. The HTML is ready: a title, a date, a list of songs and a "special guest" note. Your job is to style it using everything from the Selectors chapter.
+The bards play the Pixel Tavern on Friday, and their flyer needs some style. The HTML is ready: headings, the band's name in an element with class="band", and the date in an element with id="date". Your job is to pick the right selector for each part.
 
 ## Plan
-- Set calm defaults on body: text colour and font.
-- Make the h1 title stand out with its own colour.
-- Group h2 and h3 to share a heading font.
-- Style the song list items with a descendant selector: .songs li.
-- Give the special guest paragraph a class and colour it.
-- Add a hover colour to the ticket link.
+- The whole page (body): a deep night-blue background.
+- Both headings at once (h1 and h2): gold and centred.
+- The band name (.band): white and bigger.
+- The one date (#date): pink, so it stands out.
 
-## Example
-    body { color: white; font-family: sans-serif; }
-    h1 { color: gold; }
-    h2, h3 { font-family: Georgia, serif; }
-    .songs li { color: lightblue; }
-    .guest { color: orange; }
-    a:hover { color: white; }
+## Build it
+    body { background-color: #1e1b4b; }
+    h1, h2 { color: gold; text-align: center; }
+    .band { color: white; font-size: 20px; }
+    #date { color: pink; }
+
+## Four kinds of selector
+- body is a type selector: it styles every <body> element.
+- h1, h2 is a group: the comma shares one rule between both, so you don't repeat it.
+- .band is a class selector (dot): it styles every element with class="band".
+- #date is an id selector (hash): it styles the one element with id="date".
 
 ## Check
-- Did you use a class for the special paragraph instead of an id?
-- Does .songs li only affect the song list, not every list on the page?
-- Are all declarations closed with semicolons and all rules with braces?"##,
-            &["Start with defaults on body, then style specific parts.", "Group selectors with commas to avoid repeating rules.", "Use descendant selectors to style only one area.", "Add :hover for interactive feedback."],
+- Does every declaration end with a semicolon, and does every rule close its brace?
+- Does the dot go with the class and the hash with the id?"##,
+            &["Type selectors (body, h1) style every element of that kind.", "A comma groups selectors to share one rule.", "A dot selects a class, a hash selects an id.", "Check semicolons and braces in every rule."],
             vec![
-                quiz("Which selector styles only the song list items?", &["li", ".songs li", "songs > *"], 1, "A descendant selector limits the area."),
-                fill("Share one rule between h2 and h3.", "h2___ h3 { font-family: Georgia; }", &[",", " ", ">"], 0, "Commas group selectors."),
-                quiz("The guest paragraph should be styled with...", &["a class", "an inline style", "the universal selector"], 0, "Classes are the reusable way."),
+                quiz("Which selector styles every element with class=\"band\"?", &[".band", "#band", "band"], 0, "A dot selects a class."),
+                fill("Make the band name bigger.", r##".band { color: white; ___: 20px; }"##, &["font-size", "text-size", "size"], 0, "font-size sets how big the text is."),
+                quiz("What colour is the page behind everything?", &["#1e1b4b (night blue)", "gold", "pink"], 0, "The body rule sets the background colour."),
             ]),
         d("Colors", r##"## Ways to write a colour
 CSS accepts colours in several formats. They all describe the same colours, so pick whichever is clearest.
@@ -377,45 +378,41 @@ A shorthand resets every part you leave out to its default. If you write backgro
                 quiz("Why might border: 2px gold; show no border?", &["Gold is not a colour", "The style (like solid) is missing", "Borders need px twice"], 1, "A border needs a style."),
                 fill("Set a 3px dashed red border.", "border: 3px ___ red;", &["dashed", "dash", "lines"], 0, "dashed is a border style."),
             ]),
-        d("Project: Royal Invitation", r##"## Style an invitation to the royal ball
-This project brings the Properties chapter together: colours, units, fonts, text styling, backgrounds and shorthands.
+        d("Project: Royal Invitation", r##"## Style an invitation to the royal feast
+The queen is throwing a feast and every guest needs an invitation card. This project brings the Properties chapter together: colours, alignment, spacing, borders and fonts.
 
 ## The look to aim for
-- A dark night-sky background with a gradient.
-- A centred card in a parchment colour.
-- A fancy serif title in gold with a shadow.
-- Comfortable body text with good line height.
-- Details (date, place) in small capitals with letter spacing.
+- A royal purple card with white text.
+- Everything centred.
+- Room inside the card, so the text doesn't touch the edges.
+- A thin gold frame.
+- A fancy serif font for the title.
 
-## Example
-    body {
-      background: linear-gradient(#0b1228, #3b1e5a);
-      font-family: Georgia, serif;
-    }
-    .card {
-      background-color: #f0e2b6;
-      color: #2a1c12;
-      padding: 2rem;
-    }
-    h1 {
-      color: goldenrod;
-      text-shadow: 2px 2px 0 #000;
+## Build it
+    .invite {
+      background-color: #3a2e6b;
+      color: white;
       text-align: center;
+      padding: 20px;
+      border: 3px solid gold;
     }
-    .details {
-      text-transform: uppercase;
-      letter-spacing: 2px;
-    }
+    h1 { font-family: Georgia, serif; }
+
+## Property by property
+- background-color fills the card; color sets the text colour. White on dark purple has strong contrast, so it is easy to read.
+- text-align: center centres each line of text.
+- padding: 20px adds space inside the border, between the edge and the text.
+- border: 3px solid gold is a shorthand: width, style and colour in one line.
+- font-family lists fonts in order of preference: Georgia if the device has it, otherwise any serif font.
 
 ## Check
-- Is the text easy to read against its background?
-- Did you use rem or % where sizes should adapt?
-- Did your shorthands come before the single properties that adjust them?"##,
-            &["Combine colour, font, text and background properties into one design.", "Use gradients for backgrounds without image files.", "Check text contrast against every background.", "Use relative units where sizes should adapt."],
+- Is the text easy to read against the purple?
+- Did you write the border's three parts in the order width, style, colour?"##,
+            &["background-color fills an element; color sets its text.", "padding adds space inside the border.", "border: width style colour is a shorthand.", "font-family lists fallbacks, ending with a generic family like serif."],
             vec![
-                quiz("Which property adds the title's shadow?", &["box-shadow", "text-shadow", "shadow"], 1, "text-shadow is for text."),
-                fill("Space out the letters of the details.", ".details { ___: 2px; }", &["letter-spacing", "word-gap", "spacing"], 0, "letter-spacing adds space between letters."),
-                quiz("Dark brown text on a parchment card has...", &["good contrast", "no contrast", "too much shadow"], 0, "Dark on light reads well."),
+                quiz("What does padding: 20px do to the card?", &["Adds space inside, between the border and the text", "Adds space outside the card", "Makes the border 20px thick"], 0, "Padding is the space inside the border."),
+                fill("Use Georgia, or any serif font if Georgia is missing.", r##"h1 { font-family: Georgia, ___; }"##, &["serif", "fancy", "default"], 0, "A generic family like serif is the safe fallback."),
+                quiz("Why is white text a good choice on #3a2e6b?", &["Light text on a dark background has good contrast", "White is the only allowed colour", "It makes the card bigger"], 0, "Strong contrast keeps text readable."),
             ]),
         d("Every Element Is a Box", r##"## The box model
 To the browser, every element is a rectangle made of four layers, from inside to outside:
@@ -572,35 +569,37 @@ Percent widths, grids of cards, and form fields next to each other. Whenever thi
                 fill("Make every element use the predictable sizing.", "* { box-sizing: ___; }", &["border-box", "content-box", "fit"], 0, "border-box."),
             ]),
         d("Project: Library Card", r##"## Build a library card with the box model
-The guild library needs membership cards. Each card is a box with a photo, a name and some details, and it must look neat and evenly spaced.
+The Pixel Library needs member cards. Each card is one box, and every layer of the box model has a job: content, padding, border and margin.
 
 ## Plan
-- Use box-sizing: border-box for everything.
-- The card: fixed width, padding inside, a thick border, rounded corners and a hard shadow.
-- Centre the card on the page with margin: 0 auto.
-- The photo: a circle using border-radius: 50%.
-- Details separated by a dashed line: border-top on the details section.
+- A fixed width of 300px.
+- 16px of padding inside, so the text never touches the frame.
+- 20px of margin above and below, and centred left to right.
+- A 2px brown frame with rounded corners.
+- box-sizing: border-box, so the card is exactly 300px wide including its padding and border.
 
-## Example
-    * { box-sizing: border-box; }
+## Build it
     .card {
-      width: 320px;
-      margin: 40px auto;
-      padding: 20px;
-      border: 4px solid #8b5a2b;
-      border-radius: 8px;
-      box-shadow: 0 6px 0 #000;
+      width: 300px;
+      padding: 16px;
+      margin: 20px auto;
+      border: 2px solid brown;
+      border-radius: 10px;
+      box-sizing: border-box;
     }
-    .photo { width: 96px; border-radius: 50%; }
-    .details { border-top: 2px dashed #8b5a2b; padding-top: 12px; }
+
+## How the layers add up
+Without border-box, width sets only the content, and padding and border are added on top: 300 + 16 + 16 + 2 + 2 = 336px. With border-box, the 300px already includes them, which makes layouts much easier to plan.
+
+margin: 20px auto means 20px on the top and bottom, and auto on the left and right. Auto side margins share the free space equally, which centres a block that has a width.
 
 ## Check with developer tools
-Press F12, hover the card and confirm the content, padding, border and margin are what you expect. Is the card exactly 320px wide thanks to border-box?"##,
-            &["Start with box-sizing: border-box.", "Use padding inside, borders around and margin outside.", "Centre fixed-width blocks with margin: 0 auto.", "Check the box layers with the developer tools."],
+Press F12, hover the card and look at the box diagram: content, padding, border and margin. Is the card exactly 300px wide?"##,
+            &["Content, padding, border and margin are the four layers of a box.", "box-sizing: border-box keeps padding and border inside the width.", "margin: 20px auto centres a block that has a width.", "border-radius rounds the corners."],
             vec![
-                quiz("Which line centres the card?", &["margin: 40px auto;", "padding: auto;", "text-align: center;"], 0, "auto side margins centre a block."),
-                fill("Separate the details with a dashed line on top.", ".details { ___: 2px dashed brown; }", &["border-top", "outline", "line-top"], 0, "border-top draws one side."),
-                quiz("With border-box, how wide is a card with width: 320px and padding: 20px?", &["320px", "360px", "280px"], 0, "Padding is included."),
+                quiz("With border-box, how wide is the whole card?", &["300px", "336px", "264px"], 0, "Padding and border fit inside the 300px."),
+                fill("Round the corners.", r##".card { border-___: 10px; }"##, &["radius", "round", "corner"], 0, "border-radius rounds the corners."),
+                quiz("What does margin: 20px auto set?", &["20px top and bottom, auto left and right", "20px on all four sides", "auto top and bottom, 20px left and right"], 0, "Two values: top/bottom first, then left/right."),
             ]),
         d("Block and Inline", r##"## The display property
 Every element has a display type that decides how it sits next to others.
@@ -747,38 +746,29 @@ Huge numbers like 99999 cause wars later. Many teams use a small scale: 1 for ra
                 fill("Bring the popup to the front.", ".popup { position: absolute; ___: 100; }", &["z-index", "layer", "z-order"], 0, "z-index sets the stacking order."),
             ]),
         d("Project: Art Gallery", r##"## Hang pictures in a gallery
-The castle gallery shows paintings with name plates, a "NEW" ribbon on the latest one, a sticky gallery title and a fixed "Buy tickets" button. This project uses every Layout skill.
+The royal gallery shows paintings in rows, each with a name label pinned to the bottom of its frame, and a menu that stays at the top while you scroll. This project uses every Layout skill.
 
 ## Plan
-- Paintings are inline-block frames so they sit in rows.
-- Each frame is position: relative so its ribbon can be placed absolutely in a corner.
-- The ribbon uses z-index to sit above the painting.
-- The room title is sticky at the top.
-- The ticket button is fixed at the bottom right.
+- Frames are inline-block, so they sit side by side in rows but can still have a width and margins.
+- Each frame is position: relative. It doesn't move, but it becomes the anchor for anything absolute inside it.
+- Each label is position: absolute with bottom: 0, so it sits on the bottom edge of its own frame.
+- The menu (nav) is sticky at top: 0.
 
-## Example
-    .frame {
-      display: inline-block;
-      position: relative;
-      margin: 12px;
-      border: 8px solid #8b5a2b;
-    }
-    .ribbon {
-      position: absolute;
-      top: -6px;
-      right: -6px;
-      z-index: 2;
-    }
-    .room-title { position: sticky; top: 0; }
-    .tickets { position: fixed; bottom: 20px; right: 20px; }
+## Build it
+    .frame { display: inline-block; position: relative; width: 150px; margin: 8px; }
+    .label { position: absolute; bottom: 0; background-color: black; color: white; }
+    nav { position: sticky; top: 0; }
+
+## The relative + absolute team
+An absolute element is placed against its nearest positioned ancestor. Because every .frame is relative, each label is pinned to its own frame. Forget position: relative on the frame, and every label would jump to the bottom of the whole page, piled on top of each other.
 
 ## Check
-Scroll the page: the title should stick while its room is visible, and the ticket button should never move. Does the ribbon stay in its frame's corner when the window is resized?"##,
-            &["inline-block places frames in rows.", "A relative parent anchors an absolute ribbon.", "z-index keeps decorations on top.", "sticky for section titles, fixed for always-visible buttons."],
+Scroll the page: does the menu stick to the top? Is every label at the bottom of its own picture?"##,
+            &["inline-block places frames in rows and keeps their size.", "A relative parent anchors its absolute children.", "bottom: 0 pins an absolute element to its anchor's bottom edge.", "sticky keeps an element in view while you scroll."],
             vec![
-                quiz("Why is each frame position: relative?", &["To anchor its absolute ribbon", "To hide it", "To make it fixed"], 0, "Relative parents anchor absolute children."),
-                fill("Keep the ticket button on screen while scrolling.", ".tickets { position: ___; bottom: 20px; }", &["fixed", "relative", "static"], 0, "fixed stays put."),
-                quiz("Which property keeps the ribbon above the painting?", &["z-index", "display", "float"], 0, "z-index controls stacking."),
+                quiz("Why is each frame position: relative?", &["So each label is pinned to its own frame", "To hide the frame", "To make it stick while scrolling"], 0, "A relative parent anchors absolute children."),
+                fill("Pin the label to the bottom edge of its frame.", r##".label { position: absolute; ___: 0; }"##, &["bottom", "down", "end"], 0, "bottom: 0 puts it on the bottom edge."),
+                quiz("What would happen without position: relative on .frame?", &["Every label would pin to the page instead of its frame", "Nothing would change", "The frames would disappear"], 0, "Absolute elements look for the nearest positioned ancestor."),
             ]),
         d("Display Flex", r##"## Flexbox: layout made easy
 Flexbox is the modern way to place items in a row or column, space them out and line them up. You turn it on for the PARENT (the flex container), and its direct children become flex items.
@@ -945,33 +935,40 @@ Combine flex-wrap: wrap with flex: 1 1 200px: each card wants 200px, grows to fi
                 fill("Let the search box take the leftover space.", ".search { flex-___: 1; }", &["grow", "shrink", "basis"], 0, "flex-grow takes extra space."),
             ]),
         d("Final Project: Monster Cards", r##"## A responsive bestiary
-Your final CSS project is a page of monster cards: a header bar, a wrapping grid of cards, and nicely aligned content inside each card. It should look good on a phone and on a wide screen.
+Your final CSS project shows the monster collection as a row of cards that wraps onto new lines, centres itself and keeps even gaps, on a phone and on a wide screen.
 
 ## Plan
-- Header: a flex row with the title on the left and a menu on the right (space-between, align-items: center).
-- Card grid: a flex container with flex-wrap: wrap and gap.
-- Each card: flex: 1 1 220px so cards fill rows and wrap, a border, rounded corners and a hard shadow.
-- Inside a card: flex-direction: column, with the "Fight" button pushed to the bottom with margin-top: auto.
+- The container (.cards) is a flex row.
+- flex-wrap: wrap lets cards move to a new line when the row is full.
+- justify-content: center centres each row.
+- gap: 16px puts even space between the cards, without margins.
+- Each card gets flex: 1, so the cards in a row share the width equally.
+- Padding, a gold frame and rounded corners finish each card.
 
-## Example
-    .grid { display: flex; flex-wrap: wrap; gap: 16px; }
-    .card {
-      flex: 1 1 220px;
+## Build it
+    .cards {
       display: flex;
-      flex-direction: column;
-      padding: 16px;
-      border: 4px solid #334155;
-      border-radius: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
     }
-    .card .fight { margin-top: auto; }
+    .card {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid gold;
+      border-radius: 8px;
+    }
+
+## Parent and children
+Flexbox always has two sides: the container decides the direction, wrapping, alignment and gaps; the items decide how they grow. Here .cards is the container and every .card is an item.
 
 ## Final review
-Resize the window: do the cards wrap without breaking? Are buttons lined up at the bottom of every card even when text lengths differ? Is the text readable on every background? You have now finished the CSS course."##,
-            &["Use flex rows for headers and wrapping flex grids for cards.", "flex: 1 1 220px makes cards fill and wrap.", "A column flex card with margin-top: auto pins a button to the bottom.", "Test by resizing the window."],
+Resize the window: do the cards share each row evenly and wrap without breaking? Is the text readable on every card? You have now finished the CSS course."##,
+            &["display: flex on the container lines its children up in a row.", "flex-wrap: wrap moves items to new lines when the row is full.", "gap spaces items evenly; justify-content aligns each row.", "flex: 1 makes items share the free space equally."],
             vec![
-                quiz("How do the cards wrap onto new rows?", &["flex-wrap: wrap on the grid", "position: absolute", "z-index"], 0, "Wrapping moves cards to new lines."),
-                fill("Push the Fight button to the bottom of the card.", ".card .fight { margin-top: ___; }", &["auto", "100%", "bottom"], 0, "An auto margin takes the free space."),
-                quiz("Which justify-content puts the title left and menu right?", &["space-between", "center", "flex-end"], 0, "space-between pushes them apart."),
+                quiz("How do the cards move onto new rows?", &["flex-wrap: wrap on .cards", "position: absolute", "z-index"], 0, "Wrapping lets items flow onto new lines."),
+                fill("Centre each row of cards.", r##".cards { justify-content: ___; }"##, &["center", "middle", "auto"], 0, "justify-content: center centres items along the row."),
+                quiz("Which element is the flex container?", &[".cards", ".card", "Each monster's name"], 0, "display: flex is on .cards, so its children are the flex items."),
             ]),
     ]
 }

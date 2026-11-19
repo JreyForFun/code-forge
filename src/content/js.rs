@@ -368,7 +368,7 @@ Prints 1, 2, 3, then stops."##, "sword"),
         p("Project: Lucky Number", &[
             (r##"CHECKPOINT PROJECT
 
-Keep rolling a 10-sided die until you hit the lucky 7. Count the tries and print how many it took."##, "gem_green"),
+Keep rolling a 10-sided die until it lands on the lucky 7. Count the tries and print how many it took."##, "gem_green"),
             (r##"let lucky = 7;
 let roll = 0;
 let tries = 0;
@@ -376,12 +376,23 @@ while (roll !== lucky) {
   roll = Math.floor(Math.random() * 10) + 1;
   tries++;
 }
-console.log(`Rolled ${lucky} after ${tries} tries`);"##, "orb_red"),
+console.log(`Rolled a ${lucky}! Tries: ${tries}`);"##, "orb_red"),
         ], vec![
-            fill("Loop until it matches.", "while (roll ___ lucky) {", &["!==", "===", "<"], 0, "Keep going while NOT equal."),
-            fill("Count each try.", "  ___;", &["tries++", "tries", "++"], 0, "tries++ adds one."),
-            copy("Roll for luck.", "let lucky = 7;\nlet roll = 0;\nlet tries = 0;\nwhile (roll !== lucky) {\n  roll = Math.floor(Math.random() * 10) + 1;\n  tries++;\n}\nconsole.log(`Rolled ${lucky} after ${tries} tries`);", "A different count each time!"),
-            recall("From memory: add 1 + 2 + 3 with a for loop into total, then print total.", "let total = 0;\nfor (let i = 1; i <= 3; i++) {\n  total += i;\n}\nconsole.log(total);", "6"),
+            fill("Loop until it matches.", r##"while (roll ___ lucky) {"##, &["!==", "===", "<"], 0, "Keep going while the roll is NOT the lucky number."),
+            fill("Count each try.", r##"  ___;"##, &["tries++", "tries", "++"], 0, "tries++ adds one to the counter."),
+            copy("Roll for luck.", r##"let lucky = 7;
+let roll = 0;
+let tries = 0;
+while (roll !== lucky) {
+  roll = Math.floor(Math.random() * 10) + 1;
+  tries++;
+}
+console.log(`Rolled a ${lucky}! Tries: ${tries}`);"##, "A different count each time!"),
+            recall("From memory: let n = 0; while n !== 3, add 1 to n with n++; then print n.", r##"let n = 0;
+while (n !== 3) {
+  n++;
+}
+console.log(n);"##, "Prints 3."),
         ]),
     ])
 }
@@ -774,18 +785,37 @@ list.innerHTML = "<li>Gem</li>";"##, "chest"),
         p("Final Project: Mood Ring", &[
             (r##"FINAL PROJECT
 
-The Mood Ring glows a random color with a matching mood. Pick a random index and change the ring's background and text."##, "amulet"),
+The Mood Ring glows a random colour with a matching mood every time you press Spin. Store the moods, write a function that changes the ring, and connect it to the button."##, "amulet"),
             (r##"const ring = document.getElementById("ring");
 const moods = ["calm", "happy", "fierce"];
-const colors = ["blue", "gold", "red"];
-let pick = Math.floor(Math.random() * moods.length);
-ring.style.backgroundColor = colors[pick];
-ring.textContent = `You feel ${moods[pick]}`;"##, "crystal_blue"),
+const colors = ["teal", "gold", "crimson"];
+function setMood(pick) {
+  ring.style.backgroundColor = colors[pick];
+  ring.textContent = `You feel ${moods[pick]}`;
+}
+const btn = document.getElementById("spin");
+btn.addEventListener("click", () => {
+  setMood(Math.floor(Math.random() * moods.length));
+});"##, "crystal_blue"),
         ], vec![
-            fill("A random index for the array.", "let pick = Math.floor(Math.random() * moods.___);", &["length", "size", "count"], 0, ".length."),
-            fill("Change the glow.", "ring.style.___ = colors[pick];", &["backgroundColor", "background-color", "bg"], 0, "camelCase in JS."),
-            copy("Build the ring.", "const ring = document.getElementById(\"ring\");\nconst moods = [\"calm\", \"happy\", \"fierce\"];\nconst colors = [\"blue\", \"gold\", \"red\"];\nlet pick = Math.floor(Math.random() * moods.length);\nring.style.backgroundColor = colors[pick];\nring.textContent = `You feel ${moods[pick]}`;", "HTML + CSS + JS: the trifecta!"),
-            recall("From memory: get #ring into r and set r.style.color to blue.", "const r = document.getElementById(\"ring\");\nr.style.color = \"blue\";", "style.color = \"blue\""),
+            fill("A random index for the moods array.", r##"setMood(Math.floor(Math.random() * moods.___));"##, &["length", "size", "count"], 0, ".length is how many moods there are."),
+            fill("Change the glow.", r##"ring.style.___ = colors[pick];"##, &["backgroundColor", "background-color", "bg"], 0, "CSS names are camelCase in JavaScript."),
+            copy("Build the ring.", r##"const ring = document.getElementById("ring");
+const moods = ["calm", "happy", "fierce"];
+const colors = ["teal", "gold", "crimson"];
+function setMood(pick) {
+  ring.style.backgroundColor = colors[pick];
+  ring.textContent = `You feel ${moods[pick]}`;
+}
+const btn = document.getElementById("spin");
+btn.addEventListener("click", () => {
+  setMood(Math.floor(Math.random() * moods.length));
+});"##, "HTML + CSS + JS: the trifecta!"),
+            recall("From memory: get #ring into r and #spin into b; when b is clicked, set r.style.backgroundColor to \"gold\".", r##"const r = document.getElementById("ring");
+const b = document.getElementById("spin");
+b.addEventListener("click", () => {
+  r.style.backgroundColor = "gold";
+});"##, "A click changes the style."),
         ]),
     ])
 }

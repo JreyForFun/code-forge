@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum V { N(f64), S(String), B(bool), L(Vec<V>), O(Vec<(String, V)>), Nil }
+pub enum V { N(f64), /** a Python float (10.0 prints as 10.0) */ F(f64), S(String), B(bool), L(Vec<V>), O(Vec<(String, V)>), Nil }
 
 /// Output line kinds. `Table` holds rows joined by '\n' with cells split by '\x1f' (first row = header);
 /// `Styled` holds a css::Style encoding; `Page` is a simulated web page change.
@@ -22,12 +22,18 @@ const MAX_LIST: usize = 10_000;
 const EL: &str = "__el";
 const STYLE: &str = "__style";
 
+/// How Python prints a float: 10.0, 2.5, 55.00000000000001.
+fn float_str(n: f64) -> String {
+    if n.is_nan() { "nan".into() } else if n.is_infinite() { if n > 0.0 { "inf".into() } else { "-inf".into() } }
+    else if n.fract() == 0.0 && n.abs() < 1e16 { format!("{}.0", n as i64) } else { format!("{}", n) }
+}
+
 fn num_str(n: f64) -> String {
     if n.fract() == 0.0 && n.abs() < 1e15 { format!("{}", n as i64) } else { let s = format!("{:.10}", n); s.trim_end_matches('0').trim_end_matches('.').to_string() }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum T { Num(f64), Str(String), Tpl(String, bool), Id(String), Op(String) }
+enum T { Num(f64), Flt(f64), Str(String), Tpl(String, bool), Id(String), Op(String) }
 
 fn lex(s: &str) -> Result<Vec<T>, String> {
     let c: Vec<char> = s.chars().collect();
@@ -53,7 +59,9 @@ fn lex(s: &str) -> Result<Vec<T>, String> {
         else if ch.is_ascii_digit() || (ch == '.' && i + 1 < c.len() && c[i + 1].is_ascii_digit()) {
             let st = i;
             while i < c.len() && (c[i].is_ascii_digit() || c[i] == '.') { i += 1; }
-            out.push(T::Num(c[st..i].iter().collect::<String>().parse().map_err(|_| "bad number".to_string())?));
+            let lit: String = c[st..i].iter().collect();
+            let n = lit.parse().map_err(|_| "bad number".to_string())?;
+            out.push(if lit.contains('.') { T::Flt(n) } else { T::Num(n) });
         } else if (ch == 'f' || ch == 'F') && i + 1 < c.len() && (c[i + 1] == '"' || c[i + 1] == '\'') && (i == 0 || !(c[i - 1].is_alphanumeric() || c[i - 1] == '_')) {
             i += 1;
             let q = c[i];
@@ -78,12 +86,16 @@ fn lex(s: &str) -> Result<Vec<T>, String> {
     Ok(out)
 }
 
+/// Result of arithmetic on `l` and `r`: a Python float when either side is one, else a plain number.
+fn arith(js: bool, l: &V, r: &V, x: f64) -> V { if !js && (matches!(l, V::F(_)) || matches!(r, V::F(_))) { V::F(x) } else { V::N(x) } }
+fn is_num(v: &V) -> bool { matches!(v, V::N(_) | V::F(_)) }
+
 fn truthy(v: &V) -> bool {
-    match v { V::N(n) => *n != 0.0, V::S(s) => !s.is_empty(), V::B(b) => *b, V::L(l) => !l.is_empty(), V::O(_) => true, V::Nil => false }
+    match v { V::N(n) | V::F(n) => *n != 0.0, V::S(s) => !s.is_empty(), V::B(b) => *b, V::L(l) => !l.is_empty(), V::O(_) => true, V::Nil => false }
 }
 fn num(v: &V) -> Result<f64, String> {
     match v {
-        V::N(n) => Ok(*n),
+        V::N(n) | V::F(n) => Ok(*n),
         V::B(b) => Ok(*b as i32 as f64),
         V::S(s) => s.trim().parse().map_err(|_| format!("'{}' is not a number", s)),
         V::L(_) => Err("a list is not a number".into()),
@@ -343,13 +355,13 @@ impl<'a, 'l> Ev<'a, 'l> {
             if self.op(o) {
                 let r = self.add()?;
                 let ord = match (&l, &r) {
-                    (V::N(a), V::N(b)) => a.partial_cmp(b),
+                    (a, b) if is_num(a) && is_num(b) => num(a).ok().partial_cmp(&num(b).ok()),
                     (V::S(a), V::S(b)) => a.partial_cmp(b),
                     (V::N(a), V::S(b)) | (V::S(b), V::N(a)) if self.r.js && (o == "<" || o == ">" || o == "<=" || o == ">=") => b.trim().parse::<f64>().ok().and_then(|bn| if matches!(l, V::N(_)) { a.partial_cmp(&bn) } else { bn.partial_cmp(a) }),
                     _ => None,
                 };
                 let loose = o == "==" || o == "!=";
-                let eq = l == r || (self.r.js && loose && match (&l, &r) { (V::N(a), V::S(b)) | (V::S(b), V::N(a)) => b.trim().parse::<f64>().map(|x| x == *a).unwrap_or(false), _ => false });
+                let eq = l == r || (is_num(&l) && is_num(&r) && num(&l).ok() == num(&r).ok()) || (self.r.js && loose && match (&l, &r) { (V::N(a), V::S(b)) | (V::S(b), V::N(a)) => b.trim().parse::<f64>().map(|x| x == *a).unwrap_or(false), _ => false });
                 use std::cmp::Ordering::*;
                 return Ok(V::B(match o {
                     "==" | "===" => eq,
@@ -369,39 +381,39 @@ impl<'a, 'l> Ev<'a, 'l> {
             if self.op("+") {
                 let r = self.mul()?;
                 l = match (&l, &r) {
-                    (V::N(a), V::N(b)) => V::N(a + b),
+                    (a, b) if is_num(a) && is_num(b) => arith(self.r.js, a, b, num(a)? + num(b)?),
                     (V::L(a), V::L(b)) => V::L(a.iter().chain(b.iter()).cloned().collect()),
                     (V::S(_), _) | (_, V::S(_)) => {
                         if !self.r.js && !(matches!(l, V::S(_)) && matches!(r, V::S(_))) { return Err("can only join text with text (use str() to convert a number)".into()); }
                         V::S(format!("{}{}", self.r.show(&l), self.r.show(&r)))
                     }
-                    _ => V::N(num(&l)? + num(&r)?),
+                    _ => arith(self.r.js, &l, &r, num(&l)? + num(&r)?),
                 };
             } else if self.op("-") {
                 let r = self.mul()?;
-                l = V::N(num(&l)? - num(&r)?);
+                l = arith(self.r.js, &l, &r, num(&l)? - num(&r)?);
             } else { return Ok(l); }
         }
     }
     fn mul(&mut self) -> Result<V, String> {
         let mut l = self.un()?;
         loop {
-            if self.op("**") { let r = self.un()?; l = V::N(num(&l)?.powf(num(&r)?)); }
+            if self.op("**") { let r = self.un()?; let (a, b) = (num(&l)?, num(&r)?); l = if !self.r.js && b < 0.0 { V::F(a.powf(b)) } else { arith(self.r.js, &l, &r, a.powf(b)) }; }
             else if self.op("*") {
                 let r = self.un()?;
                 l = match (&l, &r) {
                     (V::S(s), V::N(n)) | (V::N(n), V::S(s)) if !self.r.js => V::S(s.repeat((n.max(0.0) as usize).min(MAX_LIST))),
-                    _ => V::N(num(&l)? * num(&r)?),
+                    _ => arith(self.r.js, &l, &r, num(&l)? * num(&r)?),
                 };
-            } else if self.op("//") { let r = self.un()?; let d = num(&r)?; if d == 0.0 { return Err("division by zero".into()); } l = V::N((num(&l)? / d).floor()); }
-            else if self.op("/") { let r = self.un()?; let d = num(&r)?; if d == 0.0 { if self.r.js { l = V::N(f64::INFINITY); continue; } return Err("division by zero".into()); } l = V::N(num(&l)? / d); }
-            else if self.op("%") { let r = self.un()?; let d = num(&r)?; if d == 0.0 { return Err("division by zero".into()); } let a = num(&l)?; l = V::N(if self.r.js { a % d } else { a - d * (a / d).floor() }); }
+            } else if self.op("//") { let r = self.un()?; let d = num(&r)?; if d == 0.0 { return Err("division by zero".into()); } l = arith(self.r.js, &l, &r, (num(&l)? / d).floor()); }
+            else if self.op("/") { let r = self.un()?; let d = num(&r)?; if d == 0.0 { if self.r.js { l = V::N(f64::INFINITY); continue; } return Err("division by zero".into()); } let q = num(&l)? / d; l = if self.r.js { V::N(q) } else { V::F(q) }; }
+            else if self.op("%") { let r = self.un()?; let d = num(&r)?; if d == 0.0 { return Err("division by zero".into()); } let a = num(&l)?; l = arith(self.r.js, &l, &r, if self.r.js { a % d } else { a - d * (a / d).floor() }); }
             else { return Ok(l); }
         }
     }
     fn un(&mut self) -> Result<V, String> {
-        if self.op("-") { let v = self.un()?; return Ok(V::N(-num(&v)?)); }
-        if self.op("+") { let v = self.un()?; return Ok(V::N(num(&v)?)); }
+        if self.op("-") { let v = self.un()?; return Ok(match v { V::F(x) => V::F(-x), _ => V::N(-num(&v)?) }); }
+        if self.op("+") { let v = self.un()?; return Ok(match v { V::F(x) => V::F(x), _ => V::N(num(&v)?) }); }
         if self.op("!") { let v = self.un()?; return Ok(V::B(!truthy(&v))); }
         if self.kw("typeof") { let v = self.un()?; return Ok(V::S(self.r.type_name(&v))); }
         let mut v = self.prim()?;
@@ -454,8 +466,16 @@ impl<'a, 'l> Ev<'a, 'l> {
                 while i < c.len() { if c[i] == '{' { d += 1; } else if c[i] == '}' { d -= 1; if d == 0 { break; } } i += 1; }
                 if i >= c.len() { return Err("a { in the text is never closed".into()); }
                 let inner: String = c[st..i].iter().collect();
-                let v = self.r.eval(&inner)?;
-                out.push_str(&self.r.show(&v));
+                // {value:.2f} -> fixed decimals (Python only)
+                let spec = if py { inner.rsplit_once(':').filter(|(_, sp)| sp.starts_with('.') && sp.ends_with('f') && sp[1..sp.len() - 1].chars().all(|d| d.is_ascii_digit()) && sp.len() > 2) } else { None };
+                if let Some((expr, sp)) = spec {
+                    let v = self.r.eval(expr)?;
+                    let d: usize = sp[1..sp.len() - 1].parse().unwrap_or(2);
+                    out.push_str(&format!("{:.*}", d.min(10), num(&v)?));
+                } else {
+                    let v = self.r.eval(&inner)?;
+                    out.push_str(&self.r.show(&v));
+                }
                 i += 1;
             } else if py && c[i] == '{' { out.push('{'); i += 2; } else if py && c[i] == '}' && i + 1 < c.len() && c[i + 1] == '}' { out.push('}'); i += 2; } else { out.push(c[i]); i += 1; }
         }
@@ -466,6 +486,7 @@ impl<'a, 'l> Ev<'a, 'l> {
         self.i += 1;
         match t {
             T::Num(n) => Ok(V::N(n)),
+            T::Flt(n) => Ok(if self.r.js { V::N(n) } else { V::F(n) }),
             T::Str(s) => Ok(V::S(s)),
             T::Tpl(s, py) => self.template(&s, py),
             T::Op(o) if o == "(" => { let v = self.expr()?; if !self.op(")") { return Err("missing )".into()); } Ok(v) }
@@ -536,7 +557,7 @@ fn slice(v: &V, start: Option<&V>, end: Option<&V>) -> Result<V, String> {
 
 fn index(v: &V, idx: &V) -> Result<V, String> {
     match (v, idx) {
-        (V::O(o), k) => { let k = match k { V::S(s) => s.clone(), V::N(n) => num_str(*n), _ => return Err("bad key".into()) }; Ok(field(o, &k).cloned().unwrap_or(V::Nil)) }
+        (V::O(o), k) => { let k = match k { V::S(s) => s.clone(), V::N(n) | V::F(n) => num_str(*n), _ => return Err("bad key".into()) }; Ok(field(o, &k).cloned().unwrap_or(V::Nil)) }
         (V::L(l), _) => { let k = num(idx)?; let i = if k < 0.0 { l.len() as f64 + k } else { k }; l.get(i as usize).cloned().filter(|_| i >= 0.0 && i.fract() == 0.0).ok_or_else(|| "index out of range".to_string()) }
         (V::S(s), _) => { let k = num(idx)?; let ch: Vec<char> = s.chars().collect(); let i = if k < 0.0 { ch.len() as f64 + k } else { k }; ch.get(i as usize).filter(|_| i >= 0.0).map(|c| V::S(c.to_string())).ok_or_else(|| "index out of range".to_string()) }
         _ => Err("only lists, text and objects can be indexed".into()),
@@ -549,6 +570,7 @@ impl<'l> Run<'l> {
         let q = |x: &V| match x { V::S(s) if d < 8 => format!("'{}'", s), o => self.show_d(o, d + 1) };
         match v {
             V::N(n) => if n.is_infinite() { if *n > 0.0 { "Infinity".into() } else { "-Infinity".into() } } else { num_str(*n) },
+            V::F(n) => float_str(*n),
             V::S(s) => s.clone(),
             V::B(b) => if self.js { b.to_string() } else if *b { "True".into() } else { "False".into() },
             V::Nil => if self.js { "undefined".into() } else { "None".into() },
@@ -567,7 +589,7 @@ impl<'l> Run<'l> {
     fn type_name(&self, v: &V) -> String {
         let js = self.js;
         if let V::O(o) = v && let Some(V::S(c)) = field(o, CLASS) { return c.clone(); }
-        match v { V::N(n) => if js { "number" } else if n.fract() == 0.0 { "int" } else { "float" }, V::S(_) => if js { "string" } else { "str" }, V::B(_) => if js { "boolean" } else { "bool" },
+        match v { V::N(n) => if js { "number" } else if n.fract() == 0.0 { "int" } else { "float" }, V::F(_) => if js { "number" } else { "float" }, V::S(_) => if js { "string" } else { "str" }, V::B(_) => if js { "boolean" } else { "bool" },
             V::L(_) => if js { "object" } else { "list" }, V::O(_) => if js { "object" } else { "dict" }, V::Nil => if js { "undefined" } else { "NoneType" } }.into()
     }
     fn random(&mut self) -> f64 {
@@ -682,23 +704,26 @@ impl<'l> Run<'l> {
             "str" | "String" => V::S(self.show(&arg0()?)),
             "int" | "parseInt" | "Math.trunc" => V::N(n(0)?.trunc()),
             "Math.floor" => V::N(n(0)?.floor()),
-            "float" | "Number" | "parseFloat" => V::N(n(0)?),
-            "abs" | "Math.abs" => V::N(n(0)?.abs()),
-            "round" if a.len() == 2 => { let p = 10f64.powi(n(1)? as i32); V::N((n(0)? * p).round() / p) }
-            "round" | "Math.round" => V::N(n(0)?.round()),
+            "float" => if self.js { V::N(n(0)?) } else { V::F(n(0)?) },
+            "Number" | "parseFloat" => V::N(n(0)?),
+            "abs" | "Math.abs" => match arg0()? { V::F(x) => V::F(x.abs()), _ => V::N(n(0)?.abs()) },
+            "round" if a.len() == 2 => { let p = 10f64.powi(n(1)? as i32); let x = (n(0)? * p).round() / p; if self.js { V::N(x) } else { V::F(x) } }
+            "round" | "Math.round" => V::N(if self.js { (n(0)? + 0.5).floor() } else { n(0)?.round_ties_even() }), // Python rounds halves to even; JS rounds them up
             "enumerate" => match arg0()? { V::L(l) => V::L(l.into_iter().enumerate().map(|(i, x)| V::L(vec![V::N(i as f64), x])).collect()), V::S(s) => V::L(s.chars().enumerate().map(|(i, c)| V::L(vec![V::N(i as f64), V::S(c.to_string())])).collect()), _ => return Err("enumerate() needs a list".into()) },
             "bool" => V::B(truthy(&arg0()?)),
             "isinstance" => { let (o, c) = (arg0()?, a.get(1).cloned().unwrap_or(V::Nil)); V::B(self.type_name(&o) == self.show(&c).trim_start_matches("[class ").trim_end_matches(']')) }
             "Math.sqrt" => V::N(n(0)?.sqrt()),
             "Math.ceil" => V::N(n(0)?.ceil()),
-            "Math.pow" | "pow" => V::N(n(0)?.powf(n(1)?)),
+            "Math.pow" | "pow" => { let (x, y) = (n(0)?, n(1)?); if self.js { V::N(x.powf(y)) } else { arith(false, &a[0], &a[1], x.powf(y)) } }
             "Math.random" => V::N(self.random()),
             "max" | "Math.max" | "min" | "Math.min" => {
                 let vals: Vec<f64> = match a.as_slice() { [V::L(l)] => l.iter().map(num).collect::<Result<_, _>>()?, _ => a.iter().map(num).collect::<Result<_, _>>()? };
                 if vals.is_empty() { return Err(format!("{}() needs values", f)); }
-                V::N(if f.ends_with("max") { vals.iter().cloned().fold(f64::MIN, f64::max) } else { vals.iter().cloned().fold(f64::MAX, f64::min) })
+                let x = if f.ends_with("max") { vals.iter().cloned().fold(f64::MIN, f64::max) } else { vals.iter().cloned().fold(f64::MAX, f64::min) };
+                let floats = match a.as_slice() { [V::L(l)] => l.iter().any(|v| matches!(v, V::F(_))), _ => a.iter().any(|v| matches!(v, V::F(_))) };
+                if floats && !self.js { V::F(x) } else { V::N(x) }
             }
-            "sum" => match arg0()? { V::L(l) => V::N(l.iter().map(num).sum::<Result<f64, String>>()?), _ => return Err("sum() needs a list".into()) },
+            "sum" => match arg0()? { V::L(l) => { let t = l.iter().map(num).sum::<Result<f64, String>>()?; if l.iter().any(|v| matches!(v, V::F(_))) { V::F(t) } else { V::N(t) } } _ => return Err("sum() needs a list".into()) },
             "type" => V::S(self.type_name(&arg0()?)),
             "list" => match arg0()? { V::S(s) => V::L(s.chars().map(|c| V::S(c.to_string())).collect()), V::L(l) => V::L(l), _ => return Err("list() needs text or a list".into()) },
             "range" => { let (s, e) = if a.len() >= 2 { (n(0)?, n(1)?) } else { (0.0, n(0)?) }; V::L((0..((e - s).max(0.0) as usize).min(MAX_LIST)).map(|k| V::N(s + k as f64)).collect()) }
@@ -777,12 +802,12 @@ impl<'l> Run<'l> {
     fn call_module(&mut self, q: &str, a: Vec<V>) -> Result<V, String> {
         let n = |i: usize| -> Result<f64, String> { num(a.get(i).ok_or_else(|| format!("{}() needs a value", q))?) };
         Ok(match q {
-            "math.sqrt" => { let x = n(0)?; if x < 0.0 { return Err("math.sqrt() needs a number that is not negative".into()); } V::N(x.sqrt()) }
+            "math.sqrt" => { let x = n(0)?; if x < 0.0 { return Err("math.sqrt() needs a number that is not negative".into()); } V::F(x.sqrt()) }
             "math.floor" => V::N(n(0)?.floor()),
             "math.ceil" => V::N(n(0)?.ceil()),
-            "math.fabs" => V::N(n(0)?.abs()),
-            "math.pow" => V::N(n(0)?.powf(n(1)?)),
-            "random.random" => V::N(self.random()),
+            "math.fabs" => V::F(n(0)?.abs()),
+            "math.pow" => V::F(n(0)?.powf(n(1)?)),
+            "random.random" => V::F(self.random()),
             "random.randint" => { let (lo, hi) = (n(0)?.floor(), n(1)?.floor()); if hi < lo { return Err("randint(a, b) needs a <= b".into()); } V::N(lo + (self.random() * (hi - lo + 1.0)).floor()) }
             "random.choice" => match a.first() { Some(V::L(l)) if !l.is_empty() => { let k = (self.random() * l.len() as f64) as usize; l[k.min(l.len() - 1)].clone() } Some(V::S(s)) if !s.is_empty() => { let ch: Vec<char> = s.chars().collect(); V::S(ch[(self.random() * ch.len() as f64) as usize % ch.len()].to_string()) } _ => return Err("random.choice() needs a list that is not empty".into()) },
             _ => return Err(format!("{} is not available here", q)),
@@ -858,7 +883,7 @@ impl<'l> Run<'l> {
                     "clear" => { l.clear(); V::Nil }
                     "shift" => if l.is_empty() { V::Nil } else { l.remove(0) },
                     "reverse" => { l.reverse(); V::Nil }
-                    _ => { l.sort_by(|x, y| match (x, y) { (V::N(a), V::N(b)) => a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal), _ => self.show(x).cmp(&self.show(y)) }); V::Nil }
+                    _ => { l.sort_by(|x, y| match (x, y) { (a, b) if is_num(a) && is_num(b) => num(a).unwrap_or(0.0).partial_cmp(&num(b).unwrap_or(0.0)).unwrap_or(std::cmp::Ordering::Equal), _ => self.show(x).cmp(&self.show(y)) }); V::Nil }
                 };
                 let out = if m == "reverse" || m == "sort" { V::L(l.clone()) } else { ret };
                 self.set_path(&p, V::L(l))?;
@@ -1102,13 +1127,13 @@ impl<'l> Run<'l> {
                 let cur = self.get_path(n)?;
                 let rv = self.eval(r)?;
                 let nv = match (o, &cur, &rv) {
-                    ("+=", V::N(a), V::N(b)) => V::N(a + b),
+                    ("+=", a, b) if is_num(a) && is_num(b) => arith(self.js, a, b, num(a)? + num(b)?),
                     ("+=", V::L(a), V::L(b)) => V::L(a.iter().chain(b).cloned().collect()),
                     ("+=", _, _) => V::S(format!("{}{}", self.show(&cur), self.show(&rv))),
-                    ("-=", _, _) => V::N(num(&cur)? - num(&rv)?),
-                    ("*=", _, _) => V::N(num(&cur)? * num(&rv)?),
-                    ("%=", _, _) => V::N(num(&cur)? % num(&rv)?),
-                    _ => { let d = num(&rv)?; if d == 0.0 { return Err("division by zero".into()); } V::N(num(&cur)? / d) }
+                    ("-=", _, _) => arith(self.js, &cur, &rv, num(&cur)? - num(&rv)?),
+                    ("*=", _, _) => arith(self.js, &cur, &rv, num(&cur)? * num(&rv)?),
+                    ("%=", _, _) => arith(self.js, &cur, &rv, num(&cur)? % num(&rv)?),
+                    _ => { let d = num(&rv)?; if d == 0.0 { return Err("division by zero".into()); } let q = num(&cur)? / d; if self.js { V::N(q) } else { V::F(q) } }
                 };
                 return self.set_path(n, nv);
             }
@@ -1598,7 +1623,7 @@ mod tests_v3 {
     fn python_defaults_modules_and_classes() {
         assert_eq!(o("def heal(hp, amount=10):\n    return hp + amount\nprint(heal(5), heal(5, 1))"), ["15 6"]);
         assert!(o("def f(a):\n    return a\nprint(f())")[0].starts_with('!'));
-        assert_eq!(o("import math\nprint(math.sqrt(16), math.floor(2.7))"), ["4 2"]);
+        assert_eq!(o("import math\nprint(math.sqrt(16), math.floor(2.7))"), ["4.0 2"], "sqrt gives a float, floor an int");
         assert_eq!(o("from math import pi\nprint(round(pi, 2))"), ["3.14"]);
         assert!(o("print(math.sqrt(4))")[0].contains("import math"));
         assert_eq!(o("import random\nr = random.randint(1, 6)\nprint(r >= 1 and r <= 6)"), ["True"]);
@@ -1607,5 +1632,15 @@ mod tests_v3 {
         let two = "class Slime:\n    hp = 10\n    def hit(self, d):\n        self.hp -= d\n        return self.hp\ns1 = Slime()\ns2 = Slime()\nprint(s1.hit(3))\nprint(s1.hp, s2.hp)";
         assert_eq!(o(two), ["7", "7 10"]);
         assert!(o("class A:\n    def go():\n        pass")[0].contains("self"));
+    }
+
+    #[test]
+    fn python_floats_print_like_python() {
+        assert_eq!(o("print(30 / 3, 7 / 2, 7 // 2, 2 ** 3, 2 ** -1, 1.5 * 2)"), ["10.0 3.5 3 8 0.5 3.0"]);
+        assert_eq!(o("print(10 == 10.0, type(4 / 2), type(4), int(7 / 2), float(3))"), ["True float int 3 3.0"]);
+        assert_eq!(o("x = 5\nx /= 2\ny = 2\ny += 0.5\nprint(x, y, [1.0, 2], sum([1, 2.5]), round(2.567, 2), round(2.5))"), ["2.5 2.5 [1.0, 2] 3.5 2.57 2"]);
+        assert_eq!(o("def share(t, p):\n    return t / p\nprint(f\"{share(40, 4):.2f} gold\", share(30, 3))"), ["10.00 gold 10.0"]);
+        // JavaScript keeps a single number type
+        assert_eq!(super::run("javascript", "console.log(30 / 3, 1.5 * 2)").into_iter().map(|x| x.1).collect::<Vec<_>>(), ["10 3"]);
     }
 }

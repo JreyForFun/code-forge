@@ -362,16 +362,17 @@ z-index works on positioned elements (not static)."##, "potion_magic"),
         p("Project: Art Gallery", &[
             (r##"CHECKPOINT PROJECT
 
-Lay out the royal art gallery: framed pictures in a row, labels pinned to each frame, and a sticky menu."##, "amulet"),
-            (r##".gallery { position: relative; }
-.frame { display: inline-block; width: 150px; margin: 8px; }
+Lay out the royal art gallery: framed pictures in a row, a name label pinned to the bottom of each frame, and a menu that sticks to the top."##, "amulet"),
+            (r##".frame { display: inline-block; position: relative; width: 150px; margin: 8px; }
 .label { position: absolute; bottom: 0; background-color: black; color: white; }
 nav { position: sticky; top: 0; }"##, "crystal_blue"),
         ], vec![
-            fill("Frames side by side.", ".frame { display: ___; }", &["inline-block", "none", "block"], 0, "inline-block."),
-            fill("Keep the menu visible.", "nav { position: ___; top: 0; }", &["sticky", "relative", "static"], 0, "sticky."),
-            copy("Lay out the gallery.", ".gallery { position: relative; }\n.frame { display: inline-block; width: 150px; margin: 8px; }\n.label { position: absolute; bottom: 0; background-color: black; color: white; }\nnav { position: sticky; top: 0; }", "Flow, absolute and sticky together."),
-            recall("From memory: .frame with display inline-block.", ".frame { display: inline-block; }", ".frame { display: inline-block; }"),
+            fill("Frames side by side.", r##".frame { display: ___; }"##, &["inline-block", "none", "block"], 0, "inline-block sits in a row but keeps its width."),
+            fill("Keep the menu visible.", r##"nav { position: ___; top: 0; }"##, &["sticky", "relative", "static"], 0, "sticky stays in view while you scroll."),
+            copy("Lay out the gallery.", r##".frame { display: inline-block; position: relative; width: 150px; margin: 8px; }
+.label { position: absolute; bottom: 0; background-color: black; color: white; }
+nav { position: sticky; top: 0; }"##, "Flow, relative + absolute, and sticky together."),
+            recall("From memory: .frame with display inline-block.", r##".frame { display: inline-block; }"##, ".frame { display: inline-block; }"),
         ]),
     ])
 }
